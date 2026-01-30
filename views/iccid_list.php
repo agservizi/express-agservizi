@@ -11,6 +11,13 @@ $buildPageUrl = static function (int $pageNo): string {
         'page_no' => $pageNo,
     ]);
 };
+$formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): string {
+    if ($value === null || $value === '') {
+        return '—';
+    }
+    $timestamp = strtotime($value);
+    return $timestamp !== false ? date($pattern, $timestamp) : '—';
+};
 ?>
 <section
     class="page"
@@ -49,7 +56,7 @@ $buildPageUrl = static function (int $pageNo): string {
                             <td><?= htmlspecialchars((string) $row['iccid']) ?></td>
                             <td><?= htmlspecialchars((string) $row['provider_name']) ?></td>
                             <td><?= htmlspecialchars((string) $row['status']) ?></td>
-                            <td><?= htmlspecialchars((string) $row['updated_at']) ?></td>
+                            <td><?= htmlspecialchars($formatDate($row['updated_at'] ?? null)) ?></td>
                             <td><?= htmlspecialchars((string) ($row['notes'] ?? '')) ?></td>
                         </tr>
                     <?php endforeach; ?>

@@ -26,6 +26,16 @@ declare(strict_types=1);
  * @var array{client_id:string, client_secret:string}|null $ssoSecretPreview
  * @var bool $ssoOpen
  * @var int $ssoTokenTtl
+ * @var array<string, mixed> $pdaSettings
+ * @var array{success:bool,message:string,errors?:array<int,string>}|null $pdaFeedback
+ * @var bool $pdaOpen
+ * @var array<string, mixed> $receiptSettings
+ * @var array{success:bool,message:string,errors?:array<int,string>}|null $receiptFeedback
+ * @var bool $receiptOpen
+ * @var array<int, array<string, mixed>> $energyProviders
+ * @var array{last_run?:int,last_started?:int,last_status?:string,last_message?:string,last_output?:string} $energyOffersImportStatus
+ * @var array{success:bool,message:string,errors?:array<int,string>}|null $energyFeedback
+ * @var bool $energyOpen
  */
 $pageTitle = $pageTitle ?? 'Impostazioni';
 $roles = $roles ?? [];
@@ -65,6 +75,38 @@ $ssoFeedback = isset($ssoFeedback) && is_array($ssoFeedback) ? $ssoFeedback : nu
 $ssoSecretPreview = isset($ssoSecretPreview) && is_array($ssoSecretPreview) ? $ssoSecretPreview : null;
 $ssoOpen = isset($ssoOpen) ? (bool) $ssoOpen : false;
 $ssoTokenTtl = isset($ssoTokenTtl) ? (int) $ssoTokenTtl : 0;
+$pdaSettings = isset($pdaSettings) && is_array($pdaSettings) ? $pdaSettings : [];
+$pdaFeedback = isset($pdaFeedback) && is_array($pdaFeedback) ? $pdaFeedback : null;
+$pdaOpen = isset($pdaOpen) ? (bool) $pdaOpen : false;
+$pdaOpen = $pdaOpen || $pdaFeedback !== null;
+$pdaOcr = $pdaSettings['ocr'] ?? ['enabled' => true, 'min_chars' => 200, 'lang' => 'ita'];
+$pdaTemplatesJson = $pdaSettings['templates_json'] ?? '{}';
+$receiptSettings = isset($receiptSettings) && is_array($receiptSettings) ? $receiptSettings : [];
+$receiptFeedback = isset($receiptFeedback) && is_array($receiptFeedback) ? $receiptFeedback : null;
+$receiptOpen = isset($receiptOpen) ? (bool) $receiptOpen : false;
+$receiptOpen = $receiptOpen || $receiptFeedback !== null;
+$energyProviders = isset($energyProviders) && is_array($energyProviders) ? $energyProviders : [];
+$energyOffersImportStatus = isset($energyOffersImportStatus) && is_array($energyOffersImportStatus) ? $energyOffersImportStatus : [];
+$energyFeedback = isset($energyFeedback) && is_array($energyFeedback) ? $energyFeedback : null;
+$energyOpen = isset($energyOpen) ? (bool) $energyOpen : false;
+$energyOpen = $energyOpen || $energyFeedback !== null;
+$receiptHeaderLines = $receiptSettings['header_lines'] ?? [];
+if (!is_array($receiptHeaderLines)) {
+    $receiptHeaderLines = [];
+}
+$receiptHeaderText = implode("\n", array_filter(array_map('trim', $receiptHeaderLines)));
+$receiptDocumentTitle = (string) ($receiptSettings['document_title'] ?? 'DOCUMENTO GESTIONALE');
+$receiptDocumentNumberTemplate = (string) ($receiptSettings['document_number_template'] ?? '{{document_title}} #{{sale_id}}');
+$receiptThanksText = (string) ($receiptSettings['thanks_text'] ?? 'Grazie per il tuo acquisto!');
+$receiptFooterText = (string) ($receiptSettings['footer_text'] ?? '');
+$receiptLabels = $receiptSettings['labels'] ?? [];
+if (!is_array($receiptLabels)) {
+    $receiptLabels = [];
+}
+$receiptStatusLabels = $receiptSettings['status_labels'] ?? [];
+if (!is_array($receiptStatusLabels)) {
+    $receiptStatusLabels = [];
+}
 if (!$fiscalOpen && $feedback !== null) {
     $messagesToInspect = [];
     if (isset($feedback['message'])) {
@@ -418,6 +460,195 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
             </div>
         </article>
 
+        <?php if ($isAdmin): ?>
+            <article class="settings-accordion__item" data-accordion data-open="<?= $pdaOpen ? 'true' : 'false' ?>">
+                <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $pdaOpen ? 'true' : 'false' ?>">
+                    <span class="settings-accordion__title">Configurazione PDA</span>
+                    <span class="settings-accordion__icon" aria-hidden="true"></span>
+                </button>
+                <div class="settings-accordion__content" data-accordion-content <?= $pdaOpen ? '' : 'hidden' ?>>
+                    <p class="muted">Gestisci soglie OCR e template di parsing per provider e layout.</p>
+
+                    <?php if ($pdaFeedback !== null): ?>
+                        <div class="alert <?= ($pdaFeedback['success'] ?? false) ? 'alert--success' : 'alert--error' ?>">
+                            <p><?= htmlspecialchars((string) ($pdaFeedback['message'] ?? 'Operazione completata.')) ?></p>
+                            <?php foreach ($pdaFeedback['errors'] ?? [] as $error): ?>
+                                <p><?= htmlspecialchars((string) $error) ?></p>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <section class="page__section">
+                        <h4>OCR automatico</h4>
+                        <form method="post" class="form">
+                            <input type="hidden" name="action" value="save_pda_ocr">
+                            <div class="form__grid">
+                                <div class="form__group">
+                                    <label for="pda_ocr_enabled">OCR abilitato</label>
+                                    <select id="pda_ocr_enabled" name="pda_ocr_enabled">
+                                        <option value="1" <?= !empty($pdaOcr['enabled']) ? 'selected' : '' ?>>Attivo</option>
+                                        <option value="0" <?= empty($pdaOcr['enabled']) ? 'selected' : '' ?>>Disattivo</option>
+                                    </select>
+                                </div>
+                                <div class="form__group">
+                                    <label for="pda_ocr_min_chars">Soglia minima caratteri</label>
+                                    <input type="number" id="pda_ocr_min_chars" name="pda_ocr_min_chars" min="50" value="<?= (int) ($pdaOcr['min_chars'] ?? 200) ?>">
+                                    <small class="muted">Se il testo estratto è inferiore alla soglia, viene attivato OCR.</small>
+                                </div>
+                                <div class="form__group">
+                                    <label for="pda_ocr_lang">Lingua OCR</label>
+                                    <input type="text" id="pda_ocr_lang" name="pda_ocr_lang" value="<?= htmlspecialchars((string) ($pdaOcr['lang'] ?? 'ita')) ?>">
+                                    <small class="muted">Codice lingua Tesseract (es. ita, eng).</small>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn--primary">Salva OCR</button>
+                        </form>
+                    </section>
+
+                    <section class="page__section">
+                        <h4>Template PDA</h4>
+                        <p class="muted">Aggiorna i template in formato JSON. Verranno usati per il matching per provider.</p>
+                        <form method="post" class="form">
+                            <input type="hidden" name="action" value="save_pda_templates">
+                            <div class="form__group">
+                                <label for="pda_templates_json">JSON Template</label>
+                                <textarea id="pda_templates_json" name="pda_templates_json" rows="16" class="form__textarea"><?= htmlspecialchars((string) $pdaTemplatesJson) ?></textarea>
+                            </div>
+                            <button type="submit" class="btn btn--primary">Salva template</button>
+                        </form>
+                    </section>
+                </div>
+            </article>
+        <?php endif; ?>
+
+        <?php if ($isAdmin): ?>
+            <article class="settings-accordion__item" data-accordion data-open="<?= $receiptOpen ? 'true' : 'false' ?>">
+                <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $receiptOpen ? 'true' : 'false' ?>">
+                    <span class="settings-accordion__title">Configurazione scontrino</span>
+                    <span class="settings-accordion__icon" aria-hidden="true"></span>
+                </button>
+                <div class="settings-accordion__content" data-accordion-content <?= $receiptOpen ? '' : 'hidden' ?>>
+                    <p class="muted">Personalizza ogni dicitura stampata sullo scontrino. Puoi usare i placeholder {{sale_id}}, {{document_title}}, {{date}}, {{operator}}, {{customer}}.</p>
+
+                    <?php if ($receiptFeedback !== null): ?>
+                        <div class="alert <?= ($receiptFeedback['success'] ?? false) ? 'alert--success' : 'alert--error' ?>">
+                            <p><?= htmlspecialchars((string) ($receiptFeedback['message'] ?? 'Operazione completata.')) ?></p>
+                            <?php foreach ($receiptFeedback['errors'] ?? [] as $error): ?>
+                                <p><?= htmlspecialchars((string) $error) ?></p>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <section class="page__section">
+                        <h4>Intestazione e chiusura</h4>
+                        <form method="post" class="form">
+                            <input type="hidden" name="action" value="save_receipt_settings">
+                            <div class="form__grid">
+                                <div class="form__group" style="grid-column: span 2;">
+                                    <label for="receipt_header_lines">Intestazione (una riga per riga)</label>
+                                    <textarea id="receipt_header_lines" name="receipt_header_lines" rows="3" class="form__textarea" required><?= htmlspecialchars($receiptHeaderText) ?></textarea>
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_document_title">Titolo documento</label>
+                                    <input type="text" id="receipt_document_title" name="receipt_document_title" value="<?= htmlspecialchars($receiptDocumentTitle) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_document_number_template">Template numero documento</label>
+                                    <input type="text" id="receipt_document_number_template" name="receipt_document_number_template" value="<?= htmlspecialchars($receiptDocumentNumberTemplate) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_thanks_text">Testo di ringraziamento</label>
+                                    <input type="text" id="receipt_thanks_text" name="receipt_thanks_text" value="<?= htmlspecialchars($receiptThanksText) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_footer_text">Footer pagina PDF</label>
+                                    <input type="text" id="receipt_footer_text" name="receipt_footer_text" value="<?= htmlspecialchars($receiptFooterText) ?>">
+                                </div>
+                            </div>
+
+                            <h4>Etichette principali</h4>
+                            <div class="form__grid">
+                                <div class="form__group">
+                                    <label for="receipt_label_date">Etichetta data</label>
+                                    <input type="text" id="receipt_label_date" name="receipt_label_date" value="<?= htmlspecialchars((string) ($receiptLabels['date'] ?? 'Data')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_operator">Etichetta operatore</label>
+                                    <input type="text" id="receipt_label_operator" name="receipt_label_operator" value="<?= htmlspecialchars((string) ($receiptLabels['operator'] ?? 'Operatore')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_customer">Etichetta cliente</label>
+                                    <input type="text" id="receipt_label_customer" name="receipt_label_customer" value="<?= htmlspecialchars((string) ($receiptLabels['customer'] ?? 'Cliente')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_vat">Etichetta IVA</label>
+                                    <input type="text" id="receipt_label_vat" name="receipt_label_vat" value="<?= htmlspecialchars((string) ($receiptLabels['vat'] ?? 'IVA')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_vat_included">Etichetta IVA compresa</label>
+                                    <input type="text" id="receipt_label_vat_included" name="receipt_label_vat_included" value="<?= htmlspecialchars((string) ($receiptLabels['vat_included'] ?? 'IVA compresa')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_vat_codes">Etichetta codici IVA</label>
+                                    <input type="text" id="receipt_label_vat_codes" name="receipt_label_vat_codes" value="<?= htmlspecialchars((string) ($receiptLabels['vat_codes'] ?? 'Codici IVA applicati')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_discount">Etichetta sconto</label>
+                                    <input type="text" id="receipt_label_discount" name="receipt_label_discount" value="<?= htmlspecialchars((string) ($receiptLabels['discount'] ?? 'Sconto')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_total">Etichetta totale</label>
+                                    <input type="text" id="receipt_label_total" name="receipt_label_total" value="<?= htmlspecialchars((string) ($receiptLabels['total'] ?? 'Totale')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_total_original">Etichetta totale originario</label>
+                                    <input type="text" id="receipt_label_total_original" name="receipt_label_total_original" value="<?= htmlspecialchars((string) ($receiptLabels['total_original'] ?? 'Totale originario')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_payment">Etichetta pagamento</label>
+                                    <input type="text" id="receipt_label_payment" name="receipt_label_payment" value="<?= htmlspecialchars((string) ($receiptLabels['payment'] ?? 'Pagamento')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_refund_amount">Etichetta importo reso</label>
+                                    <input type="text" id="receipt_label_refund_amount" name="receipt_label_refund_amount" value="<?= htmlspecialchars((string) ($receiptLabels['refund_amount'] ?? 'Importo reso')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_cancelled_at">Etichetta annullato il</label>
+                                    <input type="text" id="receipt_label_cancelled_at" name="receipt_label_cancelled_at" value="<?= htmlspecialchars((string) ($receiptLabels['cancelled_at'] ?? 'Annullato il')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_cancellation_reason">Etichetta motivo annullo</label>
+                                    <input type="text" id="receipt_label_cancellation_reason" name="receipt_label_cancellation_reason" value="<?= htmlspecialchars((string) ($receiptLabels['cancellation_reason'] ?? 'Motivo annullo')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_refunded_at">Etichetta reso registrato il</label>
+                                    <input type="text" id="receipt_label_refunded_at" name="receipt_label_refunded_at" value="<?= htmlspecialchars((string) ($receiptLabels['refunded_at'] ?? 'Reso registrato il')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_label_refund_note">Etichetta note reso</label>
+                                    <input type="text" id="receipt_label_refund_note" name="receipt_label_refund_note" value="<?= htmlspecialchars((string) ($receiptLabels['refund_note'] ?? 'Note reso')) ?>">
+                                </div>
+                            </div>
+
+                            <h4>Stati e banner</h4>
+                            <div class="form__grid">
+                                <div class="form__group">
+                                    <label for="receipt_status_cancelled">Banner annullato</label>
+                                    <input type="text" id="receipt_status_cancelled" name="receipt_status_cancelled" value="<?= htmlspecialchars((string) ($receiptStatusLabels['cancelled'] ?? 'ANNULLATO')) ?>">
+                                </div>
+                                <div class="form__group">
+                                    <label for="receipt_status_refunded">Banner reso</label>
+                                    <input type="text" id="receipt_status_refunded" name="receipt_status_refunded" value="<?= htmlspecialchars((string) ($receiptStatusLabels['refunded'] ?? 'RESO')) ?>">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn--primary">Salva configurazione scontrino</button>
+                        </form>
+                    </section>
+                </div>
+            </article>
+        <?php endif; ?>
+
         <article class="settings-accordion__item" data-accordion data-open="<?= $ssoOpen ? 'true' : 'false' ?>">
             <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $ssoOpen ? 'true' : 'false' ?>">
                 <span class="settings-accordion__title">Single sign-on interno</span>
@@ -623,6 +854,150 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                                             <form method="post" onsubmit="return confirm('Eliminare definitivamente questo gestore?');">
                                                                 <input type="hidden" name="action" value="delete_provider">
                                                                 <input type="hidden" name="provider_id" value="<?= $providerId ?>">
+                                                                <button type="submit" class="btn btn--danger btn--small">Elimina</button>
+                                                            </form>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        </section>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </article>
+
+        <article class="settings-accordion__item" data-accordion data-open="<?= ($energyOpen ? 'true' : 'false') ?>">
+            <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $energyOpen ? 'true' : 'false' ?>">
+                <span class="settings-accordion__title">Gestori luce &amp; gas</span>
+                <span class="settings-accordion__icon" aria-hidden="true"></span>
+            </button>
+            <div class="settings-accordion__content" data-accordion-content <?= $energyOpen ? '' : 'hidden' ?>>
+                <?php if ($energyFeedback !== null): ?>
+                    <div class="alert <?= ($energyFeedback['success'] ?? false) ? 'alert--success' : 'alert--error' ?>">
+                        <p><?= htmlspecialchars($energyFeedback['message']) ?></p>
+                        <?php if (!empty($energyFeedback['errors']) && is_array($energyFeedback['errors'])): ?>
+                            <ul class="alert__list">
+                                <?php foreach ($energyFeedback['errors'] as $error): ?>
+                                    <li><?= htmlspecialchars((string) $error) ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+                <?php if (!$isAdmin): ?>
+                    <p class="muted">Solo gli amministratori possono creare o modificare i gestori energia.</p>
+                <?php else: ?>
+                    <div class="settings-operators">
+                        <section class="settings-operators__panel">
+                            <h4>Crea un nuovo gestore energia</h4>
+                            <form method="post" class="form settings-form">
+                                <input type="hidden" name="action" value="create_energy_provider">
+                                <div class="settings-form__grid">
+                                    <div class="settings-form__field">
+                                        <label for="energy_provider_name">Nome gestore</label>
+                                        <input type="text" id="energy_provider_name" name="energy_provider_name" required>
+                                    </div>
+                                    <div class="settings-form__field">
+                                        <label for="energy_provider_type">Tipologia</label>
+                                        <select id="energy_provider_type" name="energy_provider_type" required>
+                                            <option value="luce">Luce</option>
+                                            <option value="gas">Gas</option>
+                                            <option value="luce_gas" selected>Luce + Gas</option>
+                                        </select>
+                                    </div>
+                                    <div class="settings-form__field">
+                                        <label for="energy_token_luce">Gettone luce (€)</label>
+                                        <input type="number" id="energy_token_luce" name="energy_token_luce" min="0" step="0.01" value="0">
+                                    </div>
+                                    <div class="settings-form__field">
+                                        <label for="energy_token_gas">Gettone gas (€)</label>
+                                        <input type="number" id="energy_token_gas" name="energy_token_gas" min="0" step="0.01" value="0">
+                                    </div>
+                                    <div class="settings-form__field">
+                                        <label for="energy_provider_notes">Note</label>
+                                        <input type="text" id="energy_provider_notes" name="energy_provider_notes" placeholder="(opzionale)">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn--primary">Crea gestore energia</button>
+                            </form>
+                        </section>
+
+                        <section class="settings-operators__panel">
+                            <h4>Gestori energia configurati</h4>
+                            <div class="settings-operators__actions" style="margin:10px 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                                <form method="post" class="inline-form" onsubmit="return confirm('Importare ora le offerte ARERA?');">
+                                    <input type="hidden" name="action" value="import_energy_offers">
+                                    <button type="submit" class="btn btn--secondary btn--small">Importa offerte ARERA</button>
+                                </form>
+                                <?php if (!empty($energyOffersImportStatus['last_run']) || !empty($energyOffersImportStatus['last_started'])): ?>
+                                    <?php
+                                        $lastRun = !empty($energyOffersImportStatus['last_run'])
+                                            ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_run'])
+                                            : null;
+                                        $lastStarted = !empty($energyOffersImportStatus['last_started'])
+                                            ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_started'])
+                                            : null;
+                                        $statusLabel = $energyOffersImportStatus['last_status'] ?? '';
+                                        $statusText = $statusLabel === 'success'
+                                            ? 'Completato'
+                                            : ($statusLabel === 'error' ? 'Errore' : 'In corso');
+                                    ?>
+                                    <span class="muted">Ultimo import: <?= htmlspecialchars($lastRun ?? $lastStarted ?? 'n/d') ?> · Stato: <?= htmlspecialchars($statusText) ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php if (empty($energyProviders)): ?>
+                                <p class="muted">Nessun gestore energia configurato.</p>
+                            <?php else: ?>
+                                <div class="table-wrapper table-wrapper--embedded">
+                                    <table class="table table--compact">
+                                        <thead>
+                                            <tr>
+                                                <th>Nome</th>
+                                                <th>Tipologia</th>
+                                                <th>Gettone luce</th>
+                                                <th>Gettone gas</th>
+                                                <th>Note</th>
+                                                <th class="table__col--actions">Azioni</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($energyProviders as $energyProvider): ?>
+                                                <?php $energyProviderId = (int) ($energyProvider['id'] ?? 0); ?>
+                                                <tr>
+                                                    <td>
+                                                        <input type="text" name="energy_provider_name" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= htmlspecialchars((string) ($energyProvider['name'] ?? '')) ?>" required>
+                                                    </td>
+                                                    <td>
+                                                        <select name="energy_provider_type" form="energy-provider-update-<?= $energyProviderId ?>">
+                                                            <?php $currentType = (string) ($energyProvider['service_type'] ?? 'luce_gas'); ?>
+                                                            <option value="luce" <?= $currentType === 'luce' ? 'selected' : '' ?>>Luce</option>
+                                                            <option value="gas" <?= $currentType === 'gas' ? 'selected' : '' ?>>Gas</option>
+                                                            <option value="luce_gas" <?= $currentType === 'luce_gas' ? 'selected' : '' ?>>Luce + Gas</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" min="0" step="0.01" name="energy_token_luce" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= number_format((float) ($energyProvider['token_luce'] ?? 0), 2, '.', '') ?>">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" min="0" step="0.01" name="energy_token_gas" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= number_format((float) ($energyProvider['token_gas'] ?? 0), 2, '.', '') ?>">
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" name="energy_provider_notes" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= htmlspecialchars((string) ($energyProvider['notes'] ?? '')) ?>" placeholder="(opzionale)">
+                                                    </td>
+                                                    <td class="table__col--actions">
+                                                        <div class="table-actions">
+                                                            <form id="energy-provider-update-<?= $energyProviderId ?>" method="post" class="inline-form">
+                                                                <input type="hidden" name="action" value="update_energy_provider">
+                                                                <input type="hidden" name="energy_provider_id" value="<?= $energyProviderId ?>">
+                                                                <button type="submit" class="btn btn--secondary btn--small">Salva</button>
+                                                            </form>
+                                                            <form method="post" onsubmit="return confirm('Eliminare definitivamente questo gestore energia?');">
+                                                                <input type="hidden" name="action" value="delete_energy_provider">
+                                                                <input type="hidden" name="energy_provider_id" value="<?= $energyProviderId ?>">
                                                                 <button type="submit" class="btn btn--danger btn--small">Elimina</button>
                                                             </form>
                                                         </div>

@@ -144,5 +144,5 @@ echo $customers->getBody();
 
 ## Note Finali
 
-Questa API è basata su sessioni web. Per integrazioni più robuste, considera aggiungere autenticazione token-based. Contatta lo sviluppatore per estensioni.</content>
+Questa API è basata su sessioni web. Per integrazioni più robuste, considera aggiungere autenticazione token-based. Contatta Nightcoder88 per estensioni.</content>
 <parameter name="filePath">/Users/carminecavaliere/Desktop/staging-express/API_Integration_Guide.md

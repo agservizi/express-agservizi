@@ -33,6 +33,10 @@ final class ReportsService
         $payments = $this->fetchPaymentBreakdown($start, $end, $selectedFilters);
         $operators = $this->fetchOperatorBreakdown($start, $end, $selectedFilters);
         $trend = $this->fetchTrend($mode, $referenceDate, $selectedFilters);
+        $energyTotals = $this->fetchEnergyTotals($start, $end);
+        $energyProviders = $this->fetchEnergyProviderBreakdown($start, $end);
+        $energyTypes = $this->fetchEnergyTypeBreakdown($start, $end);
+        $energyTrend = $this->fetchEnergyTrend($mode, $referenceDate);
 
         return [
             'granularity' => $mode,
@@ -46,11 +50,187 @@ final class ReportsService
             'payments' => $payments,
             'operators' => $operators,
             'trend' => $trend,
+            'energy' => [
+                'totals' => $energyTotals,
+                'providers' => $energyProviders,
+                'types' => $energyTypes,
+                'trend' => $energyTrend,
+            ],
             'selected_filters' => $selectedFilters,
             'filter_options' => [
                 'payments' => self::PAYMENT_METHODS,
                 'operators' => $this->listOperators(),
             ],
+        ];
+    }
+
+    /**
+     * @return array{contracts:int,total_commission:float,average_commission:float}
+     */
+    private function fetchEnergyTotals(DateTimeImmutable $start, DateTimeImmutable $end): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) AS contract_count, COALESCE(SUM(token_value), 0) AS total_commission
+             FROM energy_contracts
+             WHERE created_at >= :start AND created_at < :end'
+        );
+        $stmt->execute([
+            ':start' => $start->format('Y-m-d H:i:s'),
+            ':end' => $end->format('Y-m-d H:i:s'),
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [
+            'contract_count' => 0,
+            'total_commission' => 0.0,
+        ];
+
+        $count = (int) ($row['contract_count'] ?? 0);
+        $total = (float) ($row['total_commission'] ?? 0.0);
+
+        return [
+            'contracts' => $count,
+            'total_commission' => $total,
+            'average_commission' => $count > 0 ? $total / $count : 0.0,
+        ];
+    }
+
+    /**
+     * @return array<int, array{name:string,contracts:int,total_commission:float}>
+     */
+    private function fetchEnergyProviderBreakdown(DateTimeImmutable $start, DateTimeImmutable $end): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT ep.name AS provider_name,
+                    COUNT(*) AS contract_count,
+                    COALESCE(SUM(ec.token_value), 0) AS total_commission
+             FROM energy_contracts ec
+             LEFT JOIN energy_providers ep ON ep.id = ec.provider_id
+             WHERE ec.created_at >= :start AND ec.created_at < :end
+             GROUP BY ec.provider_id, provider_name
+             ORDER BY total_commission DESC, contract_count DESC
+             LIMIT 8'
+        );
+        $stmt->execute([
+            ':start' => $start->format('Y-m-d H:i:s'),
+            ':end' => $end->format('Y-m-d H:i:s'),
+        ]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $result = [];
+        foreach ($rows as $row) {
+            $name = (string) ($row['provider_name'] ?? 'Gestore');
+            if ($name === '') {
+                $name = 'Gestore';
+            }
+            $result[] = [
+                'name' => $name,
+                'contracts' => (int) ($row['contract_count'] ?? 0),
+                'total_commission' => (float) ($row['total_commission'] ?? 0.0),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array<int, array{type:string,contracts:int,total_commission:float}>
+     */
+    private function fetchEnergyTypeBreakdown(DateTimeImmutable $start, DateTimeImmutable $end): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT contract_type,
+                    COUNT(*) AS contract_count,
+                    COALESCE(SUM(token_value), 0) AS total_commission
+             FROM energy_contracts
+             WHERE created_at >= :start AND created_at < :end
+             GROUP BY contract_type
+             ORDER BY total_commission DESC, contract_count DESC'
+        );
+        $stmt->execute([
+            ':start' => $start->format('Y-m-d H:i:s'),
+            ':end' => $end->format('Y-m-d H:i:s'),
+        ]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $result = [];
+        foreach ($rows as $row) {
+            $type = (string) ($row['contract_type'] ?? '');
+            if ($type === '') {
+                $type = 'n/d';
+            }
+            $label = match ($type) {
+                'luce' => 'Luce',
+                'gas' => 'Gas',
+                'luce_gas' => 'Luce + Gas',
+                default => ucfirst($type),
+            };
+            $result[] = [
+                'type' => $label,
+                'contracts' => (int) ($row['contract_count'] ?? 0),
+                'total_commission' => (float) ($row['total_commission'] ?? 0.0),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array{points:array<int, array<string, int|float|string>>, total_count:int, total_commission:float}
+     */
+    private function fetchEnergyTrend(string $granularity, DateTimeImmutable $reference): array
+    {
+        $config = $this->resolveTrendConfig($granularity, $reference);
+
+        $stmt = $this->pdo->prepare(
+            'SELECT
+                ' . $config['bucket_expression'] . ' AS bucket,
+                COUNT(*) AS contract_count,
+                COALESCE(SUM(token_value), 0) AS total_commission
+            FROM energy_contracts
+            WHERE created_at >= :start AND created_at < :end
+            GROUP BY bucket
+            ORDER BY bucket ASC'
+        );
+        $stmt->execute([
+            ':start' => $config['start']->format('Y-m-d H:i:s'),
+            ':end' => $config['end']->format('Y-m-d H:i:s'),
+        ]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $interval = new DateInterval($config['interval_spec']);
+        $buckets = [];
+        $cursor = $config['start'];
+        while ($cursor < $config['end']) {
+            $key = $cursor->format($config['key_format']);
+            $buckets[$key] = [
+                'key' => $key,
+                'label' => $cursor->format($config['label_format']),
+                'contract_count' => 0,
+                'total_commission' => 0.0,
+            ];
+            $cursor = $cursor->add($interval);
+        }
+
+        foreach ($rows as $row) {
+            $key = (string) ($row['bucket'] ?? '');
+            if (!isset($buckets[$key])) {
+                continue;
+            }
+            $buckets[$key]['contract_count'] = (int) ($row['contract_count'] ?? 0);
+            $buckets[$key]['total_commission'] = (float) ($row['total_commission'] ?? 0.0);
+        }
+
+        $points = array_values($buckets);
+        $totalCount = 0;
+        $totalCommission = 0.0;
+        foreach ($points as $point) {
+            $totalCount += (int) ($point['contract_count'] ?? 0);
+            $totalCommission += (float) ($point['total_commission'] ?? 0.0);
+        }
+
+        return [
+            'points' => $points,
+            'total_count' => $totalCount,
+            'total_commission' => $totalCommission,
         ];
     }
 

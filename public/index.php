@@ -141,6 +141,242 @@ function toastFromFeedback(array $feedback, array $overrides = []): ?array
     return normalizeToastPayload($toast);
 }
 
+/**
+ * @param array<string, mixed> $payload
+ */
+function jsonResponse(array $payload, int $status = 200): void
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    $encoded = json_encode(
+        $payload,
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+    );
+    if ($encoded === false) {
+        $fallback = json_encode(
+            [
+                'success' => false,
+                'error' => 'json_encode_failed',
+                'message' => json_last_error_msg(),
+            ],
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
+        echo $fallback !== false ? $fallback : '{"success":false,"error":"json_encode_failed"}';
+        exit;
+    }
+    echo $encoded;
+    exit;
+}
+
+function getEnergyOffersImportPaths(): array
+{
+    $root = dirname(__DIR__);
+    $storage = $root . '/storage';
+    return [
+        'script' => $root . '/scripts/import_energy_offers.php',
+        'status' => $storage . '/energy_offers_import_status.json',
+        'log' => $storage . '/energy_offers_import.log',
+        'storage' => $storage,
+    ];
+}
+
+/**
+ * @return array{last_run?:int,last_started?:int,last_status?:string,last_message?:string,last_output?:string}
+ */
+function loadEnergyOffersImportStatus(): array
+{
+    $paths = getEnergyOffersImportPaths();
+    if (!is_file($paths['status'])) {
+        return [];
+    }
+    $raw = file_get_contents($paths['status']);
+    if ($raw === false) {
+        return [];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+/**
+ * @param array{last_run?:int,last_started?:int,last_status?:string,last_message?:string,last_output?:string} $status
+ */
+function saveEnergyOffersImportStatus(array $status): void
+{
+    $paths = getEnergyOffersImportPaths();
+    if (!is_dir($paths['storage'])) {
+        mkdir($paths['storage'], 0775, true);
+    }
+    file_put_contents(
+        $paths['status'],
+        json_encode($status, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+    );
+}
+
+/**
+ * @return array{success:bool,message:string,output?:string}
+ */
+function runEnergyOffersImport(bool $background = false): array
+{
+    $paths = getEnergyOffersImportPaths();
+    $command = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($paths['script']);
+    $status = loadEnergyOffersImportStatus();
+
+    if ($background) {
+        $status['last_started'] = time();
+        $status['last_status'] = 'scheduled';
+        $status['last_message'] = 'Import programmato in background.';
+        saveEnergyOffersImportStatus($status);
+        exec($command . ' > ' . escapeshellarg($paths['log']) . ' 2>&1 &');
+        return [
+            'success' => true,
+            'message' => 'Import programmato in background.',
+        ];
+    }
+
+    $output = [];
+    $exitCode = 0;
+    exec($command . ' 2>&1', $output, $exitCode);
+    $status['last_run'] = time();
+    $status['last_status'] = $exitCode === 0 ? 'success' : 'error';
+    $status['last_message'] = $exitCode === 0 ? 'Import completato.' : 'Import fallito.';
+    $status['last_output'] = implode("\n", array_slice($output, -20));
+    saveEnergyOffersImportStatus($status);
+
+    return [
+        'success' => $exitCode === 0,
+        'message' => $status['last_message'] ?? 'Import completato.',
+        'output' => $status['last_output'] ?? null,
+    ];
+}
+
+function maybeScheduleEnergyOffersImport(int $intervalSeconds = 86400): void
+{
+    $status = loadEnergyOffersImportStatus();
+    $lastRun = (int) ($status['last_run'] ?? 0);
+    $lastStarted = (int) ($status['last_started'] ?? 0);
+    $lastActivity = max($lastRun, $lastStarted);
+    if ($lastActivity > 0 && (time() - $lastActivity) < $intervalSeconds) {
+        return;
+    }
+    runEnergyOffersImport(true);
+}
+
+function parseItalianNumber(?string $value): ?float
+{
+    if ($value === null) {
+        return null;
+    }
+    $normalized = str_replace(['.', ' '], '', $value);
+    $normalized = str_replace(',', '.', $normalized);
+    $normalized = trim($normalized);
+    if ($normalized === '' || !is_numeric($normalized)) {
+        return null;
+    }
+    return (float) $normalized;
+}
+
+function extractMaxByRegex(string $text, string $pattern, int $group = 1): ?float
+{
+    if (!preg_match_all($pattern, $text, $matches)) {
+        return null;
+    }
+    $values = [];
+    foreach ($matches[$group] ?? [] as $raw) {
+        $num = parseItalianNumber((string) $raw);
+        if ($num !== null) {
+            $values[] = $num;
+        }
+    }
+    if ($values === []) {
+        return null;
+    }
+    return max($values);
+}
+
+function extractFirstByRegex(string $text, string $pattern, int $group = 1): ?float
+{
+    if (!preg_match($pattern, $text, $matches)) {
+        return null;
+    }
+    $raw = $matches[$group] ?? null;
+    if ($raw === null) {
+        return null;
+    }
+    return parseItalianNumber((string) $raw);
+}
+
+function extractPeriodConsumption(string $text, string $unit): ?float
+{
+    $unitPattern = $unit === 'kwh'
+        ? '(?:kwh)'
+        : '(?:smc|sm3|sm³)';
+
+    $patterns = [
+        '/consumo\s+del\s+periodo\s*([0-9][0-9\.,]*)\s*' . $unitPattern . '/i',
+        '/consumi\s+rilevati\s+nel\s+periodo[^0-9]*([0-9][0-9\.,]*)\s*' . $unitPattern . '/i',
+        '/consumo\s+totale\s+fatturato\s+del\s+periodo\s*([0-9][0-9\.,]*)\s*' . $unitPattern . '/i',
+        '/quota\s+consumi\s*([0-9][0-9\.,]*)\s*' . $unitPattern . '/i',
+    ];
+
+    foreach ($patterns as $pattern) {
+        $value = extractFirstByRegex($text, $pattern);
+        if ($value !== null && $value > 0) {
+            return $value;
+        }
+    }
+
+    return null;
+}
+
+function extractBillAmount(string $text): ?float
+{
+    $patterns = [
+        '/totale\s+da\s+pagare\s*([0-9\.,]+)\s*€/i',
+        '/totale\s+bolletta\s*([0-9\.,]+)\s*€/i',
+        '/quanto\s+pago\s+per\s+questa\s+bolletta\?\s*([0-9\.,]+)\s*€/i',
+        '/importo\s+totale\s*[:\-]?\s*€?\s*([0-9\.,]+)/i',
+    ];
+    foreach ($patterns as $pattern) {
+        $value = extractFirstByRegex($text, $pattern);
+        if ($value !== null && $value > 0) {
+            return $value;
+        }
+    }
+    $value = extractMaxByRegex($text, '/€\s*([0-9\.,]+)/i');
+    if ($value !== null && $value > 0) {
+        return $value;
+    }
+    return null;
+}
+
+function parseEnergyBillPdf(string $path): array
+{
+    $parser = new \Smalot\PdfParser\Parser();
+    $pdf = $parser->parseFile($path);
+    $text = $pdf->getText();
+    $text = preg_replace('/\s+/', ' ', (string) $text) ?? '';
+
+    $luceKwh = extractPeriodConsumption($text, 'kwh') ?? extractMaxByRegex($text, '/([0-9][0-9\.,]*)\s*kwh/i');
+    $gasSmc = extractPeriodConsumption($text, 'smc') ?? extractMaxByRegex($text, '/([0-9][0-9\.,]*)\s*(?:smc|sm3|sm³)/i');
+    $billAmount = extractBillAmount($text);
+
+    $frequency = null;
+    if (preg_match('/bimestre|bimestrale|due\s+mesi/i', $text)) {
+        $frequency = 'bimonthly';
+    } elseif (preg_match('/periodo\s+[a-z]{3}\.?\s+\d{4}\s*-\s*[a-z]{3}\.?\s+\d{4}/i', $text)) {
+        $frequency = 'bimonthly';
+    } elseif (preg_match('/mensile|mese/i', $text)) {
+        $frequency = 'monthly';
+    }
+
+    return [
+        'luce_kwh' => $luceKwh,
+        'gas_smc' => $gasSmc,
+        'bill_amount' => $billAmount,
+        'bill_frequency' => $frequency,
+    ];
+}
+
 function sendGuideSupportEmail(
     string $recipient,
     string $subject,
@@ -221,6 +457,7 @@ use App\Controllers\ProductRequestController;
 use App\Controllers\ReportsController;
 use App\Controllers\SalesController;
 use App\Controllers\SupportRequestController;
+use App\Controllers\EnergyContractController;
 use App\Controllers\SsoController;
 use App\Controllers\PdaImportController;
 use App\Services\AuthService;
@@ -236,11 +473,16 @@ use App\Services\SalesService;
 use App\Services\StockMonitorService;
 use App\Services\SupportRequestService;
 use App\Services\UserService;
+use App\Services\PdaSettingsService;
 use App\Services\ProviderService;
 use App\Services\NotificationDispatcher;
+use App\Services\EnergyProviderService;
+use App\Services\EnergyContractService;
+use App\Services\EnergyOfferService;
 use App\Services\SystemNotificationService;
 use App\Services\SsoService;
 use App\Services\PdaImportService;
+use App\Services\ReceiptSettingsService;
 
 $pdo = Database::getConnection();
 
@@ -291,6 +533,11 @@ $productRequestService = new ProductRequestService($pdo);
 $salesService = new SalesService($pdo);
 $discountCampaignService = new DiscountCampaignService($pdo);
 $pdaImportService = new PdaImportService($pdo, $customerService);
+$pdaSettingsService = new PdaSettingsService();
+$receiptSettingsService = new ReceiptSettingsService();
+$energyProviderService = new EnergyProviderService($pdo);
+$energyContractService = new EnergyContractService($pdo);
+$energyOfferService = new EnergyOfferService($pdo);
 $supportRequestService = new SupportRequestService($pdo);
 $userService = new UserService($pdo);
 $stockMonitorService = new StockMonitorService($pdo, $alertEmail, $logPath, $resendApiKey, $resendFrom, $systemNotificationService);
@@ -317,10 +564,15 @@ $salesController = new SalesController($salesService, $discountCampaignService, 
 $supportRequestController = new SupportRequestController($supportRequestService);
 $ssoController = new SsoController($ssoService);
 $pdaImportController = new PdaImportController($pdaImportService);
+$energyContractController = new EnergyContractController($energyContractService);
 
 $page = $_GET['page'] ?? 'dashboard';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $currentUser = $authService->currentUser();
+
+if ($currentUser !== null && $authService->hasRole('admin')) {
+    maybeScheduleEnergyOffersImport();
+}
 
 if ($page === 'sso_token') {
     if ($method !== 'POST') {
@@ -477,6 +729,328 @@ if ($page === 'login' && $method === 'POST') {
     exit;
 }
 
+if ($page === 'global_search') {
+    if ($method !== 'GET') {
+        jsonResponse(['error' => 'method_not_allowed'], 405);
+    }
+
+    if ($currentUser === null) {
+        jsonResponse(['error' => 'not_authenticated'], 401);
+    }
+
+    $term = trim((string) ($_GET['q'] ?? ''));
+    $minLength = 2;
+    $termLength = function_exists('mb_strlen') ? mb_strlen($term, 'UTF-8') : strlen($term);
+    if ($term === '' || $termLength < $minLength) {
+        jsonResponse([
+            'success' => true,
+            'query' => $term,
+            'sections' => [],
+        ]);
+    }
+
+    $limit = 5;
+    $sections = [];
+
+    $normalize = static function (string $value): string {
+        $trimmed = trim($value);
+        if (function_exists('mb_strtolower')) {
+            return mb_strtolower($trimmed, 'UTF-8');
+        }
+        return strtolower($trimmed);
+    };
+
+    $needle = $normalize($term);
+    $matches = static function (string $haystack) use ($needle, $normalize): bool {
+        if ($needle === '') {
+            return false;
+        }
+        return str_contains($normalize($haystack), $needle);
+    };
+
+    $addSection = static function (string $title, array $items) use (&$sections): void {
+        if ($items !== []) {
+            $sections[] = [
+                'title' => $title,
+                'items' => $items,
+            ];
+        }
+    };
+
+    $navItems = [
+        ['label' => 'Dashboard', 'keywords' => 'home panoramica', 'url' => 'index.php?page=dashboard'],
+        ['label' => 'Magazzino SIM', 'keywords' => 'sim stock iccid', 'url' => 'index.php?page=sim_stock'],
+        ['label' => 'Prodotti', 'keywords' => 'catalogo', 'url' => 'index.php?page=products'],
+        ['label' => 'Lista prodotti', 'keywords' => 'inventario', 'url' => 'index.php?page=products_list'],
+        ['label' => 'Clienti', 'keywords' => 'anagrafiche', 'url' => 'index.php?page=customers'],
+        ['label' => 'Listini', 'keywords' => 'offerte', 'url' => 'index.php?page=offers'],
+        ['label' => 'Nuova vendita', 'keywords' => 'cassa', 'url' => 'index.php?page=sales_create'],
+        ['label' => 'Storico vendite', 'keywords' => 'transazioni', 'url' => 'index.php?page=sales_list'],
+        ['label' => 'Contratti energia', 'keywords' => 'energia', 'url' => 'index.php?page=energy_contracts'],
+        ['label' => 'Ordini store', 'keywords' => 'richieste prodotti', 'url' => 'index.php?page=product_requests'],
+        ['label' => 'Supporto clienti', 'keywords' => 'assistenza', 'url' => 'index.php?page=support_requests'],
+        ['label' => 'Report', 'keywords' => 'statistiche', 'url' => 'index.php?page=reports'],
+        ['label' => 'Notifiche', 'keywords' => 'alert', 'url' => 'index.php?page=notifications'],
+        ['label' => 'Guida', 'keywords' => 'help', 'url' => 'index.php?page=guide'],
+        ['label' => 'Impostazioni', 'keywords' => 'configurazione', 'url' => 'index.php?page=settings'],
+        ['label' => 'Sicurezza account', 'keywords' => 'mfa', 'url' => 'index.php?page=security'],
+        ['label' => 'Profilo', 'keywords' => 'utente', 'url' => 'index.php?page=profile'],
+    ];
+
+    if ($authService->hasRole('admin')) {
+        $navItems[] = ['label' => 'Debug PDA', 'keywords' => 'import pda', 'url' => 'index.php?page=pda_imports'];
+    }
+
+    $navMatches = [];
+    foreach ($navItems as $item) {
+        $haystack = $item['label'] . ' ' . ($item['keywords'] ?? '');
+        if ($matches($haystack)) {
+            $navMatches[] = [
+                'title' => $item['label'],
+                'subtitle' => $item['keywords'] ?? '',
+                'url' => $item['url'],
+                'meta' => 'Sezione',
+            ];
+        }
+    }
+    $addSection('Navigazione', $navMatches);
+
+    $customerResults = $customerController->listPaginated(1, $limit, $term);
+    $customerItems = [];
+    foreach ($customerResults['rows'] ?? [] as $row) {
+        $customerId = (int) ($row['id'] ?? 0);
+        if ($customerId <= 0) {
+            continue;
+        }
+        $title = trim((string) ($row['fullname'] ?? ''));
+        if ($title === '') {
+            $title = 'Cliente #' . $customerId;
+        }
+        $subtitleParts = array_filter([
+            isset($row['email']) && $row['email'] !== '' ? (string) $row['email'] : null,
+            isset($row['phone']) && $row['phone'] !== '' ? (string) $row['phone'] : null,
+            isset($row['tax_code']) && $row['tax_code'] !== '' ? (string) $row['tax_code'] : null,
+        ]);
+        $customerItems[] = [
+            'title' => $title,
+            'subtitle' => implode(' • ', $subtitleParts),
+            'url' => 'index.php?page=customers&edit=' . $customerId,
+            'meta' => 'Cliente',
+        ];
+    }
+    $addSection('Clienti', $customerItems);
+
+    $productResults = $productController->listPaginated(1, $limit, $term);
+    $productItems = [];
+    foreach ($productResults['rows'] ?? [] as $row) {
+        $productId = (int) ($row['id'] ?? 0);
+        if ($productId <= 0) {
+            continue;
+        }
+        $title = trim((string) ($row['name'] ?? ''));
+        if ($title === '') {
+            $title = 'Prodotto #' . $productId;
+        }
+        $subtitleParts = [];
+        if (!empty($row['sku'])) {
+            $subtitleParts[] = 'SKU: ' . $row['sku'];
+        }
+        if (!empty($row['imei'])) {
+            $subtitleParts[] = 'IMEI: ' . $row['imei'];
+        }
+        if (!empty($row['category'])) {
+            $subtitleParts[] = (string) $row['category'];
+        }
+        if (array_key_exists('price', $row)) {
+            $subtitleParts[] = '€ ' . number_format((float) $row['price'], 2, ',', '.');
+        }
+        $productItems[] = [
+            'title' => $title,
+            'subtitle' => implode(' • ', array_filter($subtitleParts)),
+            'url' => 'index.php?page=products&edit=' . $productId,
+            'meta' => 'Prodotto',
+        ];
+    }
+    $addSection('Prodotti', $productItems);
+
+    $offersResults = $offersController->listPaginated(1, $limit, null, $term);
+    $offerItems = [];
+    foreach ($offersResults['rows'] ?? [] as $row) {
+        $offerId = (int) ($row['id'] ?? 0);
+        if ($offerId <= 0) {
+            continue;
+        }
+        $title = trim((string) ($row['title'] ?? ''));
+        if ($title === '') {
+            $title = 'Offerta #' . $offerId;
+        }
+        $subtitleParts = [];
+        if (!empty($row['provider_name'])) {
+            $subtitleParts[] = (string) $row['provider_name'];
+        }
+        if (array_key_exists('price', $row)) {
+            $subtitleParts[] = '€ ' . number_format((float) $row['price'], 2, ',', '.');
+        }
+        $offerItems[] = [
+            'title' => $title,
+            'subtitle' => implode(' • ', array_filter($subtitleParts)),
+            'url' => 'index.php?page=offers&edit=' . $offerId,
+            'meta' => 'Offerta',
+        ];
+    }
+    $addSection('Listini', $offerItems);
+
+    $iccidResults = $iccidController->listPaginated(1, $limit, null, $term);
+    $iccidItems = [];
+    foreach ($iccidResults['rows'] ?? [] as $row) {
+        $iccid = trim((string) ($row['iccid'] ?? ''));
+        if ($iccid === '') {
+            continue;
+        }
+        $subtitleParts = [];
+        if (!empty($row['provider_name'])) {
+            $subtitleParts[] = (string) $row['provider_name'];
+        }
+        if (!empty($row['status'])) {
+            $subtitleParts[] = (string) $row['status'];
+        }
+        $iccidItems[] = [
+            'title' => 'ICCID ' . $iccid,
+            'subtitle' => implode(' • ', array_filter($subtitleParts)),
+            'url' => 'index.php?page=sim_stock&search=' . rawurlencode($iccid),
+            'meta' => 'SIM',
+        ];
+    }
+    $addSection('Magazzino SIM', $iccidItems);
+
+    $salesResults = $salesController->listSales(['q' => $term], 1, $limit);
+    $saleItems = [];
+    foreach ($salesResults['rows'] ?? [] as $row) {
+        $saleId = (int) ($row['id'] ?? 0);
+        if ($saleId <= 0) {
+            continue;
+        }
+        $customer = trim((string) ($row['customer_name'] ?? $row['customer_fullname'] ?? ''));
+        $subtitleParts = [];
+        if ($customer !== '') {
+            $subtitleParts[] = 'Cliente: ' . $customer;
+        }
+        if (array_key_exists('total', $row)) {
+            $subtitleParts[] = 'Totale € ' . number_format((float) $row['total'], 2, ',', '.');
+        }
+        if (!empty($row['status'])) {
+            $subtitleParts[] = 'Stato: ' . $row['status'];
+        }
+        $saleItems[] = [
+            'title' => 'Vendita #' . $saleId,
+            'subtitle' => implode(' • ', array_filter($subtitleParts)),
+            'url' => 'index.php?page=sales_list&q=' . rawurlencode((string) $saleId),
+            'meta' => 'Vendita',
+        ];
+    }
+    $addSection('Vendite', $saleItems);
+
+    $energyContracts = $energyContractController->search($term, $limit);
+    $energyItems = [];
+    foreach ($energyContracts as $row) {
+        $contractId = (int) ($row['id'] ?? 0);
+        if ($contractId <= 0) {
+            continue;
+        }
+        $createdAtRaw = isset($row['created_at']) ? (string) $row['created_at'] : '';
+        $createdAtDate = '';
+        if ($createdAtRaw !== '') {
+            $timestamp = strtotime($createdAtRaw);
+            if ($timestamp !== false) {
+                $createdAtDate = date('Y-m-d', $timestamp);
+            }
+        }
+        $customerName = trim((string) ($row['customer_name'] ?? ''));
+        $title = $customerName !== '' ? $customerName : 'Contratto #' . $contractId;
+        $subtitleParts = [];
+        if (!empty($row['provider_name'])) {
+            $subtitleParts[] = (string) $row['provider_name'];
+        }
+        if (!empty($row['contract_type'])) {
+            $subtitleParts[] = strtoupper((string) $row['contract_type']);
+        }
+        if (array_key_exists('token_value', $row)) {
+            $subtitleParts[] = 'Provvigione € ' . number_format((float) $row['token_value'], 2, ',', '.');
+        }
+        $url = 'index.php?page=energy_contracts&focus=' . $contractId;
+        if ($createdAtDate !== '') {
+            $url .= '&period=month&date=' . rawurlencode($createdAtDate);
+        }
+        $energyItems[] = [
+            'title' => $title,
+            'subtitle' => implode(' • ', array_filter($subtitleParts)),
+            'url' => $url,
+            'meta' => 'Contratto energia',
+        ];
+    }
+    $addSection('Contratti energia', $energyItems);
+
+    $supportResults = $supportRequestController->list(['q' => $term], 1, $limit);
+    $supportItems = [];
+    foreach ($supportResults['rows'] ?? [] as $row) {
+        $requestId = (int) ($row['id'] ?? 0);
+        if ($requestId <= 0) {
+            continue;
+        }
+        $title = trim((string) ($row['subject'] ?? ''));
+        if ($title === '') {
+            $title = 'Richiesta #' . $requestId;
+        }
+        $subtitleParts = [];
+        if (!empty($row['customer_name'])) {
+            $subtitleParts[] = 'Cliente: ' . $row['customer_name'];
+        }
+        if (!empty($row['status'])) {
+            $subtitleParts[] = 'Stato: ' . $row['status'];
+        }
+        $supportItems[] = [
+            'title' => $title,
+            'subtitle' => implode(' • ', array_filter($subtitleParts)),
+            'url' => 'index.php?page=support_request&request_id=' . $requestId,
+            'meta' => 'Supporto',
+        ];
+    }
+    $addSection('Supporto clienti', $supportItems);
+
+    $productRequestResults = $productRequestController->list(['q' => $term], 1, $limit);
+    $productRequestItems = [];
+    foreach ($productRequestResults['rows'] ?? [] as $row) {
+        $requestId = (int) ($row['id'] ?? 0);
+        if ($requestId <= 0) {
+            continue;
+        }
+        $title = trim((string) ($row['product_name'] ?? ''));
+        if ($title === '') {
+            $title = 'Richiesta #' . $requestId;
+        }
+        $subtitleParts = [];
+        if (!empty($row['customer_name'])) {
+            $subtitleParts[] = 'Cliente: ' . $row['customer_name'];
+        }
+        if (!empty($row['status'])) {
+            $subtitleParts[] = 'Stato: ' . $row['status'];
+        }
+        $productRequestItems[] = [
+            'title' => $title,
+            'subtitle' => implode(' • ', array_filter($subtitleParts)),
+            'url' => 'index.php?page=product_request&request_id=' . $requestId,
+            'meta' => 'Ordine store',
+        ];
+    }
+    $addSection('Ordini store', $productRequestItems);
+
+    jsonResponse([
+        'success' => true,
+        'query' => $term,
+        'sections' => $sections,
+    ]);
+}
+
 if ($currentUser === null && !in_array($page, ['login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
     header('Location: index.php?page=login');
     exit;
@@ -503,6 +1077,27 @@ if ($currentUser !== null) {
 
         header('Location: index.php?page=security&setup=1');
         exit;
+    }
+
+    if ($hasMfa) {
+        $allowedWithoutReceipt = ['settings', 'security', 'logout', 'notifications_stream', 'notifications_mark_all_read'];
+        if ($receiptSettingsService->isConfigured()) {
+            unset($_SESSION['receipt_enforcement_prompted']);
+        } elseif (!in_array($page, $allowedWithoutReceipt, true)) {
+            if (empty($_SESSION['receipt_enforcement_prompted'])) {
+                pushFlashToast([
+                    'type' => 'info',
+                    'title' => 'Completa la configurazione iniziale',
+                    'message' => 'Imposta le diciture dello scontrino per completare l’avvio del gestionale.',
+                    'duration' => 0,
+                    'dismissible' => false,
+                ]);
+                $_SESSION['receipt_enforcement_prompted'] = true;
+            }
+
+            header('Location: index.php?page=settings&receipt_open=1');
+            exit;
+        }
     }
 }
 
@@ -767,7 +1362,11 @@ switch ($page) {
         if ($method === 'GET' && ($_GET['action'] ?? '') === 'refresh') {
             $stockPage = isset($_GET['page_no']) ? max((int) $_GET['page_no'], 1) : 1;
             $stockPerPage = isset($_GET['per_page']) ? max(1, min((int) $_GET['per_page'], 50)) : 7;
-            $stockList = $iccidController->listPaginated($stockPage, $stockPerPage);
+            $stockSearch = isset($_GET['search']) ? trim((string) $_GET['search']) : null;
+            if ($stockSearch === '') {
+                $stockSearch = null;
+            }
+            $stockList = $iccidController->listPaginated($stockPage, $stockPerPage, null, $stockSearch);
             jsonResponse([
                 'success' => true,
                 'payload' => [
@@ -802,12 +1401,17 @@ switch ($page) {
         }
         $stockPage = isset($_GET['page_no']) ? max((int) $_GET['page_no'], 1) : 1;
         $stockPerPage = 7;
-        $stockList = $iccidController->listPaginated($stockPage, $stockPerPage);
+        $stockSearch = isset($_GET['search']) ? trim((string) $_GET['search']) : null;
+        if ($stockSearch === '') {
+            $stockSearch = null;
+        }
+        $stockList = $iccidController->listPaginated($stockPage, $stockPerPage, null, $stockSearch);
         render('sim_stock', [
             'providers' => $iccidController->providers(),
             'stock' => $stockList['rows'],
             'pagination' => $stockList['pagination'],
             'currentUser' => $currentUser,
+            'searchTerm' => $stockSearch ?? '',
             'initialToasts' => $initialToasts,
         ]);
         break;
@@ -927,12 +1531,17 @@ switch ($page) {
             }
         }
 
-        $productsList = $productController->listPaginated($productsPage, $productsPerPage);
+        $productsSearch = isset($_GET['search']) ? trim((string) $_GET['search']) : null;
+        if ($productsSearch === '') {
+            $productsSearch = null;
+        }
+        $productsList = $productController->listPaginated($productsPage, $productsPerPage, $productsSearch);
         render('products_list', [
             'products' => $productsList['rows'],
             'pagination' => $productsList['pagination'],
             'currentUser' => $currentUser,
             'pageTitle' => 'Lista prodotti',
+            'searchTerm' => $productsSearch ?? '',
             'initialToasts' => $initialToasts,
         ]);
         break;
@@ -1201,12 +1810,29 @@ switch ($page) {
     case 'settings':
         $feedback = $_SESSION['settings_feedback'] ?? null;
         unset($_SESSION['settings_feedback']);
+        $pdaSettingsFeedback = $_SESSION['pda_settings_feedback'] ?? null;
+        unset($_SESSION['pda_settings_feedback']);
+        $receiptSettingsFeedback = $_SESSION['receipt_settings_feedback'] ?? null;
+        unset($_SESSION['receipt_settings_feedback']);
+        $energySettingsFeedback = $_SESSION['energy_settings_feedback'] ?? null;
+        unset($_SESSION['energy_settings_feedback']);
         $ssoFeedback = $_SESSION['settings_sso_feedback'] ?? null;
         unset($_SESSION['settings_sso_feedback']);
         $ssoSecretPreview = $_SESSION['settings_sso_secret'] ?? null;
         unset($_SESSION['settings_sso_secret']);
         $ssoEnabled = $ssoService->isEnabled();
         $isAdmin = $authService->hasRole('admin');
+        $pdaSettings = $pdaSettingsService->getSettings();
+        $pdaOpen = isset($_GET['pda_open']) || $pdaSettingsFeedback !== null;
+        $receiptSettings = $receiptSettingsService->getSettings();
+        $receiptOpen = isset($_GET['receipt_open']) || $receiptSettingsFeedback !== null;
+        $energyProviders = $energyProviderService->listProviders();
+        $energyOpen = isset($_GET['energy_open']) || $energySettingsFeedback !== null;
+        $energyOffersImportStatus = loadEnergyOffersImportStatus();
+
+        if ($isAdmin) {
+            maybeScheduleEnergyOffersImport();
+        }
 
         $operatorEdit = null;
         $operatorEditForm = null;
@@ -1262,6 +1888,9 @@ switch ($page) {
         if ($method === 'POST') {
             $action = $_POST['action'] ?? '';
             $redirectParams = [];
+            $isPdaAction = false;
+            $isReceiptAction = false;
+            $isEnergyAction = false;
 
             if ($action === 'update_threshold') {
                 if (!$isAdmin) {
@@ -1365,6 +1994,99 @@ switch ($page) {
                     $result = $providerService->deleteProvider($providerId, (int) ($currentUser['id'] ?? 0));
                 }
                 $redirectParams['providers_open'] = 1;
+            } elseif ($action === 'create_energy_provider') {
+                $isEnergyAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'error' => 'Solo gli amministratori possono creare gestori energia.',
+                    ];
+                } else {
+                    $result = $energyProviderService->createProvider($_POST, (int) ($currentUser['id'] ?? 0));
+                }
+                $_SESSION['energy_settings_feedback'] = $result;
+                $redirectParams['energy_open'] = 1;
+            } elseif ($action === 'update_energy_provider') {
+                $isEnergyAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'error' => 'Solo gli amministratori possono aggiornare gestori energia.',
+                    ];
+                } else {
+                    $providerId = isset($_POST['energy_provider_id']) ? (int) $_POST['energy_provider_id'] : 0;
+                    $result = $energyProviderService->updateProvider($providerId, $_POST, (int) ($currentUser['id'] ?? 0));
+                }
+                $_SESSION['energy_settings_feedback'] = $result;
+                $redirectParams['energy_open'] = 1;
+            } elseif ($action === 'delete_energy_provider') {
+                $isEnergyAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'error' => 'Solo gli amministratori possono eliminare gestori energia.',
+                    ];
+                } else {
+                    $providerId = isset($_POST['energy_provider_id']) ? (int) $_POST['energy_provider_id'] : 0;
+                    $result = $energyProviderService->deleteProvider($providerId, (int) ($currentUser['id'] ?? 0));
+                }
+                $_SESSION['energy_settings_feedback'] = $result;
+                $redirectParams['energy_open'] = 1;
+            } elseif ($action === 'import_energy_offers') {
+                $isEnergyAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'error' => 'Solo gli amministratori possono importare offerte ARERA.',
+                    ];
+                } else {
+                    $result = runEnergyOffersImport(false);
+                }
+                $_SESSION['energy_settings_feedback'] = $result;
+                $redirectParams['energy_open'] = 1;
+            } elseif ($action === 'save_pda_ocr') {
+                $isPdaAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'errors' => ['Solo gli amministratori possono configurare il PDA.'],
+                    ];
+                } else {
+                    $result = $pdaSettingsService->saveOcrSettings($_POST);
+                }
+                $_SESSION['pda_settings_feedback'] = $result;
+                $redirectParams['pda_open'] = 1;
+            } elseif ($action === 'save_pda_templates') {
+                $isPdaAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'errors' => ['Solo gli amministratori possono configurare il PDA.'],
+                    ];
+                } else {
+                    $result = $pdaSettingsService->saveTemplatesJson((string) ($_POST['pda_templates_json'] ?? ''));
+                }
+                $_SESSION['pda_settings_feedback'] = $result;
+                $redirectParams['pda_open'] = 1;
+            } elseif ($action === 'save_receipt_settings') {
+                $isReceiptAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'errors' => ['Solo gli amministratori possono configurare lo scontrino.'],
+                    ];
+                } else {
+                    $result = $receiptSettingsService->saveSettings($_POST);
+                }
+                $_SESSION['receipt_settings_feedback'] = $result;
+                $redirectParams['receipt_open'] = 1;
             } elseif ($action === 'update_product_tax') {
                 if (!$isAdmin) {
                     $result = [
@@ -1530,7 +2252,9 @@ switch ($page) {
                 ];
             }
 
-            $_SESSION['settings_feedback'] = $result;
+            if (!$isPdaAction && !$isReceiptAction && !$isEnergyAction) {
+                $_SESSION['settings_feedback'] = $result;
+            }
 
             $query = ['page' => 'settings'];
             foreach ($redirectParams as $key => $value) {
@@ -1587,6 +2311,10 @@ switch ($page) {
             'roles' => $isAdmin ? $userService->getRoles() : [],
             'operators' => $isAdmin ? $userService->listOperators() : [],
             'providers' => $isAdmin ? $providerService->listProviders() : [],
+            'energyProviders' => $energyProviders,
+            'energyOffersImportStatus' => $energyOffersImportStatus,
+            'energyOpen' => $energyOpen,
+            'energyFeedback' => $energySettingsFeedback,
             'operatorEdit' => $operatorEdit,
             'operatorEditForm' => $operatorEditForm,
             'operatorsOpen' => $operatorsOpenOverride,
@@ -1605,8 +2333,79 @@ switch ($page) {
             'ssoSecretPreview' => $ssoSecretPreview,
             'ssoOpen' => $ssoOpen,
             'ssoTokenTtl' => $ssoService->getTokenTtl(),
+            'pdaSettings' => $pdaSettings,
+            'pdaFeedback' => $pdaSettingsFeedback,
+            'pdaOpen' => $pdaOpen,
+            'receiptSettings' => $receiptSettings,
+            'receiptFeedback' => $receiptSettingsFeedback,
+            'receiptOpen' => $receiptOpen,
         ]);
         break;
+
+    case 'pda_imports':
+        if (!$authService->hasRole('admin')) {
+            header('Location: index.php?page=dashboard');
+            exit;
+        }
+
+        $pdaFeedback = $_SESSION['pda_imports_feedback'] ?? null;
+        unset($_SESSION['pda_imports_feedback']);
+
+        if ($method === 'POST' && ($_POST['action'] ?? '') === 'reprocess_pda') {
+            $importId = isset($_POST['pda_import_id']) ? (int) $_POST['pda_import_id'] : 0;
+            $result = $pdaImportController->reprocess($importId, $currentUser);
+            $_SESSION['pda_imports_feedback'] = $result;
+            header('Location: index.php?page=pda_imports&detail=' . $importId);
+            exit;
+        }
+
+        $pageNo = isset($_GET['page_no']) ? max((int) $_GET['page_no'], 1) : 1;
+        $perPage = 10;
+        $importsList = $pdaImportController->list($pageNo, $perPage);
+        $detail = null;
+        if (isset($_GET['detail'])) {
+            $detailId = max((int) $_GET['detail'], 0);
+            if ($detailId > 0) {
+                $detail = $pdaImportController->detail($detailId);
+            }
+        }
+
+        render('pda_imports', [
+            'imports' => $importsList['rows'],
+            'pagination' => $importsList['pagination'],
+            'detail' => $detail,
+            'feedback' => $pdaFeedback,
+            'currentUser' => $currentUser,
+            'pageTitle' => 'Debug Import PDA',
+        ]);
+        break;
+
+    case 'pda_settings':
+        if (!$authService->hasRole('admin')) {
+            header('Location: index.php?page=dashboard');
+            exit;
+        }
+        if ($method === 'POST') {
+            $action = $_POST['action'] ?? '';
+            if ($action === 'save_pda_ocr') {
+                $result = $pdaSettingsService->saveOcrSettings($_POST);
+            } elseif ($action === 'save_pda_templates') {
+                $result = $pdaSettingsService->saveTemplatesJson((string) ($_POST['pda_templates_json'] ?? ''));
+            } else {
+                $result = [
+                    'success' => false,
+                    'message' => 'Azione non riconosciuta.',
+                    'errors' => ['Richiesta non valida.'],
+                ];
+            }
+
+            $_SESSION['pda_settings_feedback'] = $result;
+            header('Location: index.php?page=settings&pda_open=1');
+            exit;
+        }
+
+        header('Location: index.php?page=settings&pda_open=1');
+        exit;
 
     case 'security':
         $userId = isset($currentUser['id']) ? (int) $currentUser['id'] : 0;
@@ -1625,6 +2424,7 @@ switch ($page) {
             $action = isset($_POST['action']) ? (string) $_POST['action'] : '';
             $redirectParams = [];
             $message = null;
+            $redirectPage = 'security';
 
             if ($action === 'start_setup') {
                 $setupResult = $authController->beginMfaSetup($userId, $issuer);
@@ -1655,6 +2455,17 @@ switch ($page) {
                         'success' => true,
                         'message' => 'Autenticazione a due fattori attivata correttamente.',
                     ];
+                    if (!$receiptSettingsService->isConfigured()) {
+                        $redirectPage = 'settings';
+                        $redirectParams['receipt_open'] = 1;
+                        pushFlashToast([
+                            'type' => 'info',
+                            'title' => 'Configura lo scontrino',
+                            'message' => 'Completa la configurazione iniziale impostando le diciture dello scontrino.',
+                            'duration' => 0,
+                            'dismissible' => false,
+                        ]);
+                    }
                 } else {
                     $message = [
                         'success' => false,
@@ -1690,7 +2501,7 @@ switch ($page) {
                 $_SESSION['security_feedback'] = $message;
             }
 
-            $query = ['page' => 'security'];
+            $query = ['page' => $redirectPage];
             foreach ($redirectParams as $key => $value) {
                 if ($value === null) {
                     continue;
@@ -1767,12 +2578,16 @@ switch ($page) {
         $feedbackRefund = $_SESSION['sale_refund_feedback'] ?? null;
         $pdaFeedback = $_SESSION['sale_pda_feedback'] ?? null;
         $pdaPrefill = $_SESSION['sale_pda_prefill'] ?? null;
+        $pdaPreview = $_SESSION['sale_pda_preview'] ?? null;
+        $pdaImportId = $_SESSION['sale_pda_import_id'] ?? null;
         unset(
             $_SESSION['sale_create_feedback'],
             $_SESSION['sale_cancel_feedback'],
             $_SESSION['sale_refund_feedback'],
             $_SESSION['sale_pda_feedback'],
-            $_SESSION['sale_pda_prefill']
+            $_SESSION['sale_pda_prefill'],
+            $_SESSION['sale_pda_preview'],
+            $_SESSION['sale_pda_import_id']
         );
 
         if ($method === 'POST' && ($_POST['action'] ?? '') === 'load_sale_details') {
@@ -1788,9 +2603,28 @@ switch ($page) {
             if ($action === 'upload_pda') {
                 $result = $pdaImportController->upload($_FILES, $_POST, $currentUser);
                 $_SESSION['sale_pda_feedback'] = $result;
+                if (($result['success'] ?? false) && isset($result['preview'], $result['import_id'])) {
+                    $_SESSION['sale_pda_preview'] = $result['preview'];
+                    $_SESSION['sale_pda_import_id'] = $result['import_id'];
+                }
+                header('Location: index.php?page=sales_create');
+                exit;
+            }
+            if ($action === 'confirm_pda_import') {
+                $result = $pdaImportController->confirm($_POST, $currentUser);
+                $_SESSION['sale_pda_feedback'] = $result;
                 if (($result['success'] ?? false) && isset($result['prefill'])) {
                     $_SESSION['sale_pda_prefill'] = $result['prefill'];
+                } else {
+                    $_SESSION['sale_pda_preview'] = $pdaPreview ?? null;
+                    $_SESSION['sale_pda_import_id'] = $pdaImportId ?? null;
                 }
+                header('Location: index.php?page=sales_create');
+                exit;
+            }
+            if ($action === 'cancel_pda_import') {
+                $result = $pdaImportController->cancel($_POST, $currentUser);
+                $_SESSION['sale_pda_feedback'] = $result;
                 header('Location: index.php?page=sales_create');
                 exit;
             }
@@ -1880,10 +2714,237 @@ switch ($page) {
         ]);
         break;
 
+    case 'energy_contracts':
+        $energyFeedback = $_SESSION['energy_contracts_feedback'] ?? null;
+        unset($_SESSION['energy_contracts_feedback']);
+
+        if ($method === 'POST') {
+            $action = $_POST['action'] ?? '';
+            if ($action === 'energy_bill_parse') {
+                $file = $_FILES['bill_file'] ?? null;
+                if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                    jsonResponse(['success' => false, 'message' => 'Carica un file PDF valido.'], 422);
+                }
+
+                $maxSize = 8 * 1024 * 1024;
+                if (($file['size'] ?? 0) > $maxSize) {
+                    jsonResponse(['success' => false, 'message' => 'Il file supera 8MB.'], 422);
+                }
+
+                $ext = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+                if ($ext !== 'pdf') {
+                    jsonResponse(['success' => false, 'message' => 'Formato non supportato. Usa PDF.'], 422);
+                }
+
+                try {
+                    $data = parseEnergyBillPdf((string) ($file['tmp_name'] ?? ''));
+                    jsonResponse([
+                        'success' => true,
+                        'data' => $data,
+                        'message' => 'Bolletta analizzata.',
+                    ]);
+                } catch (\Throwable $exception) {
+                    jsonResponse([
+                        'success' => false,
+                        'message' => 'Impossibile leggere la bolletta.',
+                        'error' => $exception->getMessage(),
+                    ], 500);
+                }
+            } elseif ($action === 'create_energy_contract') {
+                $userId = isset($currentUser['id']) ? (int) $currentUser['id'] : null;
+                $result = $energyContractController->create($_POST, $userId);
+                $_SESSION['energy_contracts_feedback'] = $result;
+            } elseif ($action === 'delete_energy_contract') {
+                $contractId = isset($_POST['contract_id']) ? (int) $_POST['contract_id'] : 0;
+                $result = $energyContractController->delete($contractId);
+                $_SESSION['energy_contracts_feedback'] = $result;
+            } elseif ($action === 'energy_sim_request') {
+                $name = trim((string) ($_POST['contact_name'] ?? ''));
+                $email = trim((string) ($_POST['contact_email'] ?? ''));
+                $phone = trim((string) ($_POST['contact_phone'] ?? ''));
+                $preferred = trim((string) ($_POST['preferred_time'] ?? ''));
+                $note = trim((string) ($_POST['contact_note'] ?? ''));
+                $requestType = trim((string) ($_POST['request_type'] ?? 'richiesta'));
+                $simPayload = trim((string) ($_POST['sim_payload'] ?? ''));
+                $simSummary = trim((string) ($_POST['sim_summary'] ?? ''));
+
+                $errors = [];
+                if ($name === '') {
+                    $errors[] = 'Inserisci il nome del contatto.';
+                }
+                if ($email === '' && $phone === '') {
+                    $errors[] = 'Inserisci almeno email o telefono.';
+                }
+
+                if ($errors !== []) {
+                    $_SESSION['energy_contracts_feedback'] = [
+                        'success' => false,
+                        'message' => 'Impossibile inviare la richiesta.',
+                        'errors' => $errors,
+                    ];
+                } else {
+                    $payloadJson = null;
+                    if ($simPayload !== '') {
+                        $decoded = json_decode($simPayload, true);
+                        if (is_array($decoded)) {
+                            $payloadJson = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                        }
+                    }
+
+                    try {
+                        $stmt = $pdo->prepare(
+                            'INSERT INTO energy_sim_requests
+                                (request_type, contact_name, contact_email, contact_phone, preferred_time, contact_note, sim_payload, sim_summary, user_id)
+                             VALUES
+                                (:request_type, :contact_name, :contact_email, :contact_phone, :preferred_time, :contact_note, :sim_payload, :sim_summary, :user_id)'
+                        );
+                        $stmt->execute([
+                            ':request_type' => $requestType !== '' ? $requestType : 'richiesta',
+                            ':contact_name' => $name,
+                            ':contact_email' => $email !== '' ? $email : null,
+                            ':contact_phone' => $phone !== '' ? $phone : null,
+                            ':preferred_time' => $preferred !== '' ? $preferred : null,
+                            ':contact_note' => $note !== '' ? $note : null,
+                            ':sim_payload' => $payloadJson,
+                            ':sim_summary' => $simSummary !== '' ? $simSummary : null,
+                            ':user_id' => isset($currentUser['id']) ? (int) $currentUser['id'] : null,
+                        ]);
+
+                        $_SESSION['energy_contracts_feedback'] = [
+                            'success' => true,
+                            'message' => 'Richiesta salvata correttamente. Ti ricontatteremo a breve.',
+                        ];
+                    } catch (\Throwable $exception) {
+                        $_SESSION['energy_contracts_feedback'] = [
+                            'success' => false,
+                            'message' => 'Impossibile salvare la richiesta.',
+                            'errors' => [$exception->getMessage()],
+                        ];
+                    }
+                }
+            } elseif ($action === 'energy_sim_upload') {
+                $name = trim((string) ($_POST['contact_name'] ?? ''));
+                $email = trim((string) ($_POST['contact_email'] ?? ''));
+                $phone = trim((string) ($_POST['contact_phone'] ?? ''));
+                $note = trim((string) ($_POST['contact_note'] ?? ''));
+                $simPayload = trim((string) ($_POST['sim_payload'] ?? ''));
+                $simSummary = trim((string) ($_POST['sim_summary'] ?? ''));
+
+                $errors = [];
+                if ($name === '') {
+                    $errors[] = 'Inserisci il nome del contatto.';
+                }
+                if ($email === '' && $phone === '') {
+                    $errors[] = 'Inserisci almeno email o telefono.';
+                }
+
+                $file = $_FILES['bill_file'] ?? null;
+                if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                    $errors[] = 'Carica un file valido della bolletta.';
+                }
+
+                $storedPath = null;
+                if ($errors === [] && is_array($file)) {
+                    $maxSize = 6 * 1024 * 1024;
+                    if (($file['size'] ?? 0) > $maxSize) {
+                        $errors[] = 'Il file supera la dimensione massima di 6MB.';
+                    }
+
+                    $ext = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+                    $allowed = ['pdf', 'jpg', 'jpeg', 'png'];
+                    if (!in_array($ext, $allowed, true)) {
+                        $errors[] = 'Formato file non supportato.';
+                    }
+
+                    if ($errors === []) {
+                        $relativeDir = 'uploads/energy_bills/' . date('Ym');
+                        $uploadDir = __DIR__ . '/' . $relativeDir;
+                        if (!is_dir($uploadDir)) {
+                            mkdir($uploadDir, 0775, true);
+                        }
+                        $safeName = preg_replace('/[^a-z0-9\._-]+/i', '_', (string) ($file['name'] ?? 'bolletta'));
+                        $filename = time() . '-' . bin2hex(random_bytes(4)) . '-' . $safeName;
+                        $target = $uploadDir . '/' . $filename;
+                        if (move_uploaded_file((string) ($file['tmp_name'] ?? ''), $target)) {
+                            $storedPath = $relativeDir . '/' . $filename;
+                        } else {
+                            $errors[] = 'Impossibile salvare il file caricato.';
+                        }
+                    }
+                }
+
+                if ($errors !== []) {
+                    $_SESSION['energy_contracts_feedback'] = [
+                        'success' => false,
+                        'message' => 'Upload non completato.',
+                        'errors' => $errors,
+                    ];
+                } else {
+                    $payloadJson = null;
+                    if ($simPayload !== '') {
+                        $decoded = json_decode($simPayload, true);
+                        if (is_array($decoded)) {
+                            $payloadJson = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                        }
+                    }
+
+                    try {
+                        $stmt = $pdo->prepare(
+                            'INSERT INTO energy_sim_requests
+                                (request_type, contact_name, contact_email, contact_phone, contact_note, sim_payload, sim_summary, bill_file_path, user_id)
+                             VALUES
+                                (:request_type, :contact_name, :contact_email, :contact_phone, :contact_note, :sim_payload, :sim_summary, :bill_file_path, :user_id)'
+                        );
+                        $stmt->execute([
+                            ':request_type' => 'upload',
+                            ':contact_name' => $name,
+                            ':contact_email' => $email !== '' ? $email : null,
+                            ':contact_phone' => $phone !== '' ? $phone : null,
+                            ':contact_note' => $note !== '' ? $note : null,
+                            ':sim_payload' => $payloadJson,
+                            ':sim_summary' => $simSummary !== '' ? $simSummary : null,
+                            ':bill_file_path' => $storedPath,
+                            ':user_id' => isset($currentUser['id']) ? (int) $currentUser['id'] : null,
+                        ]);
+
+                        $_SESSION['energy_contracts_feedback'] = [
+                            'success' => true,
+                            'message' => 'Bolletta caricata correttamente. Ti ricontatteremo a breve.',
+                        ];
+                    } catch (\Throwable $exception) {
+                        $_SESSION['energy_contracts_feedback'] = [
+                            'success' => false,
+                            'message' => 'Impossibile salvare la richiesta.',
+                            'errors' => [$exception->getMessage()],
+                        ];
+                    }
+                }
+            }
+            header('Location: index.php?page=energy_contracts');
+            exit;
+        }
+
+        $period = isset($_GET['period']) ? (string) $_GET['period'] : 'month';
+        $date = isset($_GET['date']) ? trim((string) $_GET['date']) : '';
+        $focusContractId = isset($_GET['focus']) ? max((int) $_GET['focus'], 0) : null;
+        $contractsData = $energyContractController->listByPeriod($period, $date !== '' ? $date : null);
+
+        render('energy_contracts', [
+            'energyProviders' => $energyProviderService->listProviders(),
+            'energyOffers' => $energyOfferService->listOffersForSimulator(),
+            'contractsData' => $contractsData,
+            'feedback' => $energyFeedback,
+            'period' => $period,
+            'dateValue' => $date,
+            'focusContractId' => $focusContractId,
+            'currentUser' => $currentUser,
+            'pageTitle' => 'Contratti energia',
+        ]);
+        break;
+
     case 'product_requests':
         $feedbackProductRequests = $_SESSION['product_requests_feedback'] ?? null;
         unset($_SESSION['product_requests_feedback']);
-
         $filters = [
             'status' => $_GET['status'] ?? null,
             'type' => $_GET['type'] ?? null,

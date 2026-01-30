@@ -37,6 +37,13 @@ $buildPageUrl = static function (int $pageNo) use ($searchTerm): string {
     return 'index.php?' . http_build_query($params);
 };
 $hasSearch = $searchTerm !== '';
+$formatDate = static function (?string $value, string $pattern = 'd/m/Y'): string {
+    if ($value === null || $value === '') {
+        return '—';
+    }
+    $timestamp = strtotime($value);
+    return $timestamp !== false ? date($pattern, $timestamp) : '—';
+};
 ?>
 <section class="page">
     <header class="page__header">
@@ -174,7 +181,9 @@ $hasSearch = $searchTerm !== '';
                             <td><?= number_format((float) $offer['price'], 2) ?> €</td>
                             <td>
                                 <?php if ($offer['valid_from'] || $offer['valid_to']): ?>
-                                    <span><?= htmlspecialchars($offer['valid_from'] ?? '—') ?> → <?= htmlspecialchars($offer['valid_to'] ?? '—') ?></span>
+                                    <?php $validFrom = $formatDate($offer['valid_from'] ?? null, 'd/m/Y'); ?>
+                                    <?php $validTo = $formatDate($offer['valid_to'] ?? null, 'd/m/Y'); ?>
+                                    <span><?= htmlspecialchars($validFrom) ?> → <?= htmlspecialchars($validTo) ?></span>
                                 <?php else: ?>
                                     <span>—</span>
                                 <?php endif; ?>
@@ -184,7 +193,7 @@ $hasSearch = $searchTerm !== '';
                                     <?= $offer['status'] === 'Active' ? 'Attiva' : 'Archiviata' ?>
                                 </span>
                             </td>
-                            <td><?= htmlspecialchars((string) $offer['updated_at']) ?></td>
+                            <td><?= htmlspecialchars($formatDate($offer['updated_at'] ?? null, 'd/m/Y H:i')) ?></td>
                             <td>
                                 <form method="post" class="table-actions">
                                     <a class="btn btn--secondary" href="<?= htmlspecialchars($buildPageUrl($currentPage) . '&edit=' . (int) $offer['id'], ENT_QUOTES) ?>">Modifica</a>

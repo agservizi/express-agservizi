@@ -4,23 +4,36 @@ declare(strict_types=1);
 /**
  * @var array<int, array<string, mixed>> $providers
  * @var array<int, array<string, mixed>> $stock
- * @var array{success:bool, message:string, error?:string}|null $feedback
+ * @var array{success:bool, message:string, error?:string, errors?:array<int, string>}|null $feedback
  * @var array{page:int, per_page:int, total:int, pages:int}|null $pagination
+ * @var string $searchTerm
  */
 $pageTitle = 'Magazzino SIM';
 $feedback = $feedback ?? null;
+$searchTerm = $searchTerm ?? '';
 $pagination = $pagination ?? ['page' => 1, 'per_page' => 7, 'total' => count($stock), 'pages' => 1];
-$buildStockPageUrl = static function (int $pageNo): string {
-    return 'index.php?' . http_build_query([
+$buildStockPageUrl = static function (int $pageNo) use ($searchTerm): string {
+    $params = [
         'page' => 'sim_stock',
         'page_no' => $pageNo,
-    ]);
+    ];
+    if ($searchTerm !== '') {
+        $params['search'] = $searchTerm;
+    }
+    return 'index.php?' . http_build_query($params);
+};
+$formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): string {
+    if ($value === null || $value === '') {
+        return '—';
+    }
+    $timestamp = strtotime($value);
+    return $timestamp !== false ? date($pattern, $timestamp) : '—';
 };
 ?>
 <section
     class="page"
     data-live-refresh="sim_stock"
-    data-refresh-url="index.php?page=sim_stock&amp;action=refresh"
+    data-refresh-url="index.php?page=sim_stock&amp;action=refresh<?= $searchTerm !== '' ? '&amp;search=' . urlencode($searchTerm) : '' ?>"
     data-refresh-interval="15000"
     data-refresh-page="<?= (int) $pagination['page'] ?>"
     data-refresh-per-page="<?= (int) $pagination['per_page'] ?>"
@@ -40,6 +53,11 @@ $buildStockPageUrl = static function (int $pageNo): string {
                     <p><?= htmlspecialchars($feedback['message']) ?></p>
                     <?php if (!empty($feedback['error'])): ?>
                         <p class="muted">Dettaglio: <?= htmlspecialchars($feedback['error']) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($feedback['errors']) && is_array($feedback['errors'])): ?>
+                        <?php foreach ($feedback['errors'] as $error): ?>
+                            <p class="muted"><?= htmlspecialchars($error) ?></p>
+                        <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
@@ -75,8 +93,62 @@ $buildStockPageUrl = static function (int $pageNo): string {
     </section>
 
     <section class="page__section">
-        <h3>SIM a magazzino</h3>
-        <p class="muted" data-live-slot="status">Ultimo aggiornamento: <span data-live-slot="timestamp">--:--</span></p>
+        <h3>Aggiunta massiva</h3>
+        <p class="muted">Incolla una lista di ICCID (uno per riga o separati da virgola). Puoi caricare decine di SIM in un'unica volta.</p>
+
+        <form method="post" class="form" autocomplete="off" data-live-form>
+            <input type="hidden" name="action" value="bulk_add">
+            <input type="hidden" name="page_no" value="<?= (int) $pagination['page'] ?>">
+            <input type="hidden" name="per_page" value="<?= (int) $pagination['per_page'] ?>">
+            <div class="form__grid">
+                <div class="form__group">
+                    <label for="bulk_iccids">Lista ICCID</label>
+                    <textarea
+                        name="bulk_iccids"
+                        id="bulk_iccids"
+                        rows="6"
+                        placeholder="8939123456789012345&#10;89391234567890123456&#10;89391234567890123457"
+                        required
+                    ></textarea>
+                </div>
+                <div class="form__group">
+                    <label for="bulk_provider_id">Operatore</label>
+                    <select name="provider_id" id="bulk_provider_id" required>
+                        <option value="">Seleziona</option>
+                        <?php foreach ($providers as $provider): ?>
+                            <option value="<?= (int) $provider['id'] ?>"><?= htmlspecialchars((string) $provider['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form__group">
+                    <label for="bulk_notes">Note</label>
+                    <input type="text" name="bulk_notes" id="bulk_notes" placeholder="Note facoltative per tutte le SIM">
+                </div>
+            </div>
+            <div class="form__footer">
+                <button type="submit" class="btn btn--primary">Carica lista SIM</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="page__section">
+        <div class="section__header">
+            <div>
+                <h3>SIM a magazzino</h3>
+                <p class="muted" data-live-slot="status">Ultimo aggiornamento: <span data-live-slot="timestamp">--:--</span></p>
+            </div>
+            <form method="get" class="search-field">
+                <input type="hidden" name="page" value="sim_stock">
+                <span class="search-field__icon" aria-hidden="true">🔎</span>
+                <input
+                    type="text"
+                    name="search"
+                    class="search-field__control"
+                    placeholder="Cerca ICCID o operatore"
+                    value="<?= htmlspecialchars($searchTerm) ?>"
+                >
+            </form>
+        </div>
         <div class="table-wrapper">
             <table class="table" data-live-slot="table">
                 <thead>
@@ -97,7 +169,7 @@ $buildStockPageUrl = static function (int $pageNo): string {
                                 <td><?= htmlspecialchars((string) $row['iccid']) ?></td>
                                 <td><?= htmlspecialchars((string) $row['provider_name']) ?></td>
                                 <td><?= htmlspecialchars((string) $row['status']) ?></td>
-                                <td><?= htmlspecialchars((string) $row['updated_at']) ?></td>
+                                <td><?= htmlspecialchars($formatDate($row['updated_at'] ?? null)) ?></td>
                                 <td><?= htmlspecialchars((string) ($row['notes'] ?? '')) ?></td>
                             </tr>
                         <?php endforeach; ?>

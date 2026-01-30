@@ -42,7 +42,7 @@ final class ICCIDService
      *   pagination: array{page:int, per_page:int, total:int, pages:int}
      * }
      */
-    public function paginateStock(int $page, int $perPage, ?string $status = null): array
+    public function paginateStock(int $page, int $perPage, ?string $status = null, ?string $search = null): array
     {
         $page = max($page, 1);
         $perPage = max($perPage, 1);
@@ -55,9 +55,24 @@ final class ICCIDService
             $params[':status'] = $status;
         }
 
+        $searchTerm = null;
+        if ($search !== null) {
+            $searchTerm = trim($search);
+            if ($searchTerm === '') {
+                $searchTerm = null;
+            }
+        }
+
+        if ($searchTerm !== null) {
+            $conditions[] = '(iccid_stock.iccid LIKE :search_iccid OR providers.name LIKE :search_provider)';
+            $likeValue = '%' . $searchTerm . '%';
+            $params[':search_iccid'] = $likeValue;
+            $params[':search_provider'] = $likeValue;
+        }
+
         $where = $conditions === [] ? '' : ('WHERE ' . implode(' AND ', $conditions));
 
-        $countSql = 'SELECT COUNT(*) FROM iccid_stock ' . $where;
+        $countSql = 'SELECT COUNT(*) FROM iccid_stock JOIN providers ON providers.id = iccid_stock.provider_id ' . $where;
         $stmtCount = $this->pdo->prepare($countSql);
         foreach ($params as $key => $value) {
             $stmtCount->bindValue($key, $value);
@@ -70,11 +85,11 @@ final class ICCIDService
         $offset = ($currentPage - 1) * $perPage;
 
         $dataSql = 'SELECT iccid_stock.*, providers.name AS provider_name
-                    FROM iccid_stock
-                    JOIN providers ON providers.id = iccid_stock.provider_id
-                    ' . $where . '
-                    ORDER BY iccid_stock.created_at DESC
-                    LIMIT :limit OFFSET :offset';
+                FROM iccid_stock
+                JOIN providers ON providers.id = iccid_stock.provider_id
+                ' . $where . '
+                ORDER BY iccid_stock.created_at DESC
+                LIMIT :limit OFFSET :offset';
 
         $stmtData = $this->pdo->prepare($dataSql);
         foreach ($params as $key => $value) {
@@ -159,6 +174,102 @@ final class ICCIDService
         return [
             'inserted' => $inserted,
             'errors' => $errors,
+        ];
+    }
+
+    /**
+     * @param array<int, string> $iccids
+     * @return array{success:bool, message:string, error?:string, errors?:array<int, string>, inserted?:int}
+     */
+    public function addBulkSims(array $iccids, int $providerId, ?string $notes = null): array
+    {
+        $cleaned = [];
+        foreach ($iccids as $value) {
+            $trimmed = trim((string) $value);
+            if ($trimmed !== '') {
+                $cleaned[] = $trimmed;
+            }
+        }
+
+        if ($cleaned === []) {
+            return [
+                'success' => false,
+                'message' => 'Nessun ICCID valido da importare.',
+                'error' => 'Lista ICCID vuota.',
+                'errors' => ['Inserisci almeno un ICCID valido.'],
+                'inserted' => 0,
+            ];
+        }
+
+        $errors = [];
+        $inserted = 0;
+
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                "INSERT INTO iccid_stock (iccid, provider_id, status, notes) VALUES (:iccid, :provider, 'InStock', :notes)"
+            );
+
+            foreach ($cleaned as $iccid) {
+                if (!Validator::isValidICCID($iccid)) {
+                    $errors[] = "ICCID non valido: {$iccid}";
+                    continue;
+                }
+
+                try {
+                    $stmt->execute([
+                        ':iccid' => $iccid,
+                        ':provider' => $providerId,
+                        ':notes' => $notes,
+                    ]);
+                    $inserted++;
+                } catch (PDOException $exception) {
+                    $errors[] = "Errore inserimento {$iccid}: " . $exception->getMessage();
+                }
+            }
+
+            $this->pdo->commit();
+        } catch (\Throwable $exception) {
+            $this->pdo->rollBack();
+
+            return [
+                'success' => false,
+                'message' => 'Errore durante il caricamento delle SIM.',
+                'error' => $exception->getMessage(),
+                'errors' => $errors,
+                'inserted' => $inserted,
+            ];
+        }
+
+        if (count($errors) > 50) {
+            $errors = array_slice($errors, 0, 50);
+            $errors[] = '... altri errori non mostrati.';
+        }
+
+        $discarded = count($errors);
+        if ($inserted === 0) {
+            return [
+                'success' => false,
+                'message' => 'Nessuna SIM caricata.',
+                'error' => 'Tutti gli ICCID sono risultati non validi o duplicati.',
+                'errors' => $errors,
+                'inserted' => 0,
+            ];
+        }
+
+        $message = "Caricate {$inserted} SIM";
+        if ($discarded > 0) {
+            $message .= ", scartate {$discarded}.";
+        } else {
+            $message .= '.';
+        }
+
+        return [
+            'success' => $inserted > 0,
+            'message' => $message,
+            'error' => $discarded > 0 ? 'Alcuni ICCID non validi o duplicati.' : null,
+            'errors' => $errors,
+            'inserted' => $inserted,
         ];
     }
 

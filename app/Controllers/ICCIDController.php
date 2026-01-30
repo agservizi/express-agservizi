@@ -25,9 +25,9 @@ final class ICCIDController
      *   pagination: array{page:int, per_page:int, total:int, pages:int}
      * }
      */
-    public function listPaginated(int $page, int $perPage, ?string $status = null): array
+    public function listPaginated(int $page, int $perPage, ?string $status = null, ?string $search = null): array
     {
-        return $this->iccidService->paginateStock($page, $perPage, $status);
+        return $this->iccidService->paginateStock($page, $perPage, $status, $search);
     }
 
     /**
@@ -48,7 +48,7 @@ final class ICCIDController
 
     /**
      * @param array<string, mixed> $input
-     * @return array{success:bool, message:string, error?:string}
+     * @return array{success:bool, message:string, error?:string, errors?:array<int, string>, inserted?:int}
      */
     public function create(array $input): array
     {
@@ -59,6 +59,15 @@ final class ICCIDController
                 'message' => 'Seleziona un operatore valido.',
                 'error' => 'Provider non valido',
             ];
+        }
+
+        $action = (string) ($input['action'] ?? '');
+        $bulkRaw = (string) ($input['bulk_iccids'] ?? '');
+        if ($action === 'bulk_add' || $bulkRaw !== '') {
+            $notes = $input['bulk_notes'] !== null ? (string) $input['bulk_notes'] : null;
+            $tokens = preg_split('/[\s,;]+/', $bulkRaw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+            return $this->iccidService->addBulkSims($tokens, $providerId, $notes);
         }
 
         $iccid = (string) ($input['iccid'] ?? '');

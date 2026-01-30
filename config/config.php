@@ -111,10 +111,10 @@ $parseHeaderList = static function (?string $raw): array {
     return $headers;
 };
 
-$dbHost = $getEnv('DB_HOST');
-$dbPort = $getEnv('DB_PORT');
-$dbName = $getEnv('DB_NAME');
-$dbUser = $getEnv('DB_USER');
+$dbHost = $getEnv('DB_HOST', null);
+$dbPort = $getEnv('DB_PORT', null);
+$dbName = $getEnv('DB_NAME', null);
+$dbUser = $getEnv('DB_USER', null);
 $dbPass = $getEnv('DB_PASS', '');
 
 if ($dbHost === null) {
@@ -134,23 +134,27 @@ $appEnv = $getEnv('APP_ENV', 'development');
 $appName = $getEnv('APP_NAME', 'Coresuite');
 $taxRate = (float) ($getEnv('APP_TAX_RATE', '0.0'));
 $taxNote = $getEnv('APP_TAX_NOTE', "Operazione non soggetta a IVA ai sensi dell'art. 74 DPR 633/72");
-$alertEmail = $getEnv('ALERT_EMAIL');
-$resendApiKey = $getEnv('RESEND_API_KEY');
+$alertEmail = $getEnv('ALERT_EMAIL', null);
+$resendApiKey = $getEnv('RESEND_API_KEY', null);
 $resendFrom = $getEnv('RESEND_FROM', 'alerts@coresuite.test');
-$resendFromName = $getEnv('RESEND_FROM_NAME');
-$salesFulfilmentEmail = $getEnv('SALES_FULFILMENT_EMAIL');
-$customerPortalUrl = $getEnv('CUSTOMER_PORTAL_URL');
+$resendFromName = $getEnv('RESEND_FROM_NAME', null);
+$salesFulfilmentEmail = $getEnv('SALES_FULFILMENT_EMAIL', null);
+$customerPortalUrl = $getEnv('CUSTOMER_PORTAL_URL', null);
 $appTimezone = $getEnv('APP_TIMEZONE', 'Europe/Rome');
-$notificationWebhookUrl = $getEnv('NOTIFICATIONS_WEBHOOK_URL');
-$notificationWebhookHeaders = $parseHeaderList($getEnv('NOTIFICATIONS_WEBHOOK_HEADERS'));
-$notificationQueueDsn = $getEnv('NOTIFICATIONS_QUEUE_DSN');
+$notificationWebhookUrl = $getEnv('NOTIFICATIONS_WEBHOOK_URL', null);
+$notificationWebhookHeaders = $parseHeaderList($getEnv('NOTIFICATIONS_WEBHOOK_HEADERS', null));
+$notificationQueueDsn = $getEnv('NOTIFICATIONS_QUEUE_DSN', null);
 $notificationQueueExchange = $getEnv('NOTIFICATIONS_QUEUE_EXCHANGE', 'coresuite.notifications');
 $notificationQueueRoutingKey = $getEnv('NOTIFICATIONS_QUEUE_ROUTING_KEY', 'event');
-$notificationQueueName = $getEnv('NOTIFICATIONS_QUEUE_NAME');
+$notificationQueueName = $getEnv('NOTIFICATIONS_QUEUE_NAME', null);
 $notificationTopbarLimit = (int) ($getEnv('NOTIFICATIONS_TOPBAR_LIMIT', '10'));
 $ssoIssuer = $getEnv('SSO_ISSUER', 'coresuite-express');
-$ssoSharedSecret = $getEnv('SSO_SHARED_SECRET');
+$ssoSharedSecret = $getEnv('SSO_SHARED_SECRET', null);
 $ssoTokenTtl = (int) ($getEnv('SSO_TOKEN_TTL', '3600'));
+$pdaOcrEnabled = (int) ($getEnv('PDA_OCR_ENABLED', '1')) === 1;
+$pdaOcrMinChars = (int) ($getEnv('PDA_OCR_MIN_CHARS', '200'));
+$pdaOcrLang = $getEnv('PDA_OCR_LANG', 'ita');
+$pdaDuplicateWindowDays = (int) ($getEnv('PDA_DUP_WINDOW_DAYS', '30'));
 
 $dsn = sprintf(
     'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
@@ -208,6 +212,12 @@ $configCache = [
         'shared_secret' => $ssoSharedSecret,
         'token_ttl' => $ssoTokenTtl > 0 ? $ssoTokenTtl : 3600,
         'code_ttl' => 300,
+    ],
+    'pda' => [
+        'ocr_enabled' => $pdaOcrEnabled,
+        'ocr_min_chars' => $pdaOcrMinChars > 0 ? $pdaOcrMinChars : 200,
+        'ocr_lang' => $pdaOcrLang ?? 'ita',
+        'duplicate_window_days' => $pdaDuplicateWindowDays > 0 ? $pdaDuplicateWindowDays : 30,
     ],
 ];
 

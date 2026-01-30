@@ -46,6 +46,28 @@ $payments = (array) ($report['payments'] ?? []);
 $operators = (array) ($report['operators'] ?? []);
 $trend = (array) ($report['trend'] ?? []);
 $trendPoints = (array) ($trend['points'] ?? []);
+$energy = (array) ($report['energy'] ?? []);
+$energyTotals = array_merge([
+    'contracts' => 0,
+    'total_commission' => 0.0,
+    'average_commission' => 0.0,
+], (array) ($energy['totals'] ?? []));
+$energyProviders = (array) ($energy['providers'] ?? []);
+$energyTypes = (array) ($energy['types'] ?? []);
+$energyTrend = (array) ($energy['trend'] ?? []);
+$energyTrendPoints = (array) ($energyTrend['points'] ?? []);
+$maxEnergyCount = 0;
+$maxEnergyCommission = 0.0;
+foreach ($energyTrendPoints as $point) {
+    $count = (int) ($point['contract_count'] ?? 0);
+    $commission = max((float) ($point['total_commission'] ?? 0.0), 0.0);
+    if ($count > $maxEnergyCount) {
+        $maxEnergyCount = $count;
+    }
+    if ($commission > $maxEnergyCommission) {
+        $maxEnergyCommission = $commission;
+    }
+}
 $period = (array) ($report['period'] ?? []);
 $referenceForFile = $period['reference'] ?? '';
 if ($view === 'daily' && $filters['date'] !== '') {
@@ -288,6 +310,86 @@ $trendSummary = sprintf(
                         </li>
                     <?php endforeach; ?>
                 </ul>
+            <?php endif; ?>
+        </section>
+
+        <section class="dashboard-panel dashboard-panel--wide" data-draggable-card="panel-energy">
+            <header class="dashboard-panel__header">
+                <h3>Contratti energia</h3>
+                <p class="dashboard-panel__meta">Sintesi periodo selezionato</p>
+            </header>
+            <ul class="insight-list">
+                <li class="insight-list__item">
+                    <span class="insight-list__label">Contratti registrati</span>
+                    <span class="insight-list__value"><?= (int) $energyTotals['contracts'] ?></span>
+                </li>
+                <li class="insight-list__item">
+                    <span class="insight-list__label">Provvigioni totali</span>
+                    <span class="insight-list__value">€ <?= $formatCurrency((float) $energyTotals['total_commission']) ?></span>
+                </li>
+                <li class="insight-list__item">
+                    <span class="insight-list__label">Provvigione media</span>
+                    <span class="insight-list__value">€ <?= $formatCurrency((float) $energyTotals['average_commission']) ?></span>
+                </li>
+            </ul>
+            <div class="insight-split">
+                <div>
+                    <h4 class="insight-title">Top gestori</h4>
+                    <?php if ($energyProviders === []): ?>
+                        <p class="muted">Nessun contratto energia nel periodo.</p>
+                    <?php else: ?>
+                        <ul class="insight-list">
+                            <?php foreach ($energyProviders as $provider): ?>
+                                <li class="insight-list__item">
+                                    <span class="insight-list__label"><?= htmlspecialchars((string) ($provider['name'] ?? 'Gestore')) ?></span>
+                                    <span class="insight-list__value"><?= (int) ($provider['contracts'] ?? 0) ?> · € <?= $formatCurrency((float) ($provider['total_commission'] ?? 0.0)) ?></span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+                </div>
+                <div>
+                    <h4 class="insight-title">Tipologie contratto</h4>
+                    <?php if ($energyTypes === []): ?>
+                        <p class="muted">Nessuna tipologia registrata.</p>
+                    <?php else: ?>
+                        <ul class="insight-list">
+                            <?php foreach ($energyTypes as $type): ?>
+                                <li class="insight-list__item">
+                                    <span class="insight-list__label"><?= htmlspecialchars((string) ($type['type'] ?? 'n/d')) ?></span>
+                                    <span class="insight-list__value"><?= (int) ($type['contracts'] ?? 0) ?> · € <?= $formatCurrency((float) ($type['total_commission'] ?? 0.0)) ?></span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <h4 class="insight-title">Trend contratti energia</h4>
+            <?php if ($energyTrendPoints === []): ?>
+                <p class="muted">Nessun contratto energia nel periodo.</p>
+            <?php else: ?>
+                <div class="trend-grid">
+                    <?php foreach ($energyTrendPoints as $point): ?>
+                        <?php
+                            $count = (int) ($point['contract_count'] ?? 0);
+                            $commission = (float) ($point['total_commission'] ?? 0.0);
+                            $countPct = $maxEnergyCount > 0 ? (int) round(($count / $maxEnergyCount) * 100) : 0;
+                            $commissionPct = $maxEnergyCommission > 0 ? (int) round((max($commission, 0.0) / $maxEnergyCommission) * 100) : 0;
+                            $label = (string) ($point['label'] ?? '');
+                        ?>
+                        <article class="trend-card" title="Contratti <?= $count ?> · Provvigioni € <?= $formatCurrency($commission) ?>">
+                            <span class="trend-card__label"><?= htmlspecialchars($label) ?></span>
+                            <span class="trend-card__value"><?= $count ?> contratti</span>
+                            <div class="trend-bar">
+                                <span class="trend-bar__fill" style="width: <?= $countPct ?>%;"></span>
+                            </div>
+                            <div class="trend-bar trend-bar--secondary">
+                                <span class="trend-bar__fill" style="width: <?= $commissionPct ?>%;"></span>
+                            </div>
+                            <span class="trend-card__meta">Provvigioni € <?= $formatCurrency($commission) ?></span>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
             <?php endif; ?>
         </section>
     </div>

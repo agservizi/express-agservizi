@@ -22,9 +22,9 @@ final class ProductController
     /**
      * @return array{rows: array<int, array<string, mixed>>, pagination: array<string, int|bool>}
      */
-    public function listPaginated(int $page, int $perPage = 7): array
+    public function listPaginated(int $page, int $perPage = 7, ?string $search = null): array
     {
-        return $this->productService->listPaginated($page, $perPage);
+        return $this->productService->listPaginated($page, $perPage, $search);
     }
 
     /**

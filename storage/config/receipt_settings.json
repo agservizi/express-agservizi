@@ -1,0 +1,31 @@
+{
+    "header_lines": [
+        "TRT Service"
+    ],
+    "document_title": "DOCUMENTO GESTIONALE",
+    "document_number_template": "{{document_title}} #{{sale_id}}",
+    "thanks_text": "Grazie per il tuo acquisto!",
+    "footer_text": "Hai bisogno di stampare di nuovo? Puoi sempre recuperare questo DOCUMENTO GESTIONALE dalla sezione vendite.",
+    "labels": {
+        "date": "Data",
+        "operator": "Operatore",
+        "customer": "Cliente",
+        "vat": "IVA",
+        "vat_included": "IVA compresa",
+        "vat_codes": "Codici IVA applicati",
+        "discount": "Sconto",
+        "total": "Totale",
+        "total_original": "Totale originario",
+        "payment": "Pagamento",
+        "refund_amount": "Importo reso",
+        "cancelled_at": "Annullato il",
+        "cancellation_reason": "Motivo annullo",
+        "refunded_at": "Reso registrato il",
+        "refund_note": "Note reso"
+    },
+    "status_labels": {
+        "cancelled": "ANNULLATO",
+        "refunded": "RESO"
+    },
+    "configured_at": "2026-01-28 16:04:49"
+}

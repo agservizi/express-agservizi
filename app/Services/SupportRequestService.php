@@ -52,13 +52,18 @@ final class SupportRequestService
         }
         if ($search !== '') {
             $conditions[] = '(
-                r.subject LIKE :search OR
-                r.message LIKE :search OR
-                c.fullname LIKE :search OR
-                c.email LIKE :search OR
-                cp.email LIKE :search
+                r.subject LIKE :search_subject OR
+                r.message LIKE :search_message OR
+                c.fullname LIKE :search_customer OR
+                c.email LIKE :search_customer_email OR
+                cp.email LIKE :search_portal_email
             )';
-            $params[':search'] = '%' . $search . '%';
+            $wildcard = '%' . $search . '%';
+            $params[':search_subject'] = $wildcard;
+            $params[':search_message'] = $wildcard;
+            $params[':search_customer'] = $wildcard;
+            $params[':search_customer_email'] = $wildcard;
+            $params[':search_portal_email'] = $wildcard;
         }
         if ($from !== null) {
             $conditions[] = 'DATE(r.created_at) >= :from';
@@ -71,7 +76,11 @@ final class SupportRequestService
 
         $where = $conditions === [] ? '' : 'WHERE ' . implode(' AND ', $conditions);
 
-        $countSql = 'SELECT COUNT(*) FROM customer_support_requests r ' . $where;
+        $countSql = 'SELECT COUNT(*)
+                     FROM customer_support_requests r
+                     LEFT JOIN customers c ON c.id = r.customer_id
+                     LEFT JOIN customer_portal_accounts cp ON cp.id = r.portal_account_id
+                     ' . $where;
         $countStmt = $this->pdo->prepare($countSql);
         foreach ($params as $key => $value) {
             $countStmt->bindValue($key, $value);

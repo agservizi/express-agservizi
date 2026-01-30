@@ -13,6 +13,8 @@ declare(strict_types=1);
  * @var array<int, array<string, mixed>> $availableProviders
  * @var array{success:bool,message:string,warnings?:array<int,string>,errors?:array<int,string>}|null $pdaFeedback
  * @var array<string, mixed>|null $pdaPrefill
+ * @var array<string, mixed>|null $pdaPreview
+ * @var int|string|null $pdaImportId
  */
 $pageTitle = 'Nuova vendita';
 $availableOffers = $availableOffers ?? [];
@@ -24,11 +26,13 @@ $feedbackCancel = $feedbackCancel ?? null;
 $feedbackRefund = $feedbackRefund ?? null;
 $pdaFeedback = $pdaFeedback ?? null;
 $pdaPrefill = $pdaPrefill ?? null;
+$pdaPreview = $pdaPreview ?? null;
+$pdaImportId = $pdaImportId ?? null;
 $discountCampaigns = $discountCampaigns ?? [];
 $taxRate = (float) ($GLOBALS['config']['app']['tax_rate'] ?? 0.0);
 $taxNote = $GLOBALS['config']['app']['tax_note'] ?? "Operazione non soggetta a IVA ai sensi dell'art. 74 DPR 633/72";
 $pendingReceiptId = isset($_GET['print']) ? max(0, (int) $_GET['print']) : 0;
-$shouldOpenPdaImport = $pdaFeedback !== null || $pdaPrefill !== null;
+$shouldOpenPdaImport = $pdaFeedback !== null || $pdaPrefill !== null || $pdaPreview !== null;
 $prefillCustomer = [
     'id' => isset($pdaPrefill['customer_id']) ? (int) $pdaPrefill['customer_id'] : null,
     'name' => isset($pdaPrefill['customer_name']) ? (string) $pdaPrefill['customer_name'] : '',
@@ -38,6 +42,13 @@ $prefillCustomer = [
     'note' => isset($pdaPrefill['customer_note']) ? (string) $pdaPrefill['customer_note'] : '',
     'provider_id' => isset($pdaPrefill['provider']['id']) ? (int) $pdaPrefill['provider']['id'] : null,
 ];
+$previewCustomer = is_array($pdaPreview['customer'] ?? null) ? $pdaPreview['customer'] : [];
+$previewItems = is_array($pdaPreview['items'] ?? null) ? $pdaPreview['items'] : [];
+$previewErrors = is_array($pdaPreview['errors'] ?? null) ? $pdaPreview['errors'] : [];
+$previewWarnings = is_array($pdaPreview['warnings'] ?? null) ? $pdaPreview['warnings'] : [];
+$previewFieldStatus = is_array($pdaPreview['field_status'] ?? null) ? $pdaPreview['field_status'] : [];
+$previewItemStatus = is_array($pdaPreview['item_status'] ?? null) ? $pdaPreview['item_status'] : [];
+$previewHasErrors = $previewErrors !== [];
 ?>
 <section class="page">
     <header class="page__header">
@@ -100,6 +111,144 @@ $prefillCustomer = [
                         </div>
                         <button type="submit" class="btn btn--secondary">Importa PDA</button>
                     </form>
+
+                    <?php if ($pdaPreview !== null): ?>
+                        <div class="pda-preview">
+                            <header class="pda-preview__header">
+                                <div>
+                                    <h4>Anteprima import</h4>
+                                    <p class="muted">Verifica e correggi i dati prima di confermare l’import.</p>
+                                </div>
+                                <div class="pda-preview__status">
+                                    <?php if ($previewHasErrors): ?>
+                                        <span class="badge badge--danger">Errori da correggere</span>
+                                    <?php elseif ($previewWarnings !== []): ?>
+                                        <span class="badge badge--warning">Controlla i warning</span>
+                                    <?php else: ?>
+                                        <span class="badge badge--success">Dati completi</span>
+                                    <?php endif; ?>
+                                </div>
+                            </header>
+
+                            <?php if ($previewErrors !== []): ?>
+                                <div class="alert alert--error">
+                                    <p>Prima di confermare, risolvi gli errori segnalati:</p>
+                                    <ul>
+                                        <?php foreach ($previewErrors as $error): ?>
+                                            <li><?= htmlspecialchars((string) $error) ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if ($previewWarnings !== []): ?>
+                                <div class="alert alert--warning">
+                                    <p>Warning rilevati:</p>
+                                    <ul>
+                                        <?php foreach ($previewWarnings as $warning): ?>
+                                            <li><?= htmlspecialchars((string) $warning) ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                            <?php endif; ?>
+
+                            <form method="post" class="form pda-preview__form">
+                                <input type="hidden" name="action" value="confirm_pda_import">
+                                <input type="hidden" name="pda_import_id" value="<?= htmlspecialchars((string) $pdaImportId) ?>">
+                                <div class="form__grid">
+                                    <div class="form__group">
+                                        <label>Cliente</label>
+                                        <input type="text" name="pda_customer_name" value="<?= htmlspecialchars((string) ($previewCustomer['fullname'] ?? '')) ?>">
+                                        <?php if (isset($previewFieldStatus['customer_name'])): ?>
+                                            <small class="pda-status pda-status--<?= htmlspecialchars($previewFieldStatus['customer_name']['status']) ?>">
+                                                <?= htmlspecialchars($previewFieldStatus['customer_name']['message']) ?>
+                                            </small>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="form__group">
+                                        <label>Email</label>
+                                        <input type="email" name="pda_customer_email" value="<?= htmlspecialchars((string) ($previewCustomer['email'] ?? '')) ?>">
+                                        <?php if (isset($previewFieldStatus['customer_email'])): ?>
+                                            <small class="pda-status pda-status--<?= htmlspecialchars($previewFieldStatus['customer_email']['status']) ?>">
+                                                <?= htmlspecialchars($previewFieldStatus['customer_email']['message']) ?>
+                                            </small>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="form__group">
+                                        <label>Telefono</label>
+                                        <input type="text" name="pda_customer_phone" value="<?= htmlspecialchars((string) ($previewCustomer['phone'] ?? '')) ?>">
+                                        <?php if (isset($previewFieldStatus['customer_phone'])): ?>
+                                            <small class="pda-status pda-status--<?= htmlspecialchars($previewFieldStatus['customer_phone']['status']) ?>">
+                                                <?= htmlspecialchars($previewFieldStatus['customer_phone']['message']) ?>
+                                            </small>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="form__group">
+                                        <label>Codice fiscale</label>
+                                        <input type="text" name="pda_customer_tax_code" value="<?= htmlspecialchars((string) ($previewCustomer['tax_code'] ?? '')) ?>">
+                                        <?php if (isset($previewFieldStatus['customer_tax_code'])): ?>
+                                            <small class="pda-status pda-status--<?= htmlspecialchars($previewFieldStatus['customer_tax_code']['status']) ?>">
+                                                <?= htmlspecialchars($previewFieldStatus['customer_tax_code']['message']) ?>
+                                            </small>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="form__group">
+                                        <label>Note/Indirizzo</label>
+                                        <input type="text" name="pda_customer_note" value="<?= htmlspecialchars((string) ($previewCustomer['note'] ?? '')) ?>">
+                                        <?php if (isset($previewFieldStatus['customer_note'])): ?>
+                                            <small class="pda-status pda-status--<?= htmlspecialchars($previewFieldStatus['customer_note']['status']) ?>">
+                                                <?= htmlspecialchars($previewFieldStatus['customer_note']['message']) ?>
+                                            </small>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+
+                                <div class="table-wrapper">
+                                    <table class="table table--compact">
+                                        <thead>
+                                            <tr>
+                                                <th>ICCID</th>
+                                                <th>Offerta</th>
+                                                <th>MSISDN</th>
+                                                <th>Prezzo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($previewItems as $index => $item): ?>
+                                                <?php $status = $previewItemStatus[$index]['iccid'] ?? 'warning'; ?>
+                                                <tr>
+                                                    <td>
+                                                        <input type="text" name="pda_items[<?= (int) $index ?>][iccid]" value="<?= htmlspecialchars((string) ($item['iccid_code'] ?? '')) ?>">
+                                                        <small class="pda-status pda-status--<?= htmlspecialchars($status) ?>">
+                                                            <?= $status === 'error' ? 'ICCID mancante' : 'ICCID ok' ?>
+                                                        </small>
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" name="pda_items[<?= (int) $index ?>][plan]" value="<?= htmlspecialchars((string) ($item['offer_title'] ?? '')) ?>">
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" name="pda_items[<?= (int) $index ?>][msisdn]" value="<?= htmlspecialchars((string) ($item['msisdn'] ?? '')) ?>">
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" name="pda_items[<?= (int) $index ?>][price]" value="<?= htmlspecialchars((string) ($item['price'] ?? '')) ?>">
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="form__footer form__footer--inline">
+                                    <button type="submit" class="btn btn--primary" <?= $previewHasErrors ? 'disabled' : '' ?>>Conferma import</button>
+                                </div>
+                            </form>
+                            <form method="post" class="form pda-preview__cancel">
+                                <input type="hidden" name="action" value="cancel_pda_import">
+                                <input type="hidden" name="pda_import_id" value="<?= htmlspecialchars((string) $pdaImportId) ?>">
+                                <button type="submit" class="btn btn--secondary">Annulla</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </article>
         </div>

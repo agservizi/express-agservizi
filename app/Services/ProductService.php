@@ -27,12 +27,54 @@ final class ProductService
     /**
      * @return array{rows: array<int, array<string, mixed>>, pagination: array<string, int|bool>}
      */
-    public function listPaginated(int $page, int $perPage = 7): array
+    public function listPaginated(int $page, int $perPage = 7, ?string $search = null): array
     {
         $page = max(1, $page);
         $perPage = max(1, min($perPage, 50));
 
-        $total = (int) ($this->pdo->query('SELECT COUNT(*) FROM products')->fetchColumn() ?: 0);
+        $conditions = [];
+        $params = [];
+
+        $searchTerm = null;
+        $searchPrice = null;
+        if ($search !== null) {
+            $searchTerm = trim($search);
+            if ($searchTerm === '') {
+                $searchTerm = null;
+            }
+        }
+
+        if ($searchTerm !== null) {
+            $searchCondition = '(
+                products.name LIKE :search_name
+                OR products.category LIKE :search_category
+                OR products.sku LIKE :search_sku
+                OR products.imei LIKE :search_imei
+            )';
+            if (preg_match('/^-?\d+(?:[\.,]\d+)?$/', $searchTerm) === 1) {
+                $searchPrice = (float) str_replace(',', '.', $searchTerm);
+                $searchCondition = '(' . $searchCondition . ' OR products.price = :search_price)';
+            }
+            $conditions[] = $searchCondition;
+            $likeValue = '%' . $searchTerm . '%';
+            $params[':search_name'] = $likeValue;
+            $params[':search_category'] = $likeValue;
+            $params[':search_sku'] = $likeValue;
+            $params[':search_imei'] = $likeValue;
+            if ($searchPrice !== null) {
+                $params[':search_price'] = $searchPrice;
+            }
+        }
+
+        $where = $conditions === [] ? '' : ('WHERE ' . implode(' AND ', $conditions));
+
+        $countSql = 'SELECT COUNT(*) FROM products ' . $where;
+        $stmtCount = $this->pdo->prepare($countSql);
+        foreach ($params as $key => $value) {
+            $stmtCount->bindValue($key, $value);
+        }
+        $stmtCount->execute();
+        $total = (int) ($stmtCount->fetchColumn() ?: 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
         if ($page > $totalPages) {
             $page = $totalPages;
@@ -42,9 +84,13 @@ final class ProductService
         $stmt = $this->pdo->prepare(
             'SELECT id, name, sku, imei, category, price, stock_quantity, stock_reserved, reorder_threshold, tax_rate, vat_code, notes, is_active, created_at, updated_at
              FROM products
+             ' . $where . '
              ORDER BY created_at DESC
              LIMIT :limit OFFSET :offset'
         );
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
         $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();

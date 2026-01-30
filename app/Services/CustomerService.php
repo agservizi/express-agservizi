@@ -49,8 +49,12 @@ final class CustomerService
 		$params = [];
 		$where = '';
 		if ($searchTerm !== '') {
-			$where = 'WHERE fullname LIKE :term OR email LIKE :term OR phone LIKE :term OR tax_code LIKE :term';
-			$params[':term'] = '%' . $searchTerm . '%';
+			$where = 'WHERE fullname LIKE :term_fullname OR email LIKE :term_email OR phone LIKE :term_phone OR tax_code LIKE :term_tax';
+			$wildcard = '%' . $searchTerm . '%';
+			$params[':term_fullname'] = $wildcard;
+			$params[':term_email'] = $wildcard;
+			$params[':term_phone'] = $wildcard;
+			$params[':term_tax'] = $wildcard;
 		}
 
 		$countSql = 'SELECT COUNT(*) FROM customers ' . $where;

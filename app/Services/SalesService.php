@@ -867,14 +867,20 @@ final class SalesService
                     $params[':sale_id'] = (int) $q;
                 } else {
                     $conditions[] = '(
-                        s.customer_name LIKE :term OR
-                        s.customer_note LIKE :term OR
-                        u.fullname LIKE :term OR
-                        u.username LIKE :term OR
-                        c.fullname LIKE :term OR
-                        c.email LIKE :term
+                        s.customer_name LIKE :term_customer_name OR
+                        s.customer_note LIKE :term_customer_note OR
+                        u.fullname LIKE :term_user_fullname OR
+                        u.username LIKE :term_user_username OR
+                        c.fullname LIKE :term_customer_fullname OR
+                        c.email LIKE :term_customer_email
                     )';
-                    $params[':term'] = '%' . $q . '%';
+                    $wildcard = '%' . $q . '%';
+                    $params[':term_customer_name'] = $wildcard;
+                    $params[':term_customer_note'] = $wildcard;
+                    $params[':term_user_fullname'] = $wildcard;
+                    $params[':term_user_username'] = $wildcard;
+                    $params[':term_customer_fullname'] = $wildcard;
+                    $params[':term_customer_email'] = $wildcard;
                 }
             }
         }

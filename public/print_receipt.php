@@ -16,9 +16,11 @@ spl_autoload_register(static function (string $class): void {
 });
 
 use App\Services\SalesService;
+use App\Services\ReceiptSettingsService;
 
 $pdo = Database::getConnection();
 $salesService = new SalesService($pdo);
+$receiptSettingsService = new ReceiptSettingsService();
 
 $saleId = isset($_GET['sale_id']) ? (int) $_GET['sale_id'] : 0;
 if ($saleId <= 0) {
@@ -32,6 +34,25 @@ if ($sale === null) {
     http_response_code(404);
     echo 'Scontrino non trovato.';
     exit;
+}
+
+$receiptSettings = $receiptSettingsService->getSettings();
+$receiptHeaderLines = $receiptSettings['header_lines'] ?? [];
+if (!is_array($receiptHeaderLines)) {
+  $receiptHeaderLines = [];
+}
+$receiptHeaderLines = array_values(array_filter(array_map('trim', $receiptHeaderLines)));
+$documentTitle = (string) ($receiptSettings['document_title'] ?? 'DOCUMENTO GESTIONALE');
+$documentNumberTemplate = (string) ($receiptSettings['document_number_template'] ?? '{{document_title}} #{{sale_id}}');
+$receiptThanksText = (string) ($receiptSettings['thanks_text'] ?? 'Grazie per il tuo acquisto!');
+$receiptFooterText = (string) ($receiptSettings['footer_text'] ?? '');
+$receiptLabels = $receiptSettings['labels'] ?? [];
+if (!is_array($receiptLabels)) {
+  $receiptLabels = [];
+}
+$receiptStatusLabels = $receiptSettings['status_labels'] ?? [];
+if (!is_array($receiptStatusLabels)) {
+  $receiptStatusLabels = [];
 }
 
 $operator = $sale['fullname'] !== null && $sale['fullname'] !== '' ? $sale['fullname'] : $sale['username'];
@@ -87,11 +108,38 @@ if (!empty($sale['items']) && is_array($sale['items'])) {
     }
   }
 }
+
+$placeholders = [
+  '{{sale_id}}' => (string) $saleId,
+  '{{document_title}}' => $documentTitle,
+  '{{date}}' => $createdAt->format('d/m/Y H:i'),
+  '{{operator}}' => $operator,
+  '{{customer}}' => isset($sale['customer_name']) ? (string) $sale['customer_name'] : '',
+  '{{total}}' => number_format((float) $sale['total'], 2, ',', '.'),
+];
+$documentNumberLine = strtr($documentNumberTemplate, $placeholders);
+$receiptDateLabel = (string) ($receiptLabels['date'] ?? 'Data');
+$receiptOperatorLabel = (string) ($receiptLabels['operator'] ?? 'Operatore');
+$receiptCustomerLabel = (string) ($receiptLabels['customer'] ?? 'Cliente');
+$receiptVatLabel = (string) ($receiptLabels['vat'] ?? 'IVA');
+$receiptVatIncludedLabel = (string) ($receiptLabels['vat_included'] ?? 'IVA compresa');
+$receiptVatCodesLabel = (string) ($receiptLabels['vat_codes'] ?? 'Codici IVA applicati');
+$receiptDiscountLabel = (string) ($receiptLabels['discount'] ?? 'Sconto');
+$receiptTotalLabel = (string) ($receiptLabels['total'] ?? 'Totale');
+$receiptTotalOriginalLabel = (string) ($receiptLabels['total_original'] ?? 'Totale originario');
+$receiptPaymentLabel = (string) ($receiptLabels['payment'] ?? 'Pagamento');
+$receiptRefundAmountLabel = (string) ($receiptLabels['refund_amount'] ?? 'Importo reso');
+$receiptCancelledAtLabel = (string) ($receiptLabels['cancelled_at'] ?? 'Annullato il');
+$receiptCancellationReasonLabel = (string) ($receiptLabels['cancellation_reason'] ?? 'Motivo annullo');
+$receiptRefundedAtLabel = (string) ($receiptLabels['refunded_at'] ?? 'Reso registrato il');
+$receiptRefundNoteLabel = (string) ($receiptLabels['refund_note'] ?? 'Note reso');
+$receiptCancelledBanner = (string) ($receiptStatusLabels['cancelled'] ?? 'ANNULLATO');
+$receiptRefundedBanner = (string) ($receiptStatusLabels['refunded'] ?? 'RESO');
 ?><!doctype html>
 <html lang="it">
 <head>
 <meta charset="utf-8">
-<title>DOCUMENTO GESTIONALE #<?= htmlspecialchars((string) $saleId) ?></title>
+<title><?= htmlspecialchars($documentTitle) ?> #<?= htmlspecialchars((string) $saleId) ?></title>
 <style>
   :root {
     color-scheme: light;
@@ -294,23 +342,33 @@ if (!empty($sale['items']) && is_array($sale['items'])) {
   </div>
 </main>
 <footer>
-  Hai bisogno di stampare di nuovo? Puoi sempre recuperare questo DOCUMENTO GESTIONALE dalla sezione vendite.
+  <?= htmlspecialchars($receiptFooterText !== '' ? $receiptFooterText : 'Hai bisogno di stampare di nuovo? Puoi sempre recuperare questo DOCUMENTO GESTIONALE dalla sezione vendite.') ?>
 </footer>
 <div class="receipt-source" aria-hidden="true">
 <div class="receipt" id="printable-receipt">
   <div class="center">
-  <h3>AG SERVIZI VIA PLINIO 72 DI CAVALIERE CARMINE</h3>
-  <div class="muted">DOCUMENTO GESTIONALE #<?= htmlspecialchars((string) $saleId) ?></div>
+  <?php if ($receiptHeaderLines === []): ?>
+    <h3><?= htmlspecialchars($documentTitle) ?></h3>
+  <?php else: ?>
+    <?php foreach ($receiptHeaderLines as $index => $line): ?>
+      <?php if ($index === 0): ?>
+        <h3><?= htmlspecialchars($line) ?></h3>
+      <?php else: ?>
+        <div><?= htmlspecialchars($line) ?></div>
+      <?php endif; ?>
+    <?php endforeach; ?>
+  <?php endif; ?>
+  <div class="muted"><?= htmlspecialchars($documentNumberLine) ?></div>
   </div>
   <?php if (($sale['status'] ?? 'Completed') !== 'Completed'): ?>
     <div class="banner">
-        <?= $sale['status'] === 'Cancelled' ? 'ANNULLATO' : 'RESO' ?>
+        <?= $sale['status'] === 'Cancelled' ? htmlspecialchars($receiptCancelledBanner) : htmlspecialchars($receiptRefundedBanner) ?>
     </div>
   <?php endif; ?>
-  <div>Data: <?= htmlspecialchars($createdAt->format('d/m/Y H:i')) ?></div>
-  <div>Operatore: <?= htmlspecialchars($operator) ?></div>
+  <div><?= htmlspecialchars($receiptDateLabel) ?>: <?= htmlspecialchars($createdAt->format('d/m/Y H:i')) ?></div>
+  <div><?= htmlspecialchars($receiptOperatorLabel) ?>: <?= htmlspecialchars($operator) ?></div>
   <?php if (!empty($sale['customer_name'])): ?>
-    <div>Cliente: <?= htmlspecialchars((string) $sale['customer_name']) ?></div>
+    <div><?= htmlspecialchars($receiptCustomerLabel) ?>: <?= htmlspecialchars((string) $sale['customer_name']) ?></div>
   <?php endif; ?>
   <hr>
   <table>
@@ -335,12 +393,12 @@ if (!empty($sale['items']) && is_array($sale['items'])) {
   </table>
   <hr>
   <?php if ($displayVatRate > 0.0001): ?>
-    <div class="muted">IVA: <?= number_format($displayVatRate, 2, ',', '.') ?>%</div>
+    <div class="muted"><?= htmlspecialchars($receiptVatLabel) ?>: <?= number_format($displayVatRate, 2, ',', '.') ?>%</div>
   <?php elseif ($taxNote): ?>
     <div class="muted"><?= htmlspecialchars($taxNote) ?></div>
   <?php endif; ?>
   <?php if ($vatAmount > 0.001): ?>
-    <div class="muted">IVA compresa: € <?= number_format($vatAmount, 2, ',', '.') ?></div>
+    <div class="muted"><?= htmlspecialchars($receiptVatIncludedLabel) ?>: € <?= number_format($vatAmount, 2, ',', '.') ?></div>
   <?php endif; ?>
   <?php if ($vatSummary !== []): ?>
     <?php
@@ -354,36 +412,36 @@ if (!empty($sale['items']) && is_array($sale['items'])) {
             $vatLabels[] = htmlspecialchars(implode(' • ', $parts));
         }
     ?>
-    <div class="muted">Codici IVA applicati: <?= implode(' | ', $vatLabels) ?></div>
+    <div class="muted"><?= htmlspecialchars($receiptVatCodesLabel) ?>: <?= implode(' | ', $vatLabels) ?></div>
   <?php endif; ?>
   <?php if ((float) $sale['discount'] > 0): ?>
-    <div class="muted">Sconto: € <?= number_format((float) $sale['discount'], 2, ',', '.') ?></div>
+    <div class="muted"><?= htmlspecialchars($receiptDiscountLabel) ?>: € <?= number_format((float) $sale['discount'], 2, ',', '.') ?></div>
   <?php endif; ?>
   <div class="total">
-    <?= ($sale['status'] ?? 'Completed') === 'Completed' ? 'Totale' : 'Totale originario' ?>:
+    <?= htmlspecialchars((($sale['status'] ?? 'Completed') === 'Completed') ? $receiptTotalLabel : $receiptTotalOriginalLabel) ?>:
     € <?= number_format((float) $sale['total'], 2, ',', '.') ?>
   </div>
-  <div>Pagamento: <?= htmlspecialchars($sale['payment_method']) ?></div>
+  <div><?= htmlspecialchars($receiptPaymentLabel) ?>: <?= htmlspecialchars($sale['payment_method']) ?></div>
   <?php if ($sale['status'] === 'Refunded'): ?>
-    <div class="total">Importo reso: € <?= number_format((float) ($sale['refunded_amount'] ?? $sale['total']), 2, ',', '.') ?></div>
+    <div class="total"><?= htmlspecialchars($receiptRefundAmountLabel) ?>: € <?= number_format((float) ($sale['refunded_amount'] ?? $sale['total']), 2, ',', '.') ?></div>
   <?php endif; ?>
   <?php if ($sale['status'] === 'Cancelled'): ?>
     <?php if ($cancelledAt): ?>
-      <div class="muted">Annullato il <?= htmlspecialchars($cancelledAt->format('d/m/Y H:i')) ?></div>
+      <div class="muted"><?= htmlspecialchars($receiptCancelledAtLabel) ?> <?= htmlspecialchars($cancelledAt->format('d/m/Y H:i')) ?></div>
     <?php endif; ?>
     <?php if (!empty($sale['cancellation_note'])): ?>
-      <div class="muted">Motivo annullo: <?= htmlspecialchars((string) $sale['cancellation_note']) ?></div>
+      <div class="muted"><?= htmlspecialchars($receiptCancellationReasonLabel) ?>: <?= htmlspecialchars((string) $sale['cancellation_note']) ?></div>
     <?php endif; ?>
   <?php endif; ?>
   <?php if ($sale['status'] === 'Refunded'): ?>
     <?php if ($refundedAt): ?>
-      <div class="muted">Reso registrato il <?= htmlspecialchars($refundedAt->format('d/m/Y H:i')) ?></div>
+      <div class="muted"><?= htmlspecialchars($receiptRefundedAtLabel) ?> <?= htmlspecialchars($refundedAt->format('d/m/Y H:i')) ?></div>
     <?php endif; ?>
     <?php if (!empty($sale['refund_note'])): ?>
-      <div class="muted">Note reso: <?= htmlspecialchars((string) $sale['refund_note']) ?></div>
+      <div class="muted"><?= htmlspecialchars($receiptRefundNoteLabel) ?>: <?= htmlspecialchars((string) $sale['refund_note']) ?></div>
     <?php endif; ?>
   <?php endif; ?>
-  <div class="center"><small>Grazie per il tuo acquisto!</small></div>
+  <div class="center"><small><?= htmlspecialchars($receiptThanksText) ?></small></div>
 </div>
 </div>
 <noscript>

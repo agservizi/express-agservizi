@@ -1181,7 +1181,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   setupLiveRefreshContainers();
-  setupDraggableDashboard();
+  setupGlobalSearch();
+  setupEnergySimulator();
   setupFileUploads();
   setupAccordions();
 
@@ -2788,130 +2789,800 @@ document.addEventListener('DOMContentLoaded', () => {
     scheduleDiscountUpdate();
   }
 
-  function setupDraggableDashboard() {
-    const containers = Array.from(document.querySelectorAll('[data-draggable-container]'));
-    if (containers.length === 0) {
+  function setupGlobalSearch() {
+    let root = document.querySelector('[data-global-search]');
+    if (!root) {
+      const actions = document.querySelector('.topbar__actions');
+      if (!actions) {
+        return;
+      }
+      root = buildGlobalSearchNode();
+      const notificationNode = actions.querySelector('[data-notification]');
+      if (notificationNode) {
+        actions.insertBefore(root, notificationNode);
+      } else {
+        actions.insertBefore(root, actions.firstChild);
+      }
+    }
+
+    const input = root.querySelector('[data-global-search-input]');
+    const panel = root.querySelector('[data-global-search-panel]');
+    const status = root.querySelector('[data-global-search-status]');
+    const results = root.querySelector('[data-global-search-results]');
+    const clearBtn = root.querySelector('[data-global-search-clear]');
+
+    if (!(input instanceof HTMLInputElement) || !(panel instanceof HTMLElement) || !(status instanceof HTMLElement) || !(results instanceof HTMLElement)) {
       return;
     }
 
-    const storageKey = 'dashboard-layout';
-    let layout = {};
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          layout = parsed;
-        }
-      }
-    } catch (_error) {
-      layout = {};
-    }
+    const minLength = Number.parseInt(root.dataset.minLength || '2', 10) || 2;
+    let debounceId = 0;
+    let activeController = null;
+    let lastQuery = '';
 
-    containers.forEach(container => {
-      const containerId = container.getAttribute('data-draggable-container');
-      if (!containerId) {
+    const setOpen = isOpen => {
+      panel.dataset.open = isOpen ? 'true' : 'false';
+      if (isOpen) {
+        panel.setAttribute('tabindex', '-1');
+      }
+    };
+
+    const setStatus = message => {
+      status.textContent = message;
+      status.hidden = false;
+      results.innerHTML = '';
+    };
+
+    const updateClear = () => {
+      if (!(clearBtn instanceof HTMLElement)) {
+        return;
+      }
+      const hasValue = input.value.trim() !== '';
+      clearBtn.dataset.visible = hasValue ? 'true' : 'false';
+    };
+
+    const buildItemHtml = item => {
+      const title = item && item.title ? escapeHtml(String(item.title)) : '';
+      const subtitle = item && item.subtitle ? `<span class="topbar__search-item-subtitle">${escapeHtml(String(item.subtitle))}</span>` : '';
+      const meta = item && item.meta ? `<span class="topbar__search-item-meta">${escapeHtml(String(item.meta))}</span>` : '';
+      const content = `<span class="topbar__search-item-title">${title}</span>${subtitle}${meta}`;
+      const url = item && item.url ? String(item.url) : '';
+      if (url) {
+        return `<a class="topbar__search-item" href="${escapeHtml(url)}">${content}</a>`;
+      }
+      return `<div class="topbar__search-item">${content}</div>`;
+    };
+
+    const renderResults = sections => {
+      if (!Array.isArray(sections) || sections.length === 0) {
+        setStatus('Nessun risultato trovato.');
         return;
       }
 
-      const cards = Array.from(container.querySelectorAll('[data-draggable-card]'));
-      cards.forEach(card => {
-        card.setAttribute('draggable', 'true');
-      });
+      status.hidden = true;
+      results.innerHTML = sections
+        .map(section => {
+          const title = section && section.title ? escapeHtml(String(section.title)) : '';
+          const items = Array.isArray(section.items) ? section.items : [];
+          if (!items.length) {
+            return '';
+          }
+          const itemsHtml = items.map(buildItemHtml).join('');
+          return `<div class="topbar__search-section"><div class="topbar__search-section-title">${title}</div><div class="topbar__search-section-items">${itemsHtml}</div></div>`;
+        })
+        .join('');
+    };
 
-      const storedOrder = Array.isArray(layout[containerId]) ? layout[containerId] : null;
-      if (storedOrder && storedOrder.length) {
-        const registry = new Map();
-        cards.forEach(card => {
-          registry.set(card.getAttribute('data-draggable-card') || '', card);
+    const fetchResults = query => {
+      if (activeController) {
+        activeController.abort();
+      }
+      activeController = new AbortController();
+
+      const url = `index.php?page=global_search&q=${encodeURIComponent(query)}`;
+      fetch(url, {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        signal: activeController.signal,
+      })
+        .then(response => (response.ok ? response.json() : Promise.reject(response)))
+        .then(data => {
+          if (query !== lastQuery) {
+            return;
+          }
+          renderResults(data && data.sections ? data.sections : []);
+        })
+        .catch(error => {
+          if (error && error.name === 'AbortError') {
+            return;
+          }
+          setStatus('Errore di rete. Riprova.');
         });
-        storedOrder.forEach(cardId => {
-          const element = registry.get(cardId);
-          if (element) {
-            container.appendChild(element);
-            registry.delete(cardId);
+    };
+
+    const handleInput = () => {
+      updateClear();
+      const query = input.value.trim();
+      lastQuery = query;
+
+      if (query.length < minLength) {
+        if (activeController) {
+          activeController.abort();
+        }
+        const message = query.length === 0
+          ? 'Inizia a digitare per cercare.'
+          : `Inserisci almeno ${minLength} caratteri.`;
+        setStatus(message);
+        setOpen(true);
+        return;
+      }
+
+      if (debounceId) {
+        window.clearTimeout(debounceId);
+      }
+
+      setStatus('Ricerca in corso…');
+      setOpen(true);
+      debounceId = window.setTimeout(() => fetchResults(query), 280);
+    };
+
+    input.addEventListener('focus', () => {
+      if (input.value.trim() === '') {
+        setStatus('Inizia a digitare per cercare.');
+      }
+      setOpen(true);
+    });
+
+    input.addEventListener('input', handleInput);
+
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        input.blur();
+      }
+    });
+
+    if (clearBtn instanceof HTMLElement) {
+      clearBtn.addEventListener('click', () => {
+        input.value = '';
+        updateClear();
+        setStatus('Inizia a digitare per cercare.');
+        setOpen(true);
+        input.focus();
+      });
+    }
+
+    document.addEventListener('click', event => {
+      if (!root.contains(event.target)) {
+        setOpen(false);
+      }
+    });
+
+    updateClear();
+  }
+
+  function buildGlobalSearchNode() {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'topbar__search';
+    wrapper.dataset.globalSearch = 'true';
+    wrapper.dataset.minLength = '2';
+
+    const field = document.createElement('div');
+    field.className = 'topbar__search-field';
+
+    const icon = document.createElement('span');
+    icon.className = 'topbar__search-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '🔍';
+
+    const input = document.createElement('input');
+    input.className = 'topbar__search-input';
+    input.type = 'search';
+    input.name = 'global_search';
+    input.placeholder = 'Cerca clienti, vendite, prodotti...';
+    input.autocomplete = 'off';
+    input.setAttribute('aria-label', 'Ricerca globale');
+    input.dataset.globalSearchInput = 'true';
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'topbar__search-clear';
+    clearBtn.dataset.globalSearchClear = 'true';
+    clearBtn.dataset.visible = 'false';
+    clearBtn.setAttribute('aria-label', 'Svuota ricerca');
+    clearBtn.textContent = '×';
+
+    field.appendChild(icon);
+    field.appendChild(input);
+    field.appendChild(clearBtn);
+
+    const panel = document.createElement('div');
+    panel.className = 'topbar__search-panel';
+    panel.dataset.globalSearchPanel = 'true';
+    panel.dataset.open = 'false';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Risultati ricerca');
+    panel.setAttribute('tabindex', '-1');
+
+    const status = document.createElement('div');
+    status.className = 'topbar__search-status';
+    status.dataset.globalSearchStatus = 'true';
+    status.textContent = 'Inizia a digitare per cercare.';
+
+    const results = document.createElement('div');
+    results.className = 'topbar__search-results';
+    results.dataset.globalSearchResults = 'true';
+
+    panel.appendChild(status);
+    panel.appendChild(results);
+
+    wrapper.appendChild(field);
+    wrapper.appendChild(panel);
+
+    return wrapper;
+  }
+
+  function setupEnergySimulator() {
+    const root = document.querySelector('[data-energy-sim]');
+    if (!root) {
+      return;
+    }
+
+    const steps = Array.from(root.querySelectorAll('[data-energy-step]'));
+    if (steps.length === 0) {
+      return;
+    }
+
+    const cta = root.querySelector('[data-energy-sim-cta]');
+    const prevBtn = root.querySelector('[data-energy-sim-prev]');
+    const nextBtn = root.querySelector('[data-energy-sim-next]');
+    const progress = root.querySelector('[data-energy-sim-progress]');
+    const resultsEl = root.querySelector('[data-energy-sim-results]');
+    const currentEl = root.querySelector('[data-energy-result-current]');
+    const newEl = root.querySelector('[data-energy-result-new]');
+    const saveEl = root.querySelector('[data-energy-result-save]');
+    const offersEl = root.querySelector('[data-energy-results-list]');
+    const billFileInput = root.querySelector('[data-energy-bill-file]');
+    const billStatusEl = root.querySelector('[data-energy-bill-status]');
+    const billDrop = root.querySelector('[data-energy-bill-drop]');
+    const supplyInputs = Array.from(root.querySelectorAll('[data-energy-supply]'));
+    const consumptionBlocks = Array.from(root.querySelectorAll('[data-energy-consumption]'));
+    let offersData = [];
+    if (root.dataset.energyOffers) {
+      try {
+        const parsed = JSON.parse(root.dataset.energyOffers);
+        if (Array.isArray(parsed)) {
+          offersData = parsed;
+        }
+      } catch (_error) {
+        offersData = [];
+      }
+    }
+    let providerAllowList = [];
+    if (root.dataset.energyProviders) {
+      try {
+        const parsedProviders = JSON.parse(root.dataset.energyProviders);
+        if (Array.isArray(parsedProviders)) {
+          providerAllowList = parsedProviders;
+        }
+      } catch (_error) {
+        providerAllowList = [];
+      }
+    }
+
+    const normalizeProviderName = value => {
+      return String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+    };
+
+    if (providerAllowList.length > 0) {
+      const normalizedAllow = new Set(providerAllowList.map(normalizeProviderName).filter(Boolean));
+      offersData = offersData.filter(offer => normalizedAllow.has(normalizeProviderName(offer.provider_name || offer.denominazione || '')));
+    }
+
+    let currentStep = 1;
+
+    const formatCurrency = value => {
+      const amount = Number.isFinite(value) ? value : 0;
+      return `€ ${amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const updateProgress = () => {
+      const pct = Math.min(100, Math.max(0, (currentStep - 1) / (steps.length - 1) * 100));
+      if (progress instanceof HTMLElement) {
+        progress.style.width = `${pct}%`;
+      }
+    };
+
+    const updateButtons = () => {
+      if (prevBtn instanceof HTMLButtonElement) {
+        prevBtn.disabled = currentStep === 1;
+      }
+      if (nextBtn instanceof HTMLButtonElement) {
+        nextBtn.textContent = currentStep === steps.length ? 'Calcola' : 'Continua';
+      }
+    };
+
+    const showStep = step => {
+      steps.forEach(node => {
+        const index = Number.parseInt(node.getAttribute('data-energy-step') || '0', 10);
+        if (index === step) {
+          node.removeAttribute('hidden');
+        } else {
+          node.setAttribute('hidden', 'hidden');
+        }
+      });
+      currentStep = step;
+      updateProgress();
+      updateButtons();
+      toggleConsumptionBlocks(getCurrentSupply());
+    };
+
+    const setBillStatus = (message, isError = false) => {
+      if (!(billStatusEl instanceof HTMLElement)) {
+        return;
+      }
+      billStatusEl.textContent = message;
+      billStatusEl.classList.toggle('text-danger', isError);
+    };
+
+    const updateBlockState = (block, visible) => {
+      block.toggleAttribute('hidden', !visible);
+      const inputs = Array.from(block.querySelectorAll('input, select, textarea'));
+      inputs.forEach(input => {
+        input.disabled = !visible;
+        if (!visible) {
+          if (input instanceof HTMLInputElement) {
+            if (input.type === 'checkbox' || input.type === 'radio') {
+              input.checked = false;
+            } else {
+              input.value = '';
+            }
+          } else if (input instanceof HTMLSelectElement) {
+            input.selectedIndex = 0;
+          }
+        }
+      });
+    };
+
+    const toggleConsumptionBlocks = supply => {
+      const showLuce = supply === 'luce' || supply === 'luce_gas';
+      const showGas = supply === 'gas' || supply === 'luce_gas';
+      consumptionBlocks.forEach(block => {
+        const type = block.getAttribute('data-energy-consumption');
+        if (type === 'luce') {
+          updateBlockState(block, showLuce);
+        } else if (type === 'gas') {
+          updateBlockState(block, showGas);
+        }
+      });
+    };
+
+    const readNumber = selector => {
+      const input = root.querySelector(selector);
+      if (!(input instanceof HTMLInputElement)) {
+        return 0;
+      }
+      const value = parseFloat(input.value);
+      return Number.isFinite(value) ? value : 0;
+    };
+
+    let currentSupply = '';
+
+    const getCurrentSupply = () => {
+      return currentSupply || supplyInputs.find(input => input.checked)?.value || 'luce';
+    };
+
+    const estimateConsumption = () => {
+      const supplyValue = getCurrentSupply();
+      const luceKwh = readNumber('[name="luce_kwh"]');
+      const luceMembers = readNumber('[name="luce_members"]');
+      const gasSmc = readNumber('[name="gas_smc"]');
+
+      let estimatedKwh = luceKwh;
+      if (estimatedKwh === 0 && luceMembers > 0) {
+        estimatedKwh = 1200 + (luceMembers - 1) * 700;
+      }
+
+      let estimatedSmc = gasSmc;
+      if (estimatedSmc === 0) {
+        const uses = Array.from(root.querySelectorAll('input[name="gas_use"]:checked'));
+        const usageMap = {
+          cottura: 200,
+          acqua: 320,
+          riscaldamento: 800,
+        };
+        estimatedSmc = uses.reduce((sum, item) => sum + (usageMap[item.value] || 0), 0);
+      }
+
+      if (supplyValue === 'luce') {
+        estimatedSmc = 0;
+      } else if (supplyValue === 'gas') {
+        estimatedKwh = 0;
+      }
+
+      return { estimatedKwh, estimatedSmc, supplyValue };
+    };
+
+    const computeResults = () => {
+      const { estimatedKwh, estimatedSmc } = estimateConsumption();
+      const billAmount = readNumber('[name="bill_amount"]');
+      const freqSelect = root.querySelector('[name="bill_frequency"]');
+      const frequency = freqSelect instanceof HTMLSelectElement ? freqSelect.value : 'monthly';
+      const annualFromBill = billAmount > 0 ? billAmount * (frequency === 'bimonthly' ? 6 : 12) : 0;
+
+      const luceRate = 0.23;
+      const gasRate = 1.1;
+      const estimatedAnnual = (estimatedKwh * luceRate) + (estimatedSmc * gasRate);
+      const currentAnnual = annualFromBill > 0 ? annualFromBill : estimatedAnnual;
+
+      const offers = Array.isArray(offersData) ? offersData : [];
+      const supplyValue = getCurrentSupply();
+      const customerType = root.querySelector('input[name="energy_customer"]:checked')?.value || '';
+      const fascia = root.querySelector('[name="luce_fascia"]')?.value || 'monoraria';
+
+      const normalizeCustomer = value => {
+        const raw = String(value || '').toLowerCase();
+        if (raw === '01' || raw === '1') return 'privato';
+        if (raw === '02' || raw === '2') return 'azienda';
+        if (raw === '03' || raw === '3') return 'azienda';
+        if (raw.includes('domestico')) return 'privato';
+        if (raw.includes('non')) return 'azienda';
+        if (raw.includes('condominio')) return 'azienda';
+        return raw;
+      };
+
+      const matchesCustomer = offer => {
+        if (!customerType) return true;
+        const normalized = normalizeCustomer(offer.customer_type || offer.tipo_cliente || '');
+        if (!normalized) return true;
+        return normalized === customerType;
+      };
+
+      const toNumber = value => {
+        const num = parseFloat(String(value).replace(',', '.'));
+        return Number.isFinite(num) ? num : 0;
+      };
+
+      const computeElectricCost = offer => {
+        const fixed = toNumber(offer.p_fix_f) || 0;
+        let unit = 0;
+        if (fascia === 'bioraria') {
+          const f1 = toNumber(offer.p_vol_f1);
+          const f2 = toNumber(offer.p_vol_f2 || offer.p_vol_bf23);
+          const f3 = toNumber(offer.p_vol_f3);
+          const values = [f1, f2, f3].filter(v => v > 0);
+          unit = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+        }
+        if (unit === 0) {
+          unit = toNumber(offer.p_vol_mono) || toNumber(offer.p_vol_f1) || 0;
+        }
+        if (unit === 0) {
+          unit = toNumber(offer.p_fix_f) || 0;
+        }
+        return fixed + (estimatedKwh * unit);
+      };
+
+      const computeGasCost = offer => {
+        const fixed = toNumber(offer.p_fix_f) || 0;
+        const unit = toNumber(offer.p_vol) || toNumber(offer.p_fix_f) || 0;
+        return fixed + (estimatedSmc * unit);
+      };
+
+      const computeOfferCost = offer => {
+        if (offer.supply_type === 'luce') {
+          return computeElectricCost(offer);
+        }
+        if (offer.supply_type === 'gas') {
+          return computeGasCost(offer);
+        }
+        return 0;
+      };
+
+      let offerResults = offers
+        .filter(offer => {
+          if (!offer || !offer.supply_type) return false;
+          if (supplyValue === 'luce_gas') {
+            return offer.supply_type === 'luce' || offer.supply_type === 'gas' || offer.supply_type === 'luce_gas';
+          }
+          return offer.supply_type === supplyValue;
+        })
+        .filter(matchesCustomer)
+        .map(offer => {
+          const newCost = computeOfferCost(offer);
+          return {
+            name: offer.offer_name || offer.nome_offerta || 'Offerta',
+            provider: offer.provider_name || offer.denominazione || '',
+            url: offer.offer_url || offer.url_offerta || '',
+            supply_type: offer.supply_type,
+            newCost,
+            saving: Math.max(0, currentAnnual - newCost),
+          };
+        })
+        .filter(offer => Number.isFinite(offer.newCost) && offer.newCost > 0);
+
+      if (supplyValue === 'luce_gas' && offerResults.length > 0) {
+        const grouped = {};
+        offerResults.forEach(offer => {
+          const key = offer.provider || offer.name;
+          if (!grouped[key]) {
+            grouped[key] = { provider: key, luce: null, gas: null };
+          }
+          if (offer.supply_type === 'gas') {
+            if (!grouped[key].gas || offer.newCost < grouped[key].gas.newCost) {
+              grouped[key].gas = offer;
+            }
+          } else {
+            if (!grouped[key].luce || offer.newCost < grouped[key].luce.newCost) {
+              grouped[key].luce = offer;
+            }
           }
         });
-        registry.forEach(element => {
-          container.appendChild(element);
+        offerResults = Object.values(grouped)
+          .filter(entry => entry.luce || entry.gas)
+          .map(entry => {
+            const luceCost = entry.luce ? entry.luce.newCost : 0;
+            const gasCost = entry.gas ? entry.gas.newCost : 0;
+            const combined = luceCost + gasCost;
+            return {
+              name: entry.provider,
+              provider: entry.provider,
+              newCost: combined,
+              saving: Math.max(0, currentAnnual - combined),
+            };
+          });
+      }
+
+      if (offerResults.length === 0) {
+        const fallbackPool = offers
+          .filter(offer => {
+            if (!offer || !offer.supply_type) return false;
+            if (supplyValue === 'luce_gas') {
+              return offer.supply_type === 'luce' || offer.supply_type === 'gas' || offer.supply_type === 'luce_gas';
+            }
+            return offer.supply_type === supplyValue;
+          })
+          .filter(matchesCustomer);
+
+        offerResults = fallbackPool.slice(0, 6).map(offer => {
+          const computed = computeOfferCost(offer);
+          const newCost = computed > 0 ? computed : currentAnnual;
+          return {
+            name: offer.offer_name || offer.nome_offerta || 'Offerta',
+            provider: offer.provider_name || offer.denominazione || '',
+            url: offer.offer_url || offer.url_offerta || '',
+            supply_type: offer.supply_type,
+            newCost,
+            saving: Math.max(0, currentAnnual - newCost),
+          };
         });
       }
 
-      container.addEventListener('dragover', event => {
-        event.preventDefault();
-        const dragging = document.querySelector('[data-draggable-card].is-dragging');
-        if (!dragging) {
-          return;
+      if (offerResults.length === 0) {
+        offerResults = [
+          {
+            name: 'Nessuna offerta disponibile',
+            provider: '',
+            newCost: currentAnnual,
+            saving: 0,
+          },
+        ];
+      }
+
+      offerResults.sort((a, b) => a.newCost - b.newCost);
+      const best = offerResults[0];
+
+      if (currentEl instanceof HTMLElement) {
+        currentEl.textContent = formatCurrency(currentAnnual);
+      }
+      if (newEl instanceof HTMLElement) {
+        newEl.textContent = formatCurrency(best.newCost);
+      }
+      if (saveEl instanceof HTMLElement) {
+        saveEl.textContent = formatCurrency(best.saving);
+      }
+
+      if (offersEl instanceof HTMLElement) {
+        if (offerResults.length === 1 && offerResults[0].name === 'Nessuna offerta disponibile') {
+          offersEl.innerHTML = `
+            <article class="energy-sim__offer">
+              <strong>Nessuna offerta ARERA disponibile</strong>
+              <span class="muted">Verifica i gestori configurati e l'import offerte.</span>
+            </article>
+          `;
+        } else {
+          offersEl.innerHTML = offerResults.slice(0, 6).map((offer, index) => {
+            const providerLabel = offer.provider ? `<span class="muted">${offer.provider}</span>` : '';
+            const link = offer.url ? `<a href="${offer.url}" class="muted" target="_blank" rel="noreferrer">Dettagli offerta</a>` : '';
+            return `
+              <article class="energy-sim__offer">
+                ${index === 0 ? '<span class="energy-sim__offer-badge">Consigliata</span>' : ''}
+                <strong>${offer.name}</strong>
+                ${providerLabel}
+                <span class="muted">Costo annuo: ${formatCurrency(offer.newCost)}</span>
+                <span class="muted">Risparmio: ${formatCurrency(offer.saving)}</span>
+                ${link}
+              </article>
+            `;
+          }).join('');
         }
-        const afterElement = getDragAfterElement(container, event.clientY);
-        if (!afterElement) {
-          container.appendChild(dragging);
-        } else if (afterElement !== dragging) {
-          container.insertBefore(dragging, afterElement);
+      }
+
+      if (resultsEl instanceof HTMLElement) {
+        resultsEl.removeAttribute('hidden');
+      }
+
+      return {
+        currentAnnual,
+        bestNewAnnual: best.newCost,
+        bestSaving: best.saving,
+      };
+    };
+
+    const collectSimData = () => {
+      const supply = getCurrentSupply();
+      const customerType = root.querySelector('input[name="energy_customer"]:checked')?.value || '';
+      const luceKwh = readNumber('[name="luce_kwh"]');
+      const luceMembers = readNumber('[name="luce_members"]');
+      const luceFascia = root.querySelector('[name="luce_fascia"]')?.value || '';
+      const gasSmc = readNumber('[name="gas_smc"]');
+      const gasUses = Array.from(root.querySelectorAll('input[name="gas_use"]:checked')).map(item => item.value);
+      const billAmount = readNumber('[name="bill_amount"]');
+      const billFrequency = root.querySelector('[name="bill_frequency"]')?.value || '';
+      const location = root.querySelector('[name="location"]')?.value || '';
+      const estimates = computeResults();
+
+      return {
+        supply,
+        customerType,
+        luceKwh,
+        luceMembers,
+        luceFascia,
+        gasSmc,
+        gasUses,
+        billAmount,
+        billFrequency,
+        location,
+        currentAnnual: estimates.currentAnnual,
+        newAnnual: estimates.bestNewAnnual,
+        savingAnnual: estimates.bestSaving,
+      };
+    };
+
+
+    if (cta instanceof HTMLElement) {
+      cta.addEventListener('click', () => {
+        const panel = root.querySelector('#energy-sim');
+        if (panel) {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       });
+    }
 
-      container.addEventListener('dragenter', () => {
-        container.classList.add('is-drag-over');
-      });
-
-      container.addEventListener('dragleave', event => {
-        const related = event.relatedTarget;
-        if (!(related instanceof Node) || !container.contains(related)) {
-          container.classList.remove('is-drag-over');
-        }
-      });
-
-      container.addEventListener('drop', () => {
-        container.classList.remove('is-drag-over');
-        persistLayout();
-      });
-
-      cards.forEach(card => {
-        card.addEventListener('dragstart', event => {
-          const transfer = event.dataTransfer;
-          if (transfer) {
-            transfer.effectAllowed = 'move';
-            transfer.setData('text/plain', card.getAttribute('data-draggable-card') || '');
-          }
-          card.classList.add('is-dragging');
-        });
-
-        card.addEventListener('dragend', () => {
-          card.classList.remove('is-dragging');
-          containers.forEach(item => item.classList.remove('is-drag-over'));
-          persistLayout();
-        });
+    supplyInputs.forEach(input => {
+      input.addEventListener('change', () => toggleConsumptionBlocks(input.value));
+      input.addEventListener('change', () => {
+        currentSupply = input.value;
       });
     });
 
-    function persistLayout() {
-      const snapshot = {};
-      containers.forEach(container => {
-        const containerId = container.getAttribute('data-draggable-container');
-        if (!containerId) {
+    const handleBillFile = async file => {
+      if (!file) {
+        return;
+      }
+      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+        setBillStatus('Formato non supportato. Usa PDF.', true);
+        return;
+      }
+
+      setBillStatus('Analisi bolletta in corso…');
+      try {
+        const formData = new FormData();
+        formData.append('action', 'energy_bill_parse');
+        formData.append('bill_file', file);
+
+        const response = await fetch('index.php?page=energy_contracts', {
+          method: 'POST',
+          body: formData,
+          credentials: 'same-origin',
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload || payload.success === false) {
+          setBillStatus(payload?.message || 'Impossibile leggere la bolletta.', true);
           return;
         }
-        snapshot[containerId] = Array.from(container.querySelectorAll('[data-draggable-card]')).map(card => card.getAttribute('data-draggable-card') || '');
-      });
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(snapshot));
-      } catch (error) {
-        console.warn('Impossibile salvare il layout della dashboard.', error);
+
+        const data = payload.data || {};
+        if (typeof data.luce_kwh === 'number' && data.luce_kwh > 0) {
+          const input = root.querySelector('[name="luce_kwh"]');
+          if (input instanceof HTMLInputElement) {
+            input.value = Math.round(data.luce_kwh).toString();
+          }
+        }
+        if (typeof data.gas_smc === 'number' && data.gas_smc > 0) {
+          const input = root.querySelector('[name="gas_smc"]');
+          if (input instanceof HTMLInputElement) {
+            input.value = Math.round(data.gas_smc).toString();
+          }
+        }
+        if (typeof data.bill_amount === 'number' && data.bill_amount > 0) {
+          const input = root.querySelector('[name="bill_amount"]');
+          if (input instanceof HTMLInputElement) {
+            input.value = data.bill_amount.toFixed(2);
+          }
+        }
+        if (data.bill_frequency) {
+          const select = root.querySelector('[name="bill_frequency"]');
+          if (select instanceof HTMLSelectElement) {
+            select.value = data.bill_frequency;
+          }
+        }
+
+        setBillStatus('Bolletta letta. Verifica i valori estratti.');
+      } catch (_error) {
+        setBillStatus('Errore durante la lettura della bolletta.', true);
       }
+    };
+
+    if (billFileInput instanceof HTMLInputElement) {
+      billFileInput.addEventListener('change', async () => {
+        const file = billFileInput.files && billFileInput.files[0];
+        await handleBillFile(file || null);
+      });
     }
 
-    function getDragAfterElement(container, y) {
-      const siblings = [...container.querySelectorAll('[data-draggable-card]:not(.is-dragging)')];
-      return siblings.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-          return { offset, element: child };
-        }
-        return closest;
-      }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+    if (billDrop instanceof HTMLElement && billFileInput instanceof HTMLInputElement) {
+      billDrop.addEventListener('click', () => {
+        billFileInput.click();
+      });
+      billDrop.addEventListener('dragover', event => {
+        event.preventDefault();
+        billDrop.classList.add('is-dragover');
+      });
+      billDrop.addEventListener('dragleave', () => {
+        billDrop.classList.remove('is-dragover');
+      });
+      billDrop.addEventListener('drop', async event => {
+        event.preventDefault();
+        billDrop.classList.remove('is-dragover');
+        const file = event.dataTransfer?.files && event.dataTransfer.files[0];
+        await handleBillFile(file || null);
+      });
     }
+
+    if (prevBtn instanceof HTMLButtonElement) {
+      prevBtn.addEventListener('click', () => {
+        showStep(Math.max(1, currentStep - 1));
+      });
+    }
+
+    if (nextBtn instanceof HTMLButtonElement) {
+      nextBtn.addEventListener('click', () => {
+        if (currentStep >= steps.length) {
+          computeResults();
+          if (resultsEl instanceof HTMLElement) {
+            resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          return;
+        }
+        currentSupply = getCurrentSupply();
+        toggleConsumptionBlocks(currentSupply);
+        showStep(Math.min(steps.length, currentStep + 1));
+      });
+    }
+
+    const initialSupply = supplyInputs.find(input => input.checked)?.value || '';
+    if (initialSupply === '' && supplyInputs.length > 0) {
+      supplyInputs[0].checked = true;
+      currentSupply = supplyInputs[0].value;
+    } else {
+      currentSupply = initialSupply;
+    }
+    toggleConsumptionBlocks(getCurrentSupply());
+    showStep(1);
   }
 
   function setupFileUploads() {

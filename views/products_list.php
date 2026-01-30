@@ -5,9 +5,11 @@ declare(strict_types=1);
  * @var array{success:bool, message:string, errors?:array<int, string>}|null $feedback
  * @var array<int, array<string, mixed>> $products
  * @var array{page:int, per_page:int, total:int, total_pages:int, has_prev:bool, has_next:bool}|null $pagination
+ * @var string $searchTerm
  */
 $pageTitle = 'Lista prodotti';
 $products = $products ?? [];
+$searchTerm = $searchTerm ?? '';
 $pagination = $pagination ?? [
     'page' => 1,
     'per_page' => 7,
@@ -17,12 +19,16 @@ $pagination = $pagination ?? [
     'has_next' => false,
 ];
 $feedback = $feedback ?? null;
-$buildProductsPageUrl = static function (int $pageNo) use ($pagination): string {
+$buildProductsPageUrl = static function (int $pageNo) use ($pagination, $searchTerm): string {
     $pageNo = max(1, $pageNo);
-    return 'index.php?' . http_build_query([
+    $params = [
         'page' => 'products_list',
         'page_no' => $pageNo,
-    ]);
+    ];
+    if ($searchTerm !== '') {
+        $params['search'] = $searchTerm;
+    }
+    return 'index.php?' . http_build_query($params);
 };
 ?>
 <section class="page">
@@ -35,6 +41,23 @@ $buildProductsPageUrl = static function (int $pageNo) use ($pagination): string 
     </header>
 
     <section class="page__section">
+        <div class="section__header">
+            <div>
+                <h3>Catalogo prodotti</h3>
+                <p class="muted">Filtra per nome, categoria, SKU, IMEI o prezzo.</p>
+            </div>
+            <form method="get" class="search-field">
+                <input type="hidden" name="page" value="products_list">
+                <span class="search-field__icon" aria-hidden="true">🔎</span>
+                <input
+                    type="text"
+                    name="search"
+                    class="search-field__control"
+                    placeholder="Cerca per nome, categoria, SKU, IMEI o prezzo"
+                    value="<?= htmlspecialchars($searchTerm) ?>"
+                >
+            </form>
+        </div>
         <?php if ($feedback !== null): ?>
             <div class="alert <?= $feedback['success'] ? 'alert--success' : 'alert--error' ?>">
                 <p><?= htmlspecialchars($feedback['message']) ?></p>

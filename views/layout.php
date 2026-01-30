@@ -97,6 +97,14 @@ if ($currentRoute === '' || $currentRoute === '/') {
         $currentRoute = 'index.php';
     }
 }
+$currentPage = $_GET['page'] ?? 'dashboard';
+$isActivePage = static function (string $page) use ($currentPage): bool {
+    return $currentPage === $page;
+};
+$isAdmin = is_array($currentUser) && (
+    (isset($currentUser['role']) && (string) $currentUser['role'] === 'admin')
+    || (isset($currentUser['role_name']) && (string) $currentUser['role_name'] === 'admin')
+);
 ?>
 <!doctype html>
 <html lang="it">
@@ -117,19 +125,23 @@ if ($currentRoute === '' || $currentRoute === '/') {
             <span class="sidebar__title">Coresuite Express</span>
         </div>
         <nav class="sidebar__nav">
-            <a href="index.php?page=dashboard" class="sidebar__link" data-tooltip="Dashboard">🏠 <span>Dashboard</span></a>
-            <a href="index.php?page=sim_stock" class="sidebar__link" data-tooltip="Magazzino SIM">📥 <span>Magazzino SIM</span></a>
-            <a href="index.php?page=products" class="sidebar__link" data-tooltip="Prodotti">🛒 <span>Prodotti</span></a>
-            <a href="index.php?page=products_list" class="sidebar__link" data-tooltip="Lista Prodotti">📋 <span>Lista prodotti</span></a>
-            <a href="index.php?page=customers" class="sidebar__link" data-tooltip="Clienti">👥 <span>Clienti</span></a>
-            <a href="index.php?page=offers" class="sidebar__link" data-tooltip="Listini">🗂️ <span>Listini</span></a>
-            <a href="index.php?page=sales_create" class="sidebar__link" data-tooltip="Nuova vendita">🧾 <span>Nuova vendita</span></a>
-            <a href="index.php?page=sales_list" class="sidebar__link" data-tooltip="Storico vendite">📊 <span>Storico vendite</span></a>
-            <a href="index.php?page=product_requests" class="sidebar__link" data-tooltip="Ordini store">📦 <span>Ordini store</span></a>
-            <a href="index.php?page=support_requests" class="sidebar__link" data-tooltip="Supporto clienti">💬 <span>Richieste supporto</span></a>
-            <a href="index.php?page=reports" class="sidebar__link" data-tooltip="Report vendite">📈 <span>Report</span></a>
-            <a href="index.php?page=guide" class="sidebar__link" data-tooltip="Guida">📘 <span>Guida completa</span></a>
-            <a href="index.php?page=settings" class="sidebar__link" data-tooltip="Impostazioni">⚙️ <span>Impostazioni</span></a>
+            <a href="index.php?page=dashboard" class="sidebar__link <?= $isActivePage('dashboard') ? 'is-active' : '' ?>" data-tooltip="Dashboard">🏠 <span>Dashboard</span></a>
+            <a href="index.php?page=sim_stock" class="sidebar__link <?= $isActivePage('sim_stock') ? 'is-active' : '' ?>" data-tooltip="Magazzino SIM">📥 <span>Magazzino SIM</span></a>
+            <a href="index.php?page=products" class="sidebar__link <?= $isActivePage('products') ? 'is-active' : '' ?>" data-tooltip="Prodotti">🛒 <span>Prodotti</span></a>
+            <a href="index.php?page=products_list" class="sidebar__link <?= $isActivePage('products_list') ? 'is-active' : '' ?>" data-tooltip="Lista Prodotti">📋 <span>Lista prodotti</span></a>
+            <a href="index.php?page=customers" class="sidebar__link <?= $isActivePage('customers') ? 'is-active' : '' ?>" data-tooltip="Clienti">👥 <span>Clienti</span></a>
+            <a href="index.php?page=offers" class="sidebar__link <?= $isActivePage('offers') ? 'is-active' : '' ?>" data-tooltip="Listini">🗂️ <span>Listini</span></a>
+            <a href="index.php?page=sales_create" class="sidebar__link <?= $isActivePage('sales_create') ? 'is-active' : '' ?>" data-tooltip="Nuova vendita">🧾 <span>Nuova vendita</span></a>
+            <a href="index.php?page=sales_list" class="sidebar__link <?= $isActivePage('sales_list') ? 'is-active' : '' ?>" data-tooltip="Storico vendite">📊 <span>Storico vendite</span></a>
+            <a href="index.php?page=energy_contracts" class="sidebar__link <?= $isActivePage('energy_contracts') ? 'is-active' : '' ?>" data-tooltip="Contratti energia">⚡ <span>Contratti energia</span></a>
+            <a href="index.php?page=product_requests" class="sidebar__link <?= $isActivePage('product_requests') ? 'is-active' : '' ?>" data-tooltip="Ordini store">📦 <span>Ordini store</span></a>
+            <a href="index.php?page=support_requests" class="sidebar__link <?= $isActivePage('support_requests') ? 'is-active' : '' ?>" data-tooltip="Supporto clienti">💬 <span>Richieste supporto</span></a>
+            <a href="index.php?page=reports" class="sidebar__link <?= $isActivePage('reports') ? 'is-active' : '' ?>" data-tooltip="Report vendite">📈 <span>Report</span></a>
+            <a href="index.php?page=guide" class="sidebar__link <?= $isActivePage('guide') ? 'is-active' : '' ?>" data-tooltip="Guida">📘 <span>Guida completa</span></a>
+            <?php if ($isAdmin): ?>
+                <a href="index.php?page=pda_imports" class="sidebar__link <?= $isActivePage('pda_imports') ? 'is-active' : '' ?>" data-tooltip="Debug PDA">🧪 <span>Debug PDA</span></a>
+            <?php endif; ?>
+            <a href="index.php?page=settings" class="sidebar__link <?= $isActivePage('settings') ? 'is-active' : '' ?>" data-tooltip="Impostazioni">⚙️ <span>Impostazioni</span></a>
         </nav>
     <div class="sidebar__footer">
         <div class="sidebar__user sidebar__user--minimal">

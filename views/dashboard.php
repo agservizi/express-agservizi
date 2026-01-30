@@ -255,7 +255,7 @@ if (is_array($currentUser)) {
         <?php endif; ?>
     </header>
 
-    <div class="cards" data-draggable-container="dashboard-metrics">
+    <div class="cards">
         <?php foreach ($analyticsCards as $card): ?>
             <?php
                 $format = (string) ($card['format'] ?? 'number');
@@ -266,7 +266,7 @@ if (is_array($currentUser)) {
                     $cardSlug = 'metric';
                 }
             ?>
-            <article class="card" data-draggable-card="metric-<?= htmlspecialchars($cardSlug) ?>">
+            <article class="card">
                 <h3><?= htmlspecialchars((string) ($card['label'] ?? '')) ?></h3>
                 <p class="card__value"><?= $formatCardValue($card) ?></p>
                 <?php if ($delta !== null): ?>
@@ -284,8 +284,8 @@ if (is_array($currentUser)) {
         <?php endforeach; ?>
     </div>
 
-    <div class="dashboard-grid" data-draggable-container="dashboard-panels">
-        <section class="dashboard-panel dashboard-panel--wide" data-draggable-card="panel-operational">
+    <div class="dashboard-grid">
+        <section class="dashboard-panel dashboard-panel--wide">
             <header class="dashboard-panel__header">
                 <h3>Pulse operativo</h3>
                 <p class="dashboard-panel__meta">Stato corrente di ticket, campagne e rischio pagamenti.</p>
@@ -369,7 +369,7 @@ if (is_array($currentUser)) {
             </div>
         </section>
 
-    <section class="dashboard-panel" data-draggable-card="panel-customers">
+    <section class="dashboard-panel">
             <header class="dashboard-panel__header">
                 <h3>Clienti al centro</h3>
                 <p class="dashboard-panel__meta">Top clienti, account a rischio e nuovi ingressi.</p>
@@ -434,7 +434,61 @@ if (is_array($currentUser)) {
             </div>
         </section>
 
-    <section class="dashboard-panel dashboard-panel--wide" data-draggable-card="panel-forecast">
+    <section class="dashboard-panel">
+            <header class="dashboard-panel__header">
+                <h3>Governance & compliance</h3>
+                <p class="dashboard-panel__meta">Policy privacy, adozione portale e audit trail.</p>
+            </header>
+            <ul class="insight-list">
+                <li class="insight-list__item">
+                    <span class="insight-list__label">Policy attive</span>
+                    <span class="insight-list__value"><?= (int) ($governance['active_policies'] ?? 0) ?><?php if (!empty($governance['latest_version'])): ?> · v<?= htmlspecialchars((string) $governance['latest_version']) ?><?php endif; ?></span>
+                </li>
+                <li class="insight-list__item">
+                    <span class="insight-list__label">Accettazioni portal</span>
+                    <?php
+                        $rate = $governance['acceptance_rate'] ?? null;
+                        $rateLabel = $rate !== null ? number_format((float) $rate, 1, ',', '.') . '%' : 'n/d';
+                    ?>
+                    <span class="insight-list__value"><?= $rateLabel ?> · Mancano <?= (int) ($governance['pending_acceptances'] ?? 0) ?></span>
+                </li>
+                <li class="insight-list__item">
+                    <span class="insight-list__label">Ultimo aggiornamento policy</span>
+                    <span class="insight-list__value"><?= htmlspecialchars($formatDateTime($governance['last_policy_update'] ?? '', 'd/m/Y')) ?></span>
+                </li>
+                <li class="insight-list__item">
+                    <span class="insight-list__label">Audit ultimi 30 giorni</span>
+                    <span class="insight-list__value"><?= (int) ($governance['audit_events_last_30'] ?? 0) ?></span>
+                </li>
+            </ul>
+            <h4 class="insight-title">Audit log recente</h4>
+            <?php if ($recentEvents === []): ?>
+                <p class="muted">Nessuna attività da mostrare.</p>
+            <?php else: ?>
+                <ul class="timeline">
+                    <?php foreach ($recentEvents as $event): ?>
+                        <?php
+                            $eventLabel = (string) ($event['action_label'] ?? $event['action'] ?? 'Evento');
+                            if ($eventLabel === '') {
+                                $eventLabel = 'Evento';
+                            }
+                        ?>
+                        <li class="timeline__item">
+                            <span class="timeline__dot" aria-hidden="true"></span>
+                            <div class="timeline__body">
+                                <span class="timeline__title"><?= htmlspecialchars($eventLabel) ?><?= !empty($event['user']) ? ' · ' . htmlspecialchars((string) $event['user']) : '' ?></span>
+                                <?php if (!empty($event['description'])): ?>
+                                    <p class="timeline__description"><?= htmlspecialchars((string) $event['description']) ?></p>
+                                <?php endif; ?>
+                                <span class="timeline__meta"><?= htmlspecialchars($formatDateTime($event['created_at'] ?? '')) ?></span>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </section>
+
+    <section class="dashboard-panel dashboard-panel--wide">
             <header class="dashboard-panel__header">
                 <h3>Trend e forecast vendite</h3>
                 <p class="dashboard-panel__meta">Previsione <?= (int) ($forecast['horizon_days'] ?? 7) ?> giorni · <?= htmlspecialchars($forecastConfidenceLabel) ?> · <?= htmlspecialchars($forecastTrendLabel) ?></p>
@@ -489,61 +543,7 @@ if (is_array($currentUser)) {
             <?php endif; ?>
         </section>
 
-    <section class="dashboard-panel" data-draggable-card="panel-governance">
-            <header class="dashboard-panel__header">
-                <h3>Governance & compliance</h3>
-                <p class="dashboard-panel__meta">Policy privacy, adozione portale e audit trail.</p>
-            </header>
-            <ul class="insight-list">
-                <li class="insight-list__item">
-                    <span class="insight-list__label">Policy attive</span>
-                    <span class="insight-list__value"><?= (int) ($governance['active_policies'] ?? 0) ?><?php if (!empty($governance['latest_version'])): ?> · v<?= htmlspecialchars((string) $governance['latest_version']) ?><?php endif; ?></span>
-                </li>
-                <li class="insight-list__item">
-                    <span class="insight-list__label">Accettazioni portal</span>
-                    <?php
-                        $rate = $governance['acceptance_rate'] ?? null;
-                        $rateLabel = $rate !== null ? number_format((float) $rate, 1, ',', '.') . '%' : 'n/d';
-                    ?>
-                    <span class="insight-list__value"><?= $rateLabel ?> · Mancano <?= (int) ($governance['pending_acceptances'] ?? 0) ?></span>
-                </li>
-                <li class="insight-list__item">
-                    <span class="insight-list__label">Ultimo aggiornamento policy</span>
-                    <span class="insight-list__value"><?= htmlspecialchars($formatDateTime($governance['last_policy_update'] ?? '', 'd/m/Y')) ?></span>
-                </li>
-                <li class="insight-list__item">
-                    <span class="insight-list__label">Audit ultimi 30 giorni</span>
-                    <span class="insight-list__value"><?= (int) ($governance['audit_events_last_30'] ?? 0) ?></span>
-                </li>
-            </ul>
-            <h4 class="insight-title">Audit log recente</h4>
-            <?php if ($recentEvents === []): ?>
-                <p class="muted">Nessuna attività da mostrare.</p>
-            <?php else: ?>
-                <ul class="timeline">
-                    <?php foreach ($recentEvents as $event): ?>
-                        <?php
-                            $eventLabel = (string) ($event['action_label'] ?? $event['action'] ?? 'Evento');
-                            if ($eventLabel === '') {
-                                $eventLabel = 'Evento';
-                            }
-                        ?>
-                        <li class="timeline__item">
-                            <span class="timeline__dot" aria-hidden="true"></span>
-                            <div class="timeline__body">
-                                <span class="timeline__title"><?= htmlspecialchars($eventLabel) ?><?= !empty($event['user']) ? ' · ' . htmlspecialchars((string) $event['user']) : '' ?></span>
-                                <?php if (!empty($event['description'])): ?>
-                                    <p class="timeline__description"><?= htmlspecialchars((string) $event['description']) ?></p>
-                                <?php endif; ?>
-                                <span class="timeline__meta"><?= htmlspecialchars($formatDateTime($event['created_at'] ?? '')) ?></span>
-                            </div>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
-            <?php endif; ?>
-        </section>
-
-    <section class="dashboard-panel dashboard-panel--wide" data-draggable-card="panel-stock">
+    <section class="dashboard-panel dashboard-panel--wide">
         <header class="dashboard-panel__header">
             <h3>Stock & fornitori</h3>
             <p class="dashboard-panel__meta">Copertura, soglie e suggerimenti di riordino.</p>
