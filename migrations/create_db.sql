@@ -208,3 +208,26 @@ CREATE TABLE user_remember_tokens (
   INDEX idx_user_id (user_id),
   CONSTRAINT fk_user_remember_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- Licenze
+CREATE TABLE licenses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(64) NOT NULL UNIQUE,
+  label VARCHAR(150) NULL,
+  max_users INT NOT NULL DEFAULT 1,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  expires_at DATE NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE license_activations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  license_id INT NOT NULL,
+  activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  revoked_at TIMESTAMP NULL,
+  notes VARCHAR(255) NULL,
+  INDEX idx_license_activations_license (license_id),
+  INDEX idx_license_activations_revoked (revoked_at),
+  CONSTRAINT fk_license_activations_license FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE
+);

@@ -36,6 +36,12 @@ declare(strict_types=1);
  * @var array{last_run?:int,last_started?:int,last_status?:string,last_message?:string,last_output?:string} $energyOffersImportStatus
  * @var array{success:bool,message:string,errors?:array<int,string>}|null $energyFeedback
  * @var bool $energyOpen
+ * @var array<int, array<string, mixed>> $licenses
+ * @var array{success:bool,message:string,error?:string}|null $licenseFeedback
+ * @var array{code:string,label?:string}|null $licenseGeneratedCode
+ * @var bool $licensesOpen
+ * @var array<int, array<string, mixed>> $licenseActivations
+ * @var int $licenseFocusId
  */
 $pageTitle = $pageTitle ?? 'Impostazioni';
 $roles = $roles ?? [];
@@ -90,6 +96,13 @@ $energyOffersImportStatus = isset($energyOffersImportStatus) && is_array($energy
 $energyFeedback = isset($energyFeedback) && is_array($energyFeedback) ? $energyFeedback : null;
 $energyOpen = isset($energyOpen) ? (bool) $energyOpen : false;
 $energyOpen = $energyOpen || $energyFeedback !== null;
+$licenses = isset($licenses) && is_array($licenses) ? $licenses : [];
+$licenseFeedback = isset($licenseFeedback) && is_array($licenseFeedback) ? $licenseFeedback : null;
+$licenseGeneratedCode = isset($licenseGeneratedCode) && is_array($licenseGeneratedCode) ? $licenseGeneratedCode : null;
+$licensesOpen = isset($licensesOpen) ? (bool) $licensesOpen : false;
+$licensesOpen = $licensesOpen || $licenseFeedback !== null || $licenseGeneratedCode !== null;
+$licenseActivations = isset($licenseActivations) && is_array($licenseActivations) ? $licenseActivations : [];
+$licenseFocusId = isset($licenseFocusId) ? (int) $licenseFocusId : 0;
 $receiptHeaderLines = $receiptSettings['header_lines'] ?? [];
 if (!is_array($receiptHeaderLines)) {
     $receiptHeaderLines = [];
@@ -1193,6 +1206,169 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 <?php endif; ?>
             </div>
         </article>
+
+        <?php if ($isAdmin): ?>
+            <article class="settings-accordion__item" data-accordion data-open="<?= $licensesOpen ? 'true' : 'false' ?>">
+                <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $licensesOpen ? 'true' : 'false' ?>">
+                    <span class="settings-accordion__title">Licenze</span>
+                    <span class="settings-accordion__icon" aria-hidden="true"></span>
+                </button>
+                <div class="settings-accordion__content" data-accordion-content <?= $licensesOpen ? '' : 'hidden' ?>>
+                    <p class="muted">Genera e gestisci le licenze per l'attivazione del gestionale.</p>
+
+                    <?php if ($licenseFeedback !== null): ?>
+                        <div class="alert <?= ($licenseFeedback['success'] ?? false) ? 'alert--success' : 'alert--error' ?>">
+                            <p><?= htmlspecialchars((string) $licenseFeedback['message']) ?></p>
+                            <?php if (!empty($licenseFeedback['error'])): ?>
+                                <p class="muted">Dettaglio: <?= htmlspecialchars((string) $licenseFeedback['error']) ?></p>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($licenseGeneratedCode !== null): ?>
+                        <div class="alert alert--success">
+                            <p>Licenza generata: <strong><?= htmlspecialchars((string) ($licenseGeneratedCode['code'] ?? '')) ?></strong></p>
+                            <?php if (!empty($licenseGeneratedCode['label'])): ?>
+                                <p class="muted">Etichetta: <?= htmlspecialchars((string) $licenseGeneratedCode['label']) ?></p>
+                            <?php endif; ?>
+                            <p class="muted">Annota il codice: verrà mostrato solo una volta.</p>
+                        </div>
+                    <?php endif; ?>
+
+                    <form method="post" class="form settings-form">
+                        <input type="hidden" name="action" value="create_license_key">
+                        <div class="settings-form__grid">
+                            <div class="settings-form__field">
+                                <label for="license_label">Etichetta</label>
+                                <input type="text" id="license_label" name="license_label" placeholder="Es. Abbonamento annuale">
+                            </div>
+                            <div class="settings-form__field">
+                                <label for="license_max_users">Max utenti</label>
+                                <input type="number" min="1" id="license_max_users" name="license_max_users" value="1" required>
+                            </div>
+                            <div class="settings-form__field">
+                                <label for="license_expires_at">Scadenza</label>
+                                <input type="date" id="license_expires_at" name="license_expires_at">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn--primary">Genera licenza</button>
+                    </form>
+
+                    <div class="table-wrapper table-wrapper--embedded">
+                        <table class="table table--compact">
+                            <thead>
+                                <tr>
+                                    <th>Codice</th>
+                                    <th>Etichetta</th>
+                                    <th>Max utenti</th>
+                                    <th>Scadenza</th>
+                                    <th>Stato</th>
+                                    <th>Creata il</th>
+                                    <th class="table__col--actions">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($licenses)): ?>
+                                    <tr><td colspan="7">Nessuna licenza disponibile.</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($licenses as $license): ?>
+                                        <?php
+                                            $licenseId = (int) ($license['id'] ?? 0);
+                                            $isActive = (int) ($license['is_active'] ?? 0) === 1;
+                                            $createdAt = !empty($license['created_at'])
+                                                ? date('d/m/Y', strtotime((string) $license['created_at']))
+                                                : 'n/d';
+                                            $expiresAt = !empty($license['expires_at'])
+                                                ? date('d/m/Y', strtotime((string) $license['expires_at']))
+                                                : 'n/d';
+                                        ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars((string) ($license['code'] ?? '')) ?></td>
+                                            <td><?= htmlspecialchars((string) ($license['label'] ?? '')) ?></td>
+                                            <td><?= (int) ($license['max_users'] ?? 1) ?></td>
+                                            <td><?= htmlspecialchars($expiresAt) ?></td>
+                                            <td>
+                                                <?php if ($isActive): ?>
+                                                    <span class="badge badge--success">Attiva</span>
+                                                <?php else: ?>
+                                                    <span class="badge badge--muted">Disattiva</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?= htmlspecialchars($createdAt) ?></td>
+                                            <td class="table__col--actions">
+                                                <div class="table-actions">
+                                                    <form method="post">
+                                                        <input type="hidden" name="action" value="toggle_license_key">
+                                                        <input type="hidden" name="license_id" value="<?= $licenseId ?>">
+                                                        <input type="hidden" name="target_status" value="<?= $isActive ? '0' : '1' ?>">
+                                                        <button type="submit" class="btn btn--secondary btn--small">
+                                                            <?= $isActive ? 'Disattiva' : 'Attiva' ?>
+                                                        </button>
+                                                    </form>
+                                                    <a class="btn btn--secondary btn--small" href="index.php?page=settings&amp;licenses_open=1&amp;license_id=<?= $licenseId ?>">Dettagli</a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <?php if ($licenseFocusId > 0): ?>
+                        <section class="settings-accordion__subsection">
+                            <h4>Attivazioni licenza</h4>
+                            <?php if (empty($licenseActivations)): ?>
+                                <p class="muted">Nessuna attivazione registrata.</p>
+                            <?php else: ?>
+                                <div class="table-wrapper table-wrapper--embedded">
+                                    <table class="table table--compact">
+                                        <thead>
+                                            <tr>
+                                                <th>Attivata il</th>
+                                                <th>Revocata il</th>
+                                                <th>Note</th>
+                                                <th class="table__col--actions">Azioni</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($licenseActivations as $activation): ?>
+                                                <?php
+                                                    $activationId = (int) ($activation['id'] ?? 0);
+                                                    $activatedAt = !empty($activation['activated_at'])
+                                                        ? date('d/m/Y H:i', strtotime((string) $activation['activated_at']))
+                                                        : 'n/d';
+                                                    $revokedAt = !empty($activation['revoked_at'])
+                                                        ? date('d/m/Y H:i', strtotime((string) $activation['revoked_at']))
+                                                        : null;
+                                                ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($activatedAt) ?></td>
+                                                    <td><?= $revokedAt !== null ? htmlspecialchars($revokedAt) : '—' ?></td>
+                                                    <td><?= htmlspecialchars((string) ($activation['notes'] ?? '')) ?></td>
+                                                    <td class="table__col--actions">
+                                                        <?php if ($revokedAt === null): ?>
+                                                            <form method="post" onsubmit="return confirm('Revocare questa attivazione?');">
+                                                                <input type="hidden" name="action" value="revoke_license_activation">
+                                                                <input type="hidden" name="activation_id" value="<?= $activationId ?>">
+                                                                <input type="hidden" name="license_focus_id" value="<?= $licenseFocusId ?>">
+                                                                <button type="submit" class="btn btn--danger btn--small">Revoca</button>
+                                                            </form>
+                                                        <?php else: ?>
+                                                            <span class="badge badge--muted">Revocata</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        </section>
+                    <?php endif; ?>
+                </div>
+            </article>
+        <?php endif; ?>
 
         <article class="settings-accordion__item" data-accordion data-open="<?= $auditOpen ? 'true' : 'false' ?>">
             <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $auditOpen ? 'true' : 'false' ?>">

@@ -13,6 +13,7 @@ $migrations = [
     __DIR__ . '/../migrations/20260129_add_energy_offers.sql',
     __DIR__ . '/../migrations/20260129_add_energy_sim_requests.sql',
     __DIR__ . '/../migrations/20260129_alter_energy_offers_supply_type.sql',
+    __DIR__ . '/../migrations/20260201_add_licenses.sql',
 ];
 
 $ignorableErrors = [1060, 1061, 1091, 1050];

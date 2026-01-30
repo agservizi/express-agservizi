@@ -483,6 +483,7 @@ use App\Services\SystemNotificationService;
 use App\Services\SsoService;
 use App\Services\PdaImportService;
 use App\Services\ReceiptSettingsService;
+use App\Services\LicenseService;
 
 $pdo = Database::getConnection();
 
@@ -538,6 +539,7 @@ $receiptSettingsService = new ReceiptSettingsService();
 $energyProviderService = new EnergyProviderService($pdo);
 $energyContractService = new EnergyContractService($pdo);
 $energyOfferService = new EnergyOfferService($pdo);
+$licenseService = new LicenseService($pdo);
 $supportRequestService = new SupportRequestService($pdo);
 $userService = new UserService($pdo);
 $stockMonitorService = new StockMonitorService($pdo, $alertEmail, $logPath, $resendApiKey, $resendFrom, $systemNotificationService);
@@ -1816,6 +1818,10 @@ switch ($page) {
         unset($_SESSION['receipt_settings_feedback']);
         $energySettingsFeedback = $_SESSION['energy_settings_feedback'] ?? null;
         unset($_SESSION['energy_settings_feedback']);
+        $licenseSettingsFeedback = $_SESSION['license_settings_feedback'] ?? null;
+        unset($_SESSION['license_settings_feedback']);
+        $licenseGeneratedCode = $_SESSION['license_generated_code'] ?? null;
+        unset($_SESSION['license_generated_code']);
         $ssoFeedback = $_SESSION['settings_sso_feedback'] ?? null;
         unset($_SESSION['settings_sso_feedback']);
         $ssoSecretPreview = $_SESSION['settings_sso_secret'] ?? null;
@@ -1829,6 +1835,17 @@ switch ($page) {
         $energyProviders = $energyProviderService->listProviders();
         $energyOpen = isset($_GET['energy_open']) || $energySettingsFeedback !== null;
         $energyOffersImportStatus = loadEnergyOffersImportStatus();
+        $licensesOpen = isset($_GET['licenses_open']) || $licenseSettingsFeedback !== null || $licenseGeneratedCode !== null;
+        $licenseFocusId = isset($_GET['license_id']) ? (int) $_GET['license_id'] : 0;
+        $licenses = [];
+        $licenseActivations = [];
+        if ($isAdmin) {
+            $licenses = $licenseService->listLicenses();
+            if ($licenseFocusId > 0) {
+                $licenseActivations = $licenseService->listActivations($licenseFocusId);
+                $licensesOpen = true;
+            }
+        }
 
         if ($isAdmin) {
             maybeScheduleEnergyOffersImport();
@@ -1891,6 +1908,7 @@ switch ($page) {
             $isPdaAction = false;
             $isReceiptAction = false;
             $isEnergyAction = false;
+            $isLicenseAction = false;
 
             if ($action === 'update_threshold') {
                 if (!$isAdmin) {
@@ -2048,6 +2066,60 @@ switch ($page) {
                 }
                 $_SESSION['energy_settings_feedback'] = $result;
                 $redirectParams['energy_open'] = 1;
+            } elseif ($action === 'create_license_key') {
+                $isLicenseAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'error' => 'Solo gli amministratori possono generare licenze.',
+                    ];
+                } else {
+                    $label = trim((string) ($_POST['license_label'] ?? ''));
+                    $maxUsers = isset($_POST['license_max_users']) ? (int) $_POST['license_max_users'] : 1;
+                    $expiresAt = isset($_POST['license_expires_at']) ? trim((string) $_POST['license_expires_at']) : null;
+                    $result = $licenseService->createLicense($label !== '' ? $label : null, $maxUsers, $expiresAt);
+                    if (($result['success'] ?? false) && isset($result['code'])) {
+                        $_SESSION['license_generated_code'] = [
+                            'code' => $result['code'],
+                            'label' => $label,
+                        ];
+                    }
+                }
+                $_SESSION['license_settings_feedback'] = $result;
+                $redirectParams['licenses_open'] = 1;
+            } elseif ($action === 'toggle_license_key') {
+                $isLicenseAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'error' => 'Solo gli amministratori possono modificare le licenze.',
+                    ];
+                } else {
+                    $licenseId = isset($_POST['license_id']) ? (int) $_POST['license_id'] : 0;
+                    $targetStatus = isset($_POST['target_status']) ? ((int) $_POST['target_status'] === 1) : false;
+                    $result = $licenseService->toggleLicense($licenseId, $targetStatus);
+                }
+                $_SESSION['license_settings_feedback'] = $result;
+                $redirectParams['licenses_open'] = 1;
+            } elseif ($action === 'revoke_license_activation') {
+                $isLicenseAction = true;
+                if (!$isAdmin) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'error' => 'Solo gli amministratori possono revocare attivazioni.',
+                    ];
+                } else {
+                    $activationId = isset($_POST['activation_id']) ? (int) $_POST['activation_id'] : 0;
+                    $result = $licenseService->revokeActivation($activationId);
+                }
+                $_SESSION['license_settings_feedback'] = $result;
+                $redirectParams['licenses_open'] = 1;
+                if (isset($_POST['license_focus_id'])) {
+                    $redirectParams['license_id'] = (int) $_POST['license_focus_id'];
+                }
             } elseif ($action === 'save_pda_ocr') {
                 $isPdaAction = true;
                 if (!$isAdmin) {
@@ -2252,7 +2324,7 @@ switch ($page) {
                 ];
             }
 
-            if (!$isPdaAction && !$isReceiptAction && !$isEnergyAction) {
+            if (!$isPdaAction && !$isReceiptAction && !$isEnergyAction && !$isLicenseAction) {
                 $_SESSION['settings_feedback'] = $result;
             }
 
@@ -2315,6 +2387,12 @@ switch ($page) {
             'energyOffersImportStatus' => $energyOffersImportStatus,
             'energyOpen' => $energyOpen,
             'energyFeedback' => $energySettingsFeedback,
+            'licenses' => $licenses,
+            'licenseFeedback' => $licenseSettingsFeedback,
+            'licenseGeneratedCode' => $licenseGeneratedCode,
+            'licensesOpen' => $licensesOpen,
+            'licenseActivations' => $licenseActivations,
+            'licenseFocusId' => $licenseFocusId,
             'operatorEdit' => $operatorEdit,
             'operatorEditForm' => $operatorEditForm,
             'operatorsOpen' => $operatorsOpenOverride,
