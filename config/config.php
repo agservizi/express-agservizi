@@ -211,8 +211,10 @@ $configCache = [
     ],
 ];
 
-if (defined('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')) {
-    $configCache['db']['options'][PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
+if (class_exists('Pdo\\Mysql') && defined('Pdo\\Mysql::ATTR_USE_BUFFERED_QUERY')) {
+    $configCache['db']['options'][\Pdo\Mysql::ATTR_USE_BUFFERED_QUERY] = true;
+} elseif (defined('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')) {
+    $configCache['db']['options'][\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
 }
 
 return $configCache;
