@@ -7,16 +7,34 @@ CREATE TABLE roles (
 
 INSERT INTO roles (name) VALUES ('admin'), ('cassiere');
 
+-- Tenants
+CREATE TABLE tenants (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  slug VARCHAR(120) NOT NULL UNIQUE,
+  contact_email VARCHAR(150) NULL,
+  contact_phone VARCHAR(60) NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO tenants (id, name, slug, contact_email, contact_phone, is_active)
+VALUES (1, 'Default', 'default', NULL, NULL, 1)
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
 -- Users
 CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(100) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
+  tenant_id INT NOT NULL DEFAULT 1,
   role_id INT NOT NULL,
   fullname VARCHAR(150),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (role_id) REFERENCES roles(id)
+  FOREIGN KEY (role_id) REFERENCES roles(id),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Providers
@@ -224,10 +242,28 @@ CREATE TABLE licenses (
 CREATE TABLE license_activations (
   id INT AUTO_INCREMENT PRIMARY KEY,
   license_id INT NOT NULL,
+  tenant_id INT NULL,
   activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   revoked_at TIMESTAMP NULL,
   notes VARCHAR(255) NULL,
   INDEX idx_license_activations_license (license_id),
+  INDEX idx_license_activations_tenant (tenant_id),
   INDEX idx_license_activations_revoked (revoked_at),
-  CONSTRAINT fk_license_activations_license FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE
+  CONSTRAINT fk_license_activations_license FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE,
+  CONSTRAINT fk_license_activations_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE SET NULL
+);
+
+CREATE TABLE tenant_licenses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL,
+  license_id INT NOT NULL,
+  max_users_override INT NULL,
+  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  revoked_at TIMESTAMP NULL,
+  notes VARCHAR(255) NULL,
+  INDEX idx_tenant_licenses_tenant (tenant_id),
+  INDEX idx_tenant_licenses_license (license_id),
+  INDEX idx_tenant_licenses_revoked (revoked_at),
+  CONSTRAINT fk_tenant_licenses_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tenant_licenses_license FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE
 );

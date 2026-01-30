@@ -484,6 +484,7 @@ use App\Services\SsoService;
 use App\Services\PdaImportService;
 use App\Services\ReceiptSettingsService;
 use App\Services\LicenseService;
+use App\Services\TenantService;
 
 $pdo = Database::getConnection();
 
@@ -540,6 +541,7 @@ $energyProviderService = new EnergyProviderService($pdo);
 $energyContractService = new EnergyContractService($pdo);
 $energyOfferService = new EnergyOfferService($pdo);
 $licenseService = new LicenseService($pdo);
+$tenantService = new TenantService($pdo);
 $supportRequestService = new SupportRequestService($pdo);
 $userService = new UserService($pdo);
 $stockMonitorService = new StockMonitorService($pdo, $alertEmail, $logPath, $resendApiKey, $resendFrom, $systemNotificationService);
@@ -801,6 +803,7 @@ if ($page === 'global_search') {
 
     if ($authService->hasRole('admin')) {
         $navItems[] = ['label' => 'Debug PDA', 'keywords' => 'import pda', 'url' => 'index.php?page=pda_imports'];
+        $navItems[] = ['label' => 'Licenze & Tenant', 'keywords' => 'licenze tenant multi-tenant', 'url' => 'index.php?page=licenses'];
     }
 
     $navMatches = [];
@@ -1806,6 +1809,76 @@ switch ($page) {
             'currentUser' => $currentUser,
             'pageTitle' => 'Guida completa',
             'feedback' => $guideFeedback,
+        ]);
+        break;
+
+    case 'licenses':
+        if (!$authService->hasRole('admin')) {
+            header('Location: index.php?page=dashboard');
+            exit;
+        }
+
+        $licenseFeedback = $_SESSION['licenses_feedback'] ?? null;
+        unset($_SESSION['licenses_feedback']);
+        $licenseGeneratedCode = $_SESSION['license_generated_code'] ?? null;
+        unset($_SESSION['license_generated_code']);
+
+        if ($method === 'POST') {
+            $action = $_POST['action'] ?? '';
+
+            if ($action === 'create_tenant') {
+                $result = $tenantService->createTenant($_POST);
+            } elseif ($action === 'update_tenant') {
+                $tenantId = (int) ($_POST['tenant_id'] ?? 0);
+                $result = $tenantService->updateTenant($tenantId, $_POST);
+            } elseif ($action === 'toggle_tenant') {
+                $tenantId = (int) ($_POST['tenant_id'] ?? 0);
+                $enabled = (int) ($_POST['enabled'] ?? 0) === 1;
+                $result = $tenantService->toggleTenant($tenantId, $enabled);
+            } elseif ($action === 'assign_license') {
+                $result = $tenantService->assignLicense($_POST);
+            } elseif ($action === 'revoke_tenant_license') {
+                $assignmentId = (int) ($_POST['assignment_id'] ?? 0);
+                $result = $tenantService->revokeTenantLicense($assignmentId);
+            } elseif ($action === 'create_license') {
+                $label = isset($_POST['license_label']) ? trim((string) $_POST['license_label']) : null;
+                $maxUsers = isset($_POST['license_max_users']) ? (int) $_POST['license_max_users'] : 1;
+                $expiresAt = isset($_POST['license_expires_at']) ? (string) $_POST['license_expires_at'] : null;
+                $result = $licenseService->createLicense($label, $maxUsers, $expiresAt);
+                if (($result['success'] ?? false) && isset($result['code'])) {
+                    $_SESSION['license_generated_code'] = [
+                        'code' => (string) $result['code'],
+                        'label' => $label !== '' ? $label : null,
+                    ];
+                }
+            } elseif ($action === 'toggle_license') {
+                $licenseId = (int) ($_POST['license_id'] ?? 0);
+                $enabled = (int) ($_POST['enabled'] ?? 0) === 1;
+                $result = $licenseService->toggleLicense($licenseId, $enabled);
+            } else {
+                $result = [
+                    'success' => false,
+                    'message' => 'Operazione non riconosciuta.',
+                ];
+            }
+
+            $_SESSION['licenses_feedback'] = $result;
+            header('Location: index.php?page=licenses');
+            exit;
+        }
+
+        $tenants = $tenantService->listTenants();
+        $licenses = $licenseService->listLicenses();
+        $assignments = $tenantService->listTenantLicenses();
+
+        render('licenses', [
+            'currentUser' => $currentUser,
+            'pageTitle' => 'Licenze & Tenant',
+            'feedback' => $licenseFeedback,
+            'tenants' => $tenants,
+            'licenses' => $licenses,
+            'assignments' => $assignments,
+            'licenseGeneratedCode' => $licenseGeneratedCode,
         ]);
         break;
 
