@@ -5,6 +5,7 @@ namespace App\Services;
 
 use DateTimeImmutable;
 use PDO;
+use App\Services\TenantContext;
 
 final class DiscountCampaignService
 {
@@ -17,9 +18,11 @@ final class DiscountCampaignService
      */
     public function listAll(): array
     {
-        $stmt = $this->pdo->query(
-            'SELECT * FROM discount_campaigns ORDER BY created_at DESC'
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM discount_campaigns WHERE tenant_id = :tenant_id ORDER BY created_at DESC'
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
 
         return $stmt ? $stmt->fetchAll() : [];
     }
@@ -29,24 +32,27 @@ final class DiscountCampaignService
      */
     public function listActive(): array
     {
+                $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT * FROM discount_campaigns
-             WHERE is_active = 1
+                         WHERE tenant_id = :tenant_id
+                             AND is_active = 1
                AND (starts_at IS NULL OR starts_at <= NOW())
                AND (ends_at IS NULL OR ends_at >= NOW())
              ORDER BY name ASC'
         );
-        $stmt->execute();
+                $stmt->execute([':tenant_id' => $tenantId]);
 
         return $stmt->fetchAll() ?: [];
     }
 
     public function find(int $id): ?array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM discount_campaigns WHERE id = :id'
+            'SELECT * FROM discount_campaigns WHERE id = :id AND tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $id]);
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $campaign = $stmt->fetch();
 
         return $campaign === false ? null : $campaign;
@@ -54,14 +60,15 @@ final class DiscountCampaignService
 
     public function findActive(int $id): ?array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT * FROM discount_campaigns
-             WHERE id = :id
+             WHERE id = :id AND tenant_id = :tenant_id
                AND is_active = 1
                AND (starts_at IS NULL OR starts_at <= NOW())
                AND (ends_at IS NULL OR ends_at >= NOW())'
         );
-        $stmt->execute([':id' => $id]);
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $campaign = $stmt->fetch();
 
         return $campaign === false ? null : $campaign;
@@ -120,11 +127,13 @@ final class DiscountCampaignService
             ];
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO discount_campaigns (name, description, type, value, is_active, starts_at, ends_at)
-             VALUES (:name, :description, :type, :value, 1, :starts_at, :ends_at)'
+            'INSERT INTO discount_campaigns (tenant_id, name, description, type, value, is_active, starts_at, ends_at)
+             VALUES (:tenant_id, :name, :description, :type, :value, 1, :starts_at, :ends_at)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':name' => $name,
             ':description' => $description !== '' ? $description : null,
             ':type' => $type === 'percent' ? 'Percent' : 'Fixed',
@@ -149,12 +158,14 @@ final class DiscountCampaignService
             ];
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'UPDATE discount_campaigns SET is_active = :active WHERE id = :id'
+            'UPDATE discount_campaigns SET is_active = :active WHERE id = :id AND tenant_id = :tenant_id'
         );
         $stmt->execute([
             ':active' => $active ? 1 : 0,
             ':id' => $id,
+            ':tenant_id' => $tenantId,
         ]);
 
         if ($stmt->rowCount() === 0) {

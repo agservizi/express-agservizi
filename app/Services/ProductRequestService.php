@@ -6,6 +6,7 @@ namespace App\Services;
 use DateTimeImmutable;
 use PDO;
 use PDOException;
+use App\Services\TenantContext;
 
 final class ProductRequestService
 {
@@ -43,8 +44,9 @@ final class ProductRequestService
         $page = max(1, $page);
         $perPage = max(1, min($perPage, 50));
 
-        $conditions = [];
-        $params = [];
+        $tenantId = TenantContext::id();
+        $conditions = ['r.tenant_id = :tenant_id'];
+        $params = [':tenant_id' => $tenantId];
 
         if ($status !== null) {
             $conditions[] = 'r.status = :status';
@@ -80,7 +82,7 @@ final class ProductRequestService
             $params[':to'] = $to;
         }
 
-        $where = $conditions === [] ? '' : 'WHERE ' . implode(' AND ', $conditions);
+        $where = 'WHERE ' . implode(' AND ', $conditions);
 
         $countStmt = $this->pdo->prepare(
             'SELECT COUNT(*)
@@ -165,6 +167,7 @@ final class ProductRequestService
         if ($requestId <= 0) {
             return null;
         }
+        $tenantId = TenantContext::id();
 
         $stmt = $this->pdo->prepare(
             'SELECT
@@ -198,12 +201,12 @@ final class ProductRequestService
                 p.stock_reserved
              FROM customer_product_requests r
              LEFT JOIN customers c ON c.id = r.customer_id
-             LEFT JOIN customer_portal_accounts cp ON cp.id = r.portal_account_id
+               LEFT JOIN customer_portal_accounts cp ON cp.id = r.portal_account_id
              LEFT JOIN users u ON u.id = r.handled_by
              LEFT JOIN products p ON p.id = r.product_id
-             WHERE r.id = :id'
+               WHERE r.id = :id AND r.tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $requestId]);
+           $stmt->execute([':id' => $requestId, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row !== false ? $row : null;
@@ -216,6 +219,7 @@ final class ProductRequestService
      */
     public function updateRequest(int $requestId, array $input, array $operator): array
     {
+        $tenantId = TenantContext::id();
         $status = isset($input['status']) ? (string) $input['status'] : '';
         if (!in_array($status, self::STATUSES, true)) {
             return [
@@ -250,9 +254,9 @@ final class ProductRequestService
         try {
             $this->pdo->beginTransaction();
             $currentStmt = $this->pdo->prepare(
-                'SELECT handling_note FROM customer_product_requests WHERE id = :id FOR UPDATE'
+                'SELECT handling_note FROM customer_product_requests WHERE id = :id AND tenant_id = :tenant_id FOR UPDATE'
             );
-            $currentStmt->execute([':id' => $requestId]);
+            $currentStmt->execute([':id' => $requestId, ':tenant_id' => $tenantId]);
             $current = $currentStmt->fetch(PDO::FETCH_ASSOC);
             if ($current === false) {
                 $this->pdo->rollBack();
@@ -289,7 +293,7 @@ final class ProductRequestService
             if ($bankReference !== null || array_key_exists('bank_transfer_reference', $input)) {
                 $updateSql .= ', bank_transfer_reference = :bank_reference';
             }
-            $updateSql .= ' WHERE id = :id';
+            $updateSql .= ' WHERE id = :id AND tenant_id = :tenant_id';
 
             $update = $this->pdo->prepare($updateSql);
             $update->bindValue(':status', $status);
@@ -315,6 +319,7 @@ final class ProductRequestService
                 }
             }
             $update->bindValue(':id', $requestId, PDO::PARAM_INT);
+            $update->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
             $update->execute();
 
             $this->pdo->commit();
@@ -342,13 +347,15 @@ final class ProductRequestService
     public function getStatusSummary(): array
     {
         $summary = array_fill_keys(self::STATUSES, 0);
-        $stmt = $this->pdo->query('SELECT status, COUNT(*) AS total FROM customer_product_requests GROUP BY status');
-        if ($stmt !== false) {
-            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $status = $row['status'] ?? null;
-                if (is_string($status) && isset($summary[$status])) {
-                    $summary[$status] = (int) ($row['total'] ?? 0);
-                }
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
+            'SELECT status, COUNT(*) AS total FROM customer_product_requests WHERE tenant_id = :tenant_id GROUP BY status'
+        );
+        $stmt->execute([':tenant_id' => $tenantId]);
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $status = $row['status'] ?? null;
+            if (is_string($status) && isset($summary[$status])) {
+                $summary[$status] = (int) ($row['total'] ?? 0);
             }
         }
         $summary['total'] = array_sum($summary);

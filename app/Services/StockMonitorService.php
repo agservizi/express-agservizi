@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PDO;
+use App\Services\TenantContext;
 
 final class StockMonitorService
 {
@@ -33,13 +34,15 @@ final class StockMonitorService
      */
     public function getOpenAlerts(): array
     {
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             'SELECT sa.*, p.name AS provider_name
              FROM stock_alerts sa
              JOIN providers p ON p.id = sa.provider_id
-             WHERE sa.status = "Open"
+             WHERE sa.tenant_id = :tenant_id AND sa.status = "Open"
              ORDER BY sa.created_at ASC'
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
 
             $rows = $stmt !== false ? $stmt->fetchAll() : [];
             foreach ($rows as &$row) {
@@ -73,13 +76,15 @@ final class StockMonitorService
     public function getOpenProductAlerts(): array
     {
         try {
-            $stmt = $this->pdo->query(
+            $tenantId = TenantContext::id();
+            $stmt = $this->pdo->prepare(
                 'SELECT psa.*, pr.name AS product_name
                  FROM product_stock_alerts psa
                  JOIN products pr ON pr.id = psa.product_id
-                 WHERE psa.status = "Open"
+                 WHERE psa.tenant_id = :tenant_id AND psa.status = "Open"
                  ORDER BY psa.created_at ASC'
             );
+            $stmt->execute([':tenant_id' => $tenantId]);
         } catch (\PDOException $exception) {
             if ($this->isSchemaNotReady($exception)) {
                 return [];
@@ -99,6 +104,7 @@ final class StockMonitorService
 
     public function updateThreshold(int $providerId, int $threshold): array
     {
+        $tenantId = TenantContext::id();
         if ($providerId <= 0) {
             return [
                 'success' => false,
@@ -112,10 +118,11 @@ final class StockMonitorService
             ];
         }
 
-        $stmt = $this->pdo->prepare('UPDATE providers SET reorder_threshold = :t WHERE id = :id');
+        $stmt = $this->pdo->prepare('UPDATE providers SET reorder_threshold = :t WHERE id = :id AND tenant_id = :tenant_id');
         $stmt->execute([
             ':t' => $threshold,
             ':id' => $providerId,
+            ':tenant_id' => $tenantId,
         ]);
 
         return [
@@ -338,8 +345,10 @@ final class StockMonitorService
      */
     private function fetchProviders(): array
     {
-        $stmt = $this->pdo->query('SELECT id, name, reorder_threshold FROM providers ORDER BY name');
-        return $stmt !== false ? $stmt->fetchAll() : [];
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT id, name, reorder_threshold FROM providers WHERE tenant_id = :tenant_id ORDER BY name');
+        $stmt->execute([':tenant_id' => $tenantId]);
+        return $stmt->fetchAll() ?: [];
     }
 
     /**
@@ -348,12 +357,14 @@ final class StockMonitorService
     private function fetchProductCatalog(): array
     {
         try {
-            $stmt = $this->pdo->query(
+            $tenantId = TenantContext::id();
+            $stmt = $this->pdo->prepare(
                 'SELECT id, name, stock_quantity, stock_reserved, reorder_threshold
                  FROM products
-                 WHERE is_active = 1
+                 WHERE tenant_id = :tenant_id AND is_active = 1
                  ORDER BY name ASC'
             );
+            $stmt->execute([':tenant_id' => $tenantId]);
         } catch (\PDOException $exception) {
             if ($this->isSchemaNotReady($exception)) {
                 return [];
@@ -369,12 +380,14 @@ final class StockMonitorService
      */
     private function fetchAvailableStockCounts(): array
     {
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             "SELECT provider_id, COUNT(*) AS total
              FROM iccid_stock
-             WHERE status = 'InStock'
+             WHERE tenant_id = :tenant_id AND status = 'InStock'
              GROUP BY provider_id"
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
         $results = $stmt !== false ? $stmt->fetchAll() : [];
 
         $counts = [];
@@ -389,11 +402,14 @@ final class StockMonitorService
      */
     private function fetchLastMovement(): array
     {
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             'SELECT provider_id, MAX(updated_at) AS last_movement
              FROM iccid_stock
+             WHERE tenant_id = :tenant_id
              GROUP BY provider_id'
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
         $rows = $stmt !== false ? $stmt->fetchAll() : [];
 
         $map = [];
@@ -410,6 +426,7 @@ final class StockMonitorService
      */
     private function fetchSalesCounts(int $lookbackDays): array
     {
+                $tenantId = TenantContext::id();
                 $fromDate = (new \DateTimeImmutable('-' . $lookbackDays . ' days'))->format('Y-m-d 00:00:00');
 
                 $stmt = $this->pdo->prepare(
@@ -417,11 +434,14 @@ final class StockMonitorService
                          FROM sale_items si
                          JOIN sales s ON s.id = si.sale_id
                          JOIN iccid_stock ic ON ic.id = si.iccid_id
-                         WHERE s.status = 'Completed'
+                         WHERE s.tenant_id = :tenant_id
+                             AND si.tenant_id = :tenant_id
+                             AND ic.tenant_id = :tenant_id
+                             AND s.status = 'Completed'
                              AND s.created_at >= :from_date
                          GROUP BY ic.provider_id"
                 );
-                $stmt->execute([':from_date' => $fromDate]);
+                $stmt->execute([':tenant_id' => $tenantId, ':from_date' => $fromDate]);
         $rows = $stmt->fetchAll();
 
         $sales = [];
@@ -436,6 +456,7 @@ final class StockMonitorService
      */
     private function fetchProductSalesCounts(int $lookbackDays): array
     {
+        $tenantId = TenantContext::id();
         $fromDate = (new \DateTimeImmutable('-' . $lookbackDays . ' days'))->format('Y-m-d 00:00:00');
 
         try {
@@ -444,11 +465,13 @@ final class StockMonitorService
                  FROM sale_items si
                  JOIN sales s ON s.id = si.sale_id
                  WHERE si.product_id IS NOT NULL
+                   AND s.tenant_id = :tenant_id
+                   AND si.tenant_id = :tenant_id
                    AND s.status = "Completed"
                    AND s.created_at >= :from_date
                  GROUP BY si.product_id'
             );
-            $stmt->execute([':from_date' => $fromDate]);
+            $stmt->execute([':tenant_id' => $tenantId, ':from_date' => $fromDate]);
             $rows = $stmt->fetchAll();
         } catch (\PDOException $exception) {
             if ($this->isSchemaNotReady($exception)) {
@@ -474,11 +497,14 @@ final class StockMonitorService
     private function fetchProductLastMovement(): array
     {
         try {
-            $stmt = $this->pdo->query(
+            $tenantId = TenantContext::id();
+            $stmt = $this->pdo->prepare(
                 'SELECT product_id, MAX(created_at) AS last_movement
                  FROM product_stock_movements
+                 WHERE tenant_id = :tenant_id
                  GROUP BY product_id'
             );
+            $stmt->execute([':tenant_id' => $tenantId]);
         } catch (\PDOException $exception) {
             if ($this->isSchemaNotReady($exception)) {
                 return [];
@@ -503,8 +529,10 @@ final class StockMonitorService
      */
     private function fetchOpenAlertsIndexed(): array
     {
-        $stmt = $this->pdo->query('SELECT * FROM stock_alerts WHERE status = "Open"');
-        $rows = $stmt !== false ? $stmt->fetchAll() : [];
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT * FROM stock_alerts WHERE tenant_id = :tenant_id AND status = "Open"');
+        $stmt->execute([':tenant_id' => $tenantId]);
+        $rows = $stmt->fetchAll() ?: [];
         $indexed = [];
         foreach ($rows as $row) {
             $row['message'] = isset($row['message']) ? (string) $row['message'] : '';
@@ -519,7 +547,9 @@ final class StockMonitorService
     private function fetchOpenProductAlertsIndexed(): array
     {
         try {
-            $stmt = $this->pdo->query('SELECT * FROM product_stock_alerts WHERE status = "Open"');
+            $tenantId = TenantContext::id();
+            $stmt = $this->pdo->prepare('SELECT * FROM product_stock_alerts WHERE tenant_id = :tenant_id AND status = "Open"');
+            $stmt->execute([':tenant_id' => $tenantId]);
         } catch (\PDOException $exception) {
             if ($this->isSchemaNotReady($exception)) {
                 return [];
@@ -541,14 +571,16 @@ final class StockMonitorService
      */
     private function createAlert(int $providerId, array $info, string $message): void
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'INSERT INTO stock_alerts (
-                 provider_id, current_stock, threshold, average_daily_sales,
+                 tenant_id, provider_id, current_stock, threshold, average_daily_sales,
                  days_cover, last_movement, message
-             ) VALUES (:provider_id, :current_stock, :threshold, :average_daily_sales,
+             ) VALUES (:tenant_id, :provider_id, :current_stock, :threshold, :average_daily_sales,
                  :days_cover, :last_movement, :message)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':provider_id' => $providerId,
             ':current_stock' => (int) ($info['current_stock'] ?? 0),
             ':threshold' => (int) ($info['threshold'] ?? 0),
@@ -577,6 +609,7 @@ final class StockMonitorService
      */
     private function updateAlert(int $alertId, array $info, string $message): void
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'UPDATE stock_alerts
              SET current_stock = :current_stock,
@@ -585,7 +618,7 @@ final class StockMonitorService
                  days_cover = :days_cover,
                  last_movement = :last_movement,
                  message = :message
-             WHERE id = :id'
+             WHERE id = :id AND tenant_id = :tenant_id'
         );
         $stmt->execute([
             ':current_stock' => (int) ($info['current_stock'] ?? 0),
@@ -595,17 +628,19 @@ final class StockMonitorService
             ':last_movement' => $info['last_movement'] ?? null,
             ':message' => $message,
             ':id' => $alertId,
+            ':tenant_id' => $tenantId,
         ]);
     }
 
     private function resolveAlert(int $alertId): void
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             "UPDATE stock_alerts
              SET status = 'Resolved', resolved_at = NOW()
-             WHERE id = :id"
+             WHERE id = :id AND tenant_id = :tenant_id"
         );
-        $stmt->execute([':id' => $alertId]);
+        $stmt->execute([':id' => $alertId, ':tenant_id' => $tenantId]);
     }
 
     /**
@@ -614,14 +649,16 @@ final class StockMonitorService
     private function createProductAlert(int $productId, array $info, string $message): void
     {
         try {
+            $tenantId = TenantContext::id();
             $stmt = $this->pdo->prepare(
                 'INSERT INTO product_stock_alerts (
-                     product_id, current_stock, stock_reserved, threshold, average_daily_sales,
+                     tenant_id, product_id, current_stock, stock_reserved, threshold, average_daily_sales,
                      days_cover, last_movement, message
-                 ) VALUES (:product_id, :current_stock, :stock_reserved, :threshold, :average_daily_sales,
+                 ) VALUES (:tenant_id, :product_id, :current_stock, :stock_reserved, :threshold, :average_daily_sales,
                      :days_cover, :last_movement, :message)'
             );
             $stmt->execute([
+                ':tenant_id' => $tenantId,
                 ':product_id' => $productId,
                 ':current_stock' => (int) ($info['current_stock'] ?? 0),
                 ':stock_reserved' => (int) ($info['stock_reserved'] ?? 0),
@@ -659,6 +696,7 @@ final class StockMonitorService
     private function updateProductAlert(int $alertId, array $info, string $message): void
     {
         try {
+            $tenantId = TenantContext::id();
             $stmt = $this->pdo->prepare(
                 'UPDATE product_stock_alerts
                  SET current_stock = :current_stock,
@@ -668,7 +706,7 @@ final class StockMonitorService
                      days_cover = :days_cover,
                      last_movement = :last_movement,
                      message = :message
-                 WHERE id = :id'
+                 WHERE id = :id AND tenant_id = :tenant_id'
             );
             $stmt->execute([
                 ':current_stock' => (int) ($info['current_stock'] ?? 0),
@@ -679,6 +717,7 @@ final class StockMonitorService
                 ':last_movement' => $info['last_movement'] ?? null,
                 ':message' => $message,
                 ':id' => $alertId,
+                ':tenant_id' => $tenantId,
             ]);
         } catch (\PDOException $exception) {
             if ($this->isSchemaNotReady($exception)) {
@@ -691,12 +730,13 @@ final class StockMonitorService
     private function resolveProductAlert(int $alertId): void
     {
         try {
+            $tenantId = TenantContext::id();
             $stmt = $this->pdo->prepare(
                 "UPDATE product_stock_alerts
                  SET status = 'Resolved', resolved_at = NOW()
-                 WHERE id = :id"
+                 WHERE id = :id AND tenant_id = :tenant_id"
             );
-            $stmt->execute([':id' => $alertId]);
+            $stmt->execute([':id' => $alertId, ':tenant_id' => $tenantId]);
         } catch (\PDOException $exception) {
             if ($this->isSchemaNotReady($exception)) {
                 return;

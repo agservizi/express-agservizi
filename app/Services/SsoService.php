@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use PDO;
 use PDOException;
 use RuntimeException;
+use App\Services\TenantContext;
 
 final class SsoService
 {
@@ -43,13 +44,16 @@ final class SsoService
     {
         $this->assertEnabled();
 
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             'SELECT id, name, client_id, redirect_uri, is_active, is_confidential, created_at, updated_at
              FROM sso_clients
+             WHERE tenant_id = :tenant_id
              ORDER BY created_at DESC'
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
 
-        return $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     /**
@@ -78,13 +82,15 @@ final class SsoService
         $clientId = bin2hex(random_bytes(16));
         $clientSecret = bin2hex(random_bytes(32));
         $secretHash = hash('sha256', $clientSecret);
+        $tenantId = TenantContext::id();
 
         try {
             $stmt = $this->pdo->prepare(
-                'INSERT INTO sso_clients (name, client_id, client_secret_hash, redirect_uri, is_active, is_confidential)
-                 VALUES (:name, :client_id, :secret_hash, :redirect, 1, :confidential)'
+                'INSERT INTO sso_clients (tenant_id, name, client_id, client_secret_hash, redirect_uri, is_active, is_confidential)
+                 VALUES (:tenant_id, :name, :client_id, :secret_hash, :redirect, 1, :confidential)'
             );
             $stmt->execute([
+                ':tenant_id' => $tenantId,
                 ':name' => $normalizedName,
                 ':client_id' => $clientId,
                 ':secret_hash' => $secretHash,
@@ -124,10 +130,12 @@ final class SsoService
         $clientSecret = bin2hex(random_bytes(32));
         $secretHash = hash('sha256', $clientSecret);
 
-        $stmt = $this->pdo->prepare('UPDATE sso_clients SET client_secret_hash = :hash, updated_at = NOW() WHERE id = :id');
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('UPDATE sso_clients SET client_secret_hash = :hash, updated_at = NOW() WHERE id = :id AND tenant_id = :tenant_id');
         $stmt->execute([
             ':hash' => $secretHash,
             ':id' => $id,
+            ':tenant_id' => $tenantId,
         ]);
 
         return [
@@ -144,10 +152,12 @@ final class SsoService
     {
         $this->assertEnabled();
 
-        $stmt = $this->pdo->prepare('UPDATE sso_clients SET is_active = :active, updated_at = NOW() WHERE id = :id');
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('UPDATE sso_clients SET is_active = :active, updated_at = NOW() WHERE id = :id AND tenant_id = :tenant_id');
         $stmt->execute([
             ':active' => $active ? 1 : 0,
             ':id' => $id,
+            ':tenant_id' => $tenantId,
         ]);
 
         if ($stmt->rowCount() === 0) {
@@ -170,8 +180,9 @@ final class SsoService
     {
         $this->assertEnabled();
 
-        $stmt = $this->pdo->prepare('DELETE FROM sso_clients WHERE id = :id');
-        $stmt->execute([':id' => $id]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('DELETE FROM sso_clients WHERE id = :id AND tenant_id = :tenant_id');
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
 
         if ($stmt->rowCount() === 0) {
             return [
@@ -193,8 +204,9 @@ final class SsoService
     {
         $this->assertEnabled();
 
-        $stmt = $this->pdo->prepare('SELECT * FROM sso_clients WHERE client_id = :client LIMIT 1');
-        $stmt->execute([':client' => $clientIdentifier]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT * FROM sso_clients WHERE tenant_id = :tenant_id AND client_id = :client LIMIT 1');
+        $stmt->execute([':tenant_id' => $tenantId, ':client' => $clientIdentifier]);
         $client = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $client ?: null;
@@ -216,11 +228,13 @@ final class SsoService
             ->add(new DateInterval('PT' . $this->codeTtl . 'S'))
             ->format('Y-m-d H:i:s');
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO sso_auth_codes (client_id, user_id, code_hash, code_challenge, code_method, redirect_uri, state, expires_at)
-             VALUES (:client_id, :user_id, :code_hash, :challenge, :method, :redirect, :state, :expires)'
+            'INSERT INTO sso_auth_codes (tenant_id, client_id, user_id, code_hash, code_challenge, code_method, redirect_uri, state, expires_at)
+             VALUES (:tenant_id, :client_id, :user_id, :code_hash, :challenge, :method, :redirect, :state, :expires)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':client_id' => (int) $client['id'],
             ':user_id' => $userId,
             ':code_hash' => $codeHash,
@@ -251,9 +265,10 @@ final class SsoService
             ];
         }
 
+        $tenantId = TenantContext::id();
         $hash = hash('sha256', $code);
-        $stmt = $this->pdo->prepare('SELECT * FROM sso_auth_codes WHERE code_hash = :hash LIMIT 1');
-        $stmt->execute([':hash' => $hash]);
+        $stmt = $this->pdo->prepare('SELECT * FROM sso_auth_codes WHERE tenant_id = :tenant_id AND code_hash = :hash LIMIT 1');
+        $stmt->execute([':tenant_id' => $tenantId, ':hash' => $hash]);
         $record = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$record) {
             return [
@@ -405,9 +420,10 @@ final class SsoService
     {
         $this->assertEnabled();
 
+        $tenantId = TenantContext::id();
         $hash = hash('sha256', $token);
-        $stmt = $this->pdo->prepare('UPDATE sso_tokens SET revoked_at = NOW() WHERE access_token_hash = :hash');
-        $stmt->execute([':hash' => $hash]);
+        $stmt = $this->pdo->prepare('UPDATE sso_tokens SET revoked_at = NOW() WHERE tenant_id = :tenant_id AND access_token_hash = :hash');
+        $stmt->execute([':tenant_id' => $tenantId, ':hash' => $hash]);
 
         return [
             'success' => true,
@@ -448,11 +464,14 @@ final class SsoService
 
     private function storeAccessToken(int $clientId, int $userId, string $token, DateTimeImmutable $expiresAt): void
     {
+        $tenantId = TenantContext::id();
         $hash = hash('sha256', $token);
         $stmt = $this->pdo->prepare(
-            'INSERT INTO sso_tokens (client_id, user_id, access_token_hash, expires_at) VALUES (:client, :user, :hash, :expires)'
+            'INSERT INTO sso_tokens (tenant_id, client_id, user_id, access_token_hash, expires_at)
+             VALUES (:tenant_id, :client, :user, :hash, :expires)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':client' => $clientId,
             ':user' => $userId,
             ':hash' => $hash,
@@ -477,13 +496,17 @@ final class SsoService
 
     private function markAuthCodeAsUsed(int $id): void
     {
-        $stmt = $this->pdo->prepare('UPDATE sso_auth_codes SET used_at = NOW() WHERE id = :id');
-        $stmt->execute([':id' => $id]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('UPDATE sso_auth_codes SET used_at = NOW() WHERE id = :id AND tenant_id = :tenant_id');
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
     }
 
     private function cleanupExpiredAuthCodes(): void
     {
-        $this->pdo->prepare('DELETE FROM sso_auth_codes WHERE expires_at < (NOW() - INTERVAL 1 DAY) OR used_at IS NOT NULL')->execute();
+        $tenantId = TenantContext::id();
+        $this->pdo->prepare(
+            'DELETE FROM sso_auth_codes WHERE tenant_id = :tenant_id AND (expires_at < (NOW() - INTERVAL 1 DAY) OR used_at IS NOT NULL)'
+        )->execute([':tenant_id' => $tenantId]);
     }
 
     /**
@@ -491,13 +514,14 @@ final class SsoService
      */
     private function getUserProfile(int $userId): ?array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT u.id, u.username, u.fullname, u.role_id, u.mfa_enabled, r.name AS role_name
              FROM users u
              LEFT JOIN roles r ON r.id = u.role_id
-             WHERE u.id = :id'
+             WHERE u.id = :id AND u.tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $userId]);
+        $stmt->execute([':id' => $userId, ':tenant_id' => $tenantId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$user) {
             return null;
@@ -515,8 +539,9 @@ final class SsoService
 
     private function findClientById(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM sso_clients WHERE id = :id LIMIT 1');
-        $stmt->execute([':id' => $id]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT * FROM sso_clients WHERE tenant_id = :tenant_id AND id = :id LIMIT 1');
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
         $client = $stmt->fetch(PDO::FETCH_ASSOC);
         return $client ?: null;
     }

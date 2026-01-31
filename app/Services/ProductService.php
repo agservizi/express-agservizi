@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 use PDO;
 use PDOException;
+use App\Services\TenantContext;
 
 final class ProductService
 {
@@ -16,11 +17,14 @@ final class ProductService
      */
     public function listAll(): array
     {
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             'SELECT id, name, sku, imei, category, price, stock_quantity, stock_reserved, reorder_threshold, tax_rate, vat_code, notes, is_active, created_at, updated_at
              FROM products
+             WHERE tenant_id = :tenant_id
              ORDER BY created_at DESC'
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
         return $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
     }
 
@@ -34,6 +38,9 @@ final class ProductService
 
         $conditions = [];
         $params = [];
+        $tenantId = TenantContext::id();
+        $conditions[] = 'products.tenant_id = :tenant_id';
+        $params[':tenant_id'] = $tenantId;
 
         $searchTerm = null;
         $searchPrice = null;
@@ -114,13 +121,14 @@ final class ProductService
      */
     public function listActive(): array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT id, name, sku, imei, category, price, stock_quantity, tax_rate, vat_code
              FROM products
-             WHERE is_active = 1
+             WHERE is_active = 1 AND tenant_id = :tenant_id
              ORDER BY name ASC'
         );
-        $stmt->execute();
+        $stmt->execute([':tenant_id' => $tenantId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
@@ -129,23 +137,27 @@ final class ProductService
      */
     public function listForFiscalSettings(): array
     {
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             'SELECT id, name, sku, tax_rate, vat_code, is_active
              FROM products
+             WHERE tenant_id = :tenant_id
              ORDER BY is_active DESC, name ASC'
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
 
         return $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
     }
 
     public function findById(int $id): ?array
     {
+                $tenantId = TenantContext::id();
                 $stmt = $this->pdo->prepare(
                     'SELECT id, name, sku, imei, category, price, stock_quantity, stock_reserved, reorder_threshold, tax_rate, vat_code, is_active
              FROM products
-             WHERE id = :id'
+             WHERE id = :id AND tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $id]);
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row !== false ? $row : null;
     }
@@ -158,7 +170,8 @@ final class ProductService
     {
         $name = isset($input['name']) ? trim((string) $input['name']) : '';
         $sku = isset($input['sku']) ? trim((string) $input['sku']) : '';
-    $imei = isset($input['imei']) ? trim((string) $input['imei']) : '';
+            $tenantId = TenantContext::id();
+            $imei = isset($input['imei']) ? trim((string) $input['imei']) : '';
         $category = isset($input['category']) ? trim((string) $input['category']) : '';
         $notes = isset($input['notes']) ? trim((string) $input['notes']) : null;
         $price = isset($input['price']) ? (float) $input['price'] : 0.0;
@@ -204,8 +217,8 @@ final class ProductService
         }
 
         if ($sku !== '') {
-            $stmtSku = $this->pdo->prepare('SELECT id FROM products WHERE sku = :sku LIMIT 1');
-            $stmtSku->execute([':sku' => $sku]);
+            $stmtSku = $this->pdo->prepare('SELECT id FROM products WHERE sku = :sku AND tenant_id = :tenant_id LIMIT 1');
+            $stmtSku->execute([':sku' => $sku, ':tenant_id' => $tenantId]);
             if ($stmtSku->fetch()) {
                 return [
                     'success' => false,
@@ -216,8 +229,8 @@ final class ProductService
         }
 
         if ($imei !== '') {
-            $stmtImei = $this->pdo->prepare('SELECT id FROM products WHERE imei = :imei LIMIT 1');
-            $stmtImei->execute([':imei' => $imei]);
+            $stmtImei = $this->pdo->prepare('SELECT id FROM products WHERE imei = :imei AND tenant_id = :tenant_id LIMIT 1');
+            $stmtImei->execute([':imei' => $imei, ':tenant_id' => $tenantId]);
             if ($stmtImei->fetch()) {
                 return [
                     'success' => false,
@@ -233,10 +246,11 @@ final class ProductService
             $this->pdo->beginTransaction();
 
             $stmt = $this->pdo->prepare(
-                'INSERT INTO products (name, sku, imei, category, price, stock_quantity, stock_reserved, reorder_threshold, tax_rate, vat_code, notes, is_active)
+                    'INSERT INTO products (tenant_id, name, sku, imei, category, price, stock_quantity, stock_reserved, reorder_threshold, tax_rate, vat_code, notes, is_active)
                  VALUES (:name, :sku, :imei, :category, :price, :stock_quantity, 0, :reorder_threshold, :tax_rate, :vat_code, :notes, :is_active)'
             );
             $stmt->execute([
+                    ':tenant_id' => $tenantId,
                 ':name' => $name,
                 ':sku' => $sku !== '' ? $sku : null,
                 ':imei' => $imei !== '' ? $imei : null,
@@ -347,8 +361,11 @@ final class ProductService
         }
 
         if ($sku !== '') {
-            $stmtSku = $this->pdo->prepare('SELECT id FROM products WHERE sku = :sku AND id != :id LIMIT 1');
-            $stmtSku->execute([':sku' => $sku, ':id' => $id]);
+            $tenantId = TenantContext::id();
+            $stmtSku = $this->pdo->prepare(
+                'SELECT id FROM products WHERE sku = :sku AND tenant_id = :tenant_id AND id != :id LIMIT 1'
+            );
+            $stmtSku->execute([':sku' => $sku, ':tenant_id' => $tenantId, ':id' => $id]);
             if ($stmtSku->fetch()) {
                 return [
                     'success' => false,
@@ -359,8 +376,11 @@ final class ProductService
         }
 
         if ($imei !== '') {
-            $stmtImei = $this->pdo->prepare('SELECT id FROM products WHERE imei = :imei AND id != :id LIMIT 1');
-            $stmtImei->execute([':imei' => $imei, ':id' => $id]);
+            $tenantId = TenantContext::id();
+            $stmtImei = $this->pdo->prepare(
+                'SELECT id FROM products WHERE imei = :imei AND tenant_id = :tenant_id AND id != :id LIMIT 1'
+            );
+            $stmtImei->execute([':imei' => $imei, ':tenant_id' => $tenantId, ':id' => $id]);
             if ($stmtImei->fetch()) {
                 return [
                     'success' => false,
@@ -376,6 +396,7 @@ final class ProductService
         try {
             $this->pdo->beginTransaction();
 
+            $tenantId = TenantContext::id();
             $stmt = $this->pdo->prepare(
                 'UPDATE products
                  SET name = :name,
@@ -389,7 +410,7 @@ final class ProductService
                      reorder_threshold = :reorder_threshold,
                      notes = :notes,
                      is_active = :is_active
-                 WHERE id = :id'
+                 WHERE id = :id AND tenant_id = :tenant_id'
             );
             $stmt->execute([
                 ':name' => $name,
@@ -404,6 +425,7 @@ final class ProductService
                 ':notes' => $notes !== null && $notes !== '' ? $notes : null,
                 ':is_active' => $isActive,
                 ':id' => $id,
+                ':tenant_id' => $tenantId,
             ]);
 
             if ($stockDelta !== 0) {
@@ -476,16 +498,18 @@ final class ProductService
             }
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'UPDATE products
              SET tax_rate = :tax_rate,
                  vat_code = :vat_code
-             WHERE id = :id'
+             WHERE id = :id AND tenant_id = :tenant_id'
         );
         $stmt->execute([
             ':tax_rate' => $taxRate,
             ':vat_code' => $normalizedCode,
             ':id' => $productId,
+            ':tenant_id' => $tenantId,
         ]);
 
         $updated = $stmt->rowCount() > 0;
@@ -502,8 +526,9 @@ final class ProductService
     public function delete(int $id): array
     {
         try {
-            $stmt = $this->pdo->prepare('DELETE FROM products WHERE id = :id');
-            $stmt->execute([':id' => $id]);
+            $tenantId = TenantContext::id();
+            $stmt = $this->pdo->prepare('DELETE FROM products WHERE id = :id AND tenant_id = :tenant_id');
+            $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         } catch (PDOException $e) {
             return [
                 'success' => false,
@@ -533,15 +558,17 @@ final class ProductService
     {
         $productId = max(1, $productId);
         $limit = max(1, min($limit, 200));
+        $tenantId = TenantContext::id();
 
         $stmt = $this->pdo->prepare(
             'SELECT id, product_id, quantity_change, balance_after, reason, reference_type, reference_id, user_id, note, created_at
              FROM product_stock_movements
-             WHERE product_id = :product_id
+               WHERE product_id = :product_id AND tenant_id = :tenant_id
              ORDER BY created_at DESC
              LIMIT :limit'
         );
         $stmt->bindValue(':product_id', $productId, PDO::PARAM_INT);
+           $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
 
@@ -554,8 +581,9 @@ final class ProductService
     public function restock(int $id): array
     {
         try {
-            $stmt = $this->pdo->prepare('UPDATE products SET is_active = 1 WHERE id = :id');
-            $stmt->execute([':id' => $id]);
+            $tenantId = TenantContext::id();
+            $stmt = $this->pdo->prepare('UPDATE products SET is_active = 1 WHERE id = :id AND tenant_id = :tenant_id');
+            $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         } catch (PDOException $e) {
             return [
                 'success' => false,
@@ -592,11 +620,13 @@ final class ProductService
             return;
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO product_stock_movements (product_id, quantity_change, balance_after, reason, reference_type, reference_id, user_id, note)
-             VALUES (:product_id, :quantity_change, :balance_after, :reason, :reference_type, :reference_id, :user_id, :note)'
+            'INSERT INTO product_stock_movements (tenant_id, product_id, quantity_change, balance_after, reason, reference_type, reference_id, user_id, note)
+             VALUES (:tenant_id, :product_id, :quantity_change, :balance_after, :reason, :reference_type, :reference_id, :user_id, :note)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':product_id' => $productId,
             ':quantity_change' => $quantityChange,
             ':balance_after' => $balanceAfter,

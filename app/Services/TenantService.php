@@ -171,6 +171,23 @@ final class TenantService
             ];
         }
 
+        $existsStmt = $this->pdo->prepare(
+            'SELECT id FROM tenant_licenses
+             WHERE tenant_id = :tenant AND license_id = :license AND revoked_at IS NULL
+             LIMIT 1'
+        );
+        $existsStmt->execute([
+            ':tenant' => $tenantId,
+            ':license' => $licenseId,
+        ]);
+        if ($existsStmt->fetchColumn()) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile assegnare la licenza.',
+                'error' => 'Esiste già un\'assegnazione attiva per questo tenant.',
+            ];
+        }
+
         $stmt = $this->pdo->prepare(
             'INSERT INTO tenant_licenses (tenant_id, license_id, max_users_override, notes)
              VALUES (:tenant, :license, :max_users, :notes)'

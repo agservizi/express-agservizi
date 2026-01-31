@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PDO;
+use App\Services\TenantContext;
 
 final class ProviderService
 {
@@ -16,9 +17,11 @@ final class ProviderService
      */
     public function listProviders(): array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->query(
             'SELECT id, name, reorder_threshold, notes, created_at
              FROM providers
+             WHERE tenant_id = ' . (int) $tenantId . '
              ORDER BY name'
         );
         return $stmt->fetchAll();
@@ -39,10 +42,13 @@ final class ProviderService
             ];
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO providers (name, reorder_threshold, notes) VALUES (:name, :threshold, :notes)'
+            'INSERT INTO providers (tenant_id, name, reorder_threshold, notes)
+             VALUES (:tenant_id, :name, :threshold, :notes)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':name' => $validation['name'],
             ':threshold' => $validation['reorder_threshold'],
             ':notes' => $validation['notes'],
@@ -88,14 +94,18 @@ final class ProviderService
             ];
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'UPDATE providers SET name = :name, reorder_threshold = :threshold, notes = :notes WHERE id = :id'
+            'UPDATE providers
+             SET name = :name, reorder_threshold = :threshold, notes = :notes
+             WHERE id = :id AND tenant_id = :tenant_id'
         );
         $stmt->execute([
             ':name' => $validation['name'],
             ':threshold' => $validation['reorder_threshold'],
             ':notes' => $validation['notes'],
             ':id' => $id,
+            ':tenant_id' => $tenantId,
         ]);
 
         $this->logAudit(
@@ -138,8 +148,9 @@ final class ProviderService
             ];
         }
 
-        $stmt = $this->pdo->prepare('DELETE FROM providers WHERE id = :id');
-        $stmt->execute([':id' => $id]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('DELETE FROM providers WHERE id = :id AND tenant_id = :tenant_id');
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
 
         $this->logAudit($userId, 'provider_delete', 'Eliminato gestore #' . $id . ' (' . $existing['name'] . ')');
 
@@ -154,8 +165,9 @@ final class ProviderService
      */
     private function findProvider(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, name FROM providers WHERE id = :id');
-        $stmt->execute([':id' => $id]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT id, name FROM providers WHERE id = :id AND tenant_id = :tenant_id');
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch();
         return $row === false ? null : $row;
     }
@@ -184,11 +196,13 @@ final class ProviderService
         }
 
         if ($name !== '') {
+            $tenantId = TenantContext::id();
             $stmt = $this->pdo->prepare(
-                'SELECT id FROM providers WHERE LOWER(name) = LOWER(:name)'
+                'SELECT id FROM providers WHERE LOWER(name) = LOWER(:name) AND tenant_id = :tenant_id'
                 . ($currentId !== null ? ' AND id <> :id' : '')
             );
             $params = [':name' => $name];
+            $params[':tenant_id'] = $tenantId;
             if ($currentId !== null) {
                 $params[':id'] = $currentId;
             }
@@ -208,6 +222,7 @@ final class ProviderService
 
     private function countProviderDependencies(int $providerId): int
     {
+        $tenantId = TenantContext::id();
         $tables = [
             'iccid_stock',
             'operator_offers',
@@ -216,8 +231,10 @@ final class ProviderService
 
         $total = 0;
         foreach ($tables as $table) {
-            $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM ' . $table . ' WHERE provider_id = :id');
-            $stmt->execute([':id' => $providerId]);
+            $stmt = $this->pdo->prepare(
+                'SELECT COUNT(*) FROM ' . $table . ' WHERE provider_id = :id AND tenant_id = :tenant_id'
+            );
+            $stmt->execute([':id' => $providerId, ':tenant_id' => $tenantId]);
             $total += (int) $stmt->fetchColumn();
         }
 
@@ -227,10 +244,13 @@ final class ProviderService
     private function logAudit(?int $userId, string $action, string $description): void
     {
         $userId = $userId !== null && $userId > 0 ? $userId : null;
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO audit_log (user_id, action, description) VALUES (:user_id, :action, :description)'
+            'INSERT INTO audit_log (tenant_id, user_id, action, description)
+             VALUES (:tenant_id, :user_id, :action, :description)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':user_id' => $userId,
             ':action' => $action,
             ':description' => $description,

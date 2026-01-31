@@ -8,8 +8,13 @@ use PDOException;
 
 final class UserService
 {
-    public function __construct(private PDO $pdo)
-    {
+    public function __construct(
+        private PDO $pdo,
+        private ?string $resendApiKey = null,
+        private ?string $resendFrom = null,
+        private ?string $resendFromName = null,
+        private ?string $appName = null
+    ) {
     }
 
     /**
@@ -18,9 +23,12 @@ final class UserService
     public function listOperators(): array
     {
         $stmt = $this->pdo->query(
-            'SELECT u.id, u.username, u.fullname, u.created_at, u.updated_at, u.role_id, r.name AS role_name, u.mfa_enabled, u.mfa_enabled_at
+            'SELECT u.id, u.username, u.email, u.fullname, u.created_at, u.updated_at,
+                    u.role_id, r.name AS role_name, u.mfa_enabled, u.mfa_enabled_at,
+                    u.tenant_id, t.name AS tenant_name
              FROM users u
              INNER JOIN roles r ON r.id = u.role_id
+             LEFT JOIN tenants t ON t.id = u.tenant_id
              ORDER BY u.fullname ASC, u.username ASC'
         );
 
@@ -39,9 +47,11 @@ final class UserService
         }
 
         $stmt = $this->pdo->prepare(
-            'SELECT u.id, u.username, u.fullname, u.role_id, u.created_at, u.updated_at, r.name AS role_name, u.mfa_enabled, u.mfa_enabled_at
+            'SELECT u.id, u.username, u.email, u.fullname, u.role_id, u.created_at, u.updated_at,
+                    r.name AS role_name, u.mfa_enabled, u.mfa_enabled_at, u.tenant_id, t.name AS tenant_name
              FROM users u
              INNER JOIN roles r ON r.id = u.role_id
+             LEFT JOIN tenants t ON t.id = u.tenant_id
              WHERE u.id = :id
              LIMIT 1'
         );
@@ -73,6 +83,9 @@ final class UserService
         $password = (string) ($input['operator_password'] ?? '');
         $confirm = (string) ($input['operator_password_confirmation'] ?? '');
         $roleId = isset($input['operator_role']) ? (int) $input['operator_role'] : 0;
+        $email = trim((string) ($input['operator_email'] ?? ''));
+        $tenantId = isset($input['operator_tenant_id']) ? (int) $input['operator_tenant_id'] : 0;
+        $sendCredentials = isset($input['operator_send_credentials']) && (int) $input['operator_send_credentials'] === 1;
 
         $errors = [];
 
@@ -94,9 +107,22 @@ final class UserService
             $errors[] = 'Le password non coincidono.';
         }
 
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'L\'email non è valida.';
+        }
+
+        if ($sendCredentials && $email === '') {
+            $errors[] = 'Indica un\'email valida per inviare le credenziali.';
+        }
+
         $role = $this->findRole($roleId);
         if ($role === null) {
             $errors[] = 'Seleziona un ruolo valido.';
+        }
+
+        $tenant = $this->findTenant($tenantId);
+        if ($tenant === null) {
+            $errors[] = 'Seleziona un tenant valido.';
         }
 
         if ($errors !== []) {
@@ -119,6 +145,18 @@ final class UserService
             ];
         }
 
+        if ($email !== '') {
+            $emailStmt = $this->pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+            $emailStmt->execute([':email' => $email]);
+            if ($emailStmt->fetchColumn()) {
+                return [
+                    'success' => false,
+                    'message' => 'Impossibile creare l\'operatore.',
+                    'error' => 'Esiste già un operatore con questa email.',
+                ];
+            }
+        }
+
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
         if ($passwordHash === false) {
             return [
@@ -130,13 +168,16 @@ final class UserService
 
         try {
             $stmt = $this->pdo->prepare(
-                'INSERT INTO users (username, password_hash, role_id, fullname) VALUES (:username, :hash, :role, :fullname)'
+                'INSERT INTO users (username, email, password_hash, role_id, fullname, tenant_id)
+                 VALUES (:username, :email, :hash, :role, :fullname, :tenant_id)'
             );
             $stmt->execute([
                 ':username' => $normalizedUsername,
+                ':email' => $email !== '' ? $email : null,
                 ':hash' => $passwordHash,
                 ':role' => $roleId,
                 ':fullname' => $fullname,
+                ':tenant_id' => $tenantId,
             ]);
         } catch (PDOException $exception) {
             return [
@@ -146,9 +187,23 @@ final class UserService
             ];
         }
 
+        $emailSent = false;
+        if ($sendCredentials && $email !== '') {
+            $emailSent = $this->sendCredentialsEmail($email, $normalizedUsername, $password, $fullname);
+        }
+
+        if ($sendCredentials && !$emailSent) {
+            $message = 'Operatore creato correttamente. Invio credenziali non riuscito: verifica la configurazione email.';
+        } elseif ($emailSent) {
+            $message = 'Operatore creato correttamente. Credenziali inviate via email.';
+        } else {
+            $message = 'Operatore creato correttamente.';
+        }
+
         return [
             'success' => true,
-            'message' => 'Operatore creato correttamente.',
+            'message' => $message,
+            'email_sent' => $emailSent,
         ];
     }
 
@@ -178,6 +233,8 @@ final class UserService
         $fullname = trim((string) ($input['operator_edit_fullname'] ?? ''));
         $username = trim((string) ($input['operator_edit_username'] ?? ''));
         $roleId = isset($input['operator_edit_role']) ? (int) $input['operator_edit_role'] : 0;
+        $email = trim((string) ($input['operator_edit_email'] ?? ''));
+        $tenantId = isset($input['operator_edit_tenant_id']) ? (int) $input['operator_edit_tenant_id'] : 0;
         $password = (string) ($input['operator_edit_password'] ?? '');
         $confirm = (string) ($input['operator_edit_password_confirmation'] ?? '');
 
@@ -198,6 +255,15 @@ final class UserService
             $errors[] = 'Seleziona un ruolo valido.';
         }
 
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'L\'email non è valida.';
+        }
+
+        $tenant = $this->findTenant($tenantId);
+        if ($tenant === null) {
+            $errors[] = 'Seleziona un tenant valido.';
+        }
+
         $normalizedUsername = function_exists('mb_strtolower') ? mb_strtolower($username) : strtolower($username);
 
         $existsStmt = $this->pdo->prepare('SELECT id FROM users WHERE username = :username AND id <> :id LIMIT 1');
@@ -207,6 +273,17 @@ final class UserService
         ]);
         if ($existsStmt->fetchColumn()) {
             $errors[] = 'Esiste già un operatore con questo nome utente.';
+        }
+
+        if ($email !== '') {
+            $emailStmt = $this->pdo->prepare('SELECT id FROM users WHERE email = :email AND id <> :id LIMIT 1');
+            $emailStmt->execute([
+                ':email' => $email,
+                ':id' => $operatorId,
+            ]);
+            if ($emailStmt->fetchColumn()) {
+                $errors[] = 'Esiste già un operatore con questa email.';
+            }
         }
 
         $passwordHash = null;
@@ -241,11 +318,13 @@ final class UserService
             ];
         }
 
-        $sql = 'UPDATE users SET fullname = :fullname, username = :username, role_id = :role, updated_at = NOW()';
+        $sql = 'UPDATE users SET fullname = :fullname, username = :username, email = :email, role_id = :role, tenant_id = :tenant_id, updated_at = NOW()';
         $params = [
             ':fullname' => $fullname,
             ':username' => $normalizedUsername,
+            ':email' => $email !== '' ? $email : null,
             ':role' => $roleId,
+            ':tenant_id' => $tenantId,
             ':id' => $operatorId,
         ];
         if ($passwordHash !== null) {
@@ -345,5 +424,185 @@ final class UserService
         $role = $stmt->fetch();
 
         return $role !== false ? $role : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function findTenant(int $tenantId): ?array
+    {
+        if ($tenantId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare('SELECT id, name FROM tenants WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $tenantId]);
+        $tenant = $stmt->fetch();
+
+        return $tenant !== false ? $tenant : null;
+    }
+
+    private function sendCredentialsEmail(string $recipient, string $username, string $password, string $fullname): bool
+    {
+        $recipient = trim($recipient);
+        if ($recipient === '' || !filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        $appName = $this->appName !== null && $this->appName !== '' ? $this->appName : 'Coresuite Express';
+        $loginUrl = $this->buildLoginUrl();
+        $displayName = $fullname !== '' ? $fullname : $username;
+
+        $subject = '[' . $appName . '] Credenziali di accesso';
+        $textBody = "Ciao {$displayName},\n\n";
+        $textBody .= "Il tuo accesso è stato creato.\n\n";
+        $textBody .= "Username: {$username}\n";
+        $textBody .= "Password: {$password}\n\n";
+        $textBody .= "Accedi qui: {$loginUrl}\n\n";
+        $textBody .= "Ti consigliamo di cambiare la password al primo accesso.\n";
+
+        $brandColor = '#1f2937';
+        $accentColor = '#2563eb';
+        $htmlBody = '<!doctype html>';
+        $htmlBody .= '<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+        $htmlBody .= '<title>' . htmlspecialchars($appName) . '</title>';
+        $htmlBody .= '</head><body style="margin:0;padding:0;background:#f4f6fb;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827;">';
+        $htmlBody .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:32px 12px;">';
+        $htmlBody .= '<tr><td align="center">';
+        $htmlBody .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 18px 45px rgba(15,23,42,0.08);">';
+        $htmlBody .= '<tr><td style="padding:24px 28px;background:' . $brandColor . ';color:#ffffff;">';
+        $htmlBody .= '<h1 style="margin:0;font-size:20px;font-weight:600;">' . htmlspecialchars($appName) . '</h1>';
+        $htmlBody .= '<p style="margin:6px 0 0;font-size:14px;opacity:0.85;">Credenziali di accesso</p>';
+        $htmlBody .= '</td></tr>';
+        $htmlBody .= '<tr><td style="padding:28px;">';
+        $htmlBody .= '<p style="margin:0 0 12px;font-size:16px;">Ciao <strong>' . htmlspecialchars($displayName) . '</strong>,</p>';
+        $htmlBody .= '<p style="margin:0 0 20px;color:#4b5563;">Il tuo accesso è stato creato. Trovi qui le credenziali personali:</p>';
+        $htmlBody .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:22px;">';
+        $htmlBody .= '<p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Username</p>';
+        $htmlBody .= '<p style="margin:0 0 14px;font-size:16px;font-weight:600;color:#111827;">' . htmlspecialchars($username) . '</p>';
+        $htmlBody .= '<p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Password</p>';
+        $htmlBody .= '<p style="margin:0;font-size:16px;font-weight:600;color:#111827;">' . htmlspecialchars($password) . '</p>';
+        $htmlBody .= '</div>';
+        $htmlBody .= '<a href="' . htmlspecialchars($loginUrl) . '" style="display:inline-block;background:' . $accentColor . ';color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">Accedi al gestionale</a>';
+        $htmlBody .= '<p style="margin:20px 0 0;color:#6b7280;font-size:13px;">Ti consigliamo di cambiare la password al primo accesso.</p>';
+        $htmlBody .= '</td></tr>';
+        $htmlBody .= '<tr><td style="padding:20px 28px;border-top:1px solid #e5e7eb;background:#fafafa;color:#9ca3af;font-size:12px;">';
+        $htmlBody .= 'Se non riconosci questa email, contatta subito l\'amministratore.';
+        $htmlBody .= '</td></tr>';
+        $htmlBody .= '</table>';
+        $htmlBody .= '</td></tr></table>';
+        $htmlBody .= '</body></html>';
+
+        $sent = false;
+        if ($this->resendApiKey !== null && $this->sendEmailViaResend($recipient, $subject, $textBody, $htmlBody)) {
+            $sent = true;
+        }
+
+        if (!$sent) {
+            $fromEmail = $this->getFromEmail();
+            $fromName = $this->getFromDisplayName();
+            $formattedFrom = $this->formatEmailAddress($fromEmail, $fromName);
+            $headers = [
+                'From: ' . $formattedFrom,
+                'Reply-To: ' . $fromEmail,
+                'MIME-Version: 1.0',
+                'Content-Type: text/plain; charset=UTF-8',
+            ];
+            $sent = @mail($recipient, $subject, $textBody, implode("\r\n", $headers));
+        }
+
+        return $sent;
+    }
+
+    private function buildLoginUrl(): string
+    {
+        if (!empty($_SERVER['HTTP_HOST'])) {
+            $httpsValue = $_SERVER['HTTPS'] ?? null;
+            $scheme = (is_string($httpsValue) && strtolower((string) $httpsValue) !== 'off' && $httpsValue !== '') ? 'https' : 'http';
+            return $scheme . '://' . $_SERVER['HTTP_HOST'] . '/public/index.php?page=login';
+        }
+        return 'index.php?page=login';
+    }
+
+    private function sendEmailViaResend(string $recipient, string $subject, string $textBody, ?string $htmlBody = null): bool
+    {
+        if (!function_exists('curl_init') || $this->resendApiKey === null) {
+            return false;
+        }
+
+        $fromEmail = $this->getFromEmail();
+        $fromName = $this->getFromDisplayName();
+        $from = $this->formatEmailAddress($fromEmail, $fromName);
+        $payloadData = [
+            'from' => $from,
+            'to' => [$recipient],
+            'subject' => $subject,
+            'text' => $textBody,
+        ];
+        $payloadData['reply_to'] = [$fromEmail];
+        if ($htmlBody !== null) {
+            $payloadData['html'] = $htmlBody;
+        }
+        $payload = json_encode($payloadData);
+        if ($payload === false) {
+            return false;
+        }
+
+        $ch = curl_init('https://api.resend.com/emails');
+        if ($ch === false) {
+            return false;
+        }
+
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $this->resendApiKey,
+        ]);
+
+        $response = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($response === false) {
+            curl_close($ch);
+            return false;
+        }
+        curl_close($ch);
+
+        return $status >= 200 && $status < 300;
+    }
+
+    private function getFromEmail(): string
+    {
+        $email = trim((string) ($this->resendFrom ?? ''));
+        return $email !== '' ? $email : 'alerts@coresuite.test';
+    }
+
+    private function getFromDisplayName(): ?string
+    {
+        $name = trim((string) ($this->resendFromName ?? ''));
+        if ($name !== '') {
+            return str_replace(["\r", "\n"], '', $name);
+        }
+        $fallback = trim((string) ($this->appName ?? ''));
+        if ($fallback !== '') {
+            return str_replace(["\r", "\n"], '', $fallback);
+        }
+        return null;
+    }
+
+    private function formatEmailAddress(string $email, ?string $name = null): string
+    {
+        $cleanEmail = trim(str_replace(["\r", "\n"], '', $email));
+        if ($name === null || trim($name) === '') {
+            return $cleanEmail;
+        }
+        $cleanName = trim(str_replace(["\r", "\n"], '', $name));
+        if ($cleanName === '') {
+            return $cleanEmail;
+        }
+        $needsQuotes = strpbrk($cleanName, ',;"') !== false;
+        $encodedName = $needsQuotes ? '"' . addcslashes($cleanName, '"\\') . '"' : $cleanName;
+        return $encodedName . ' <' . $cleanEmail . '>';
     }
 }

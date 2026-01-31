@@ -5,6 +5,7 @@ namespace App\Services;
 
 use DateTimeImmutable;
 use PDO;
+use App\Services\TenantContext;
 
 final class EnergyContractService
 {
@@ -18,6 +19,7 @@ final class EnergyContractService
      */
     public function createContract(array $data, ?int $userId = null): array
     {
+        $tenantId = TenantContext::id();
         $validation = $this->validate($data);
         if ($validation['errors'] !== []) {
             return [
@@ -48,10 +50,11 @@ final class EnergyContractService
         $customerId = $this->ensureCustomer($validation['customer_name']);
 
         $stmt = $this->pdo->prepare(
-            'INSERT INTO energy_contracts (customer_id, customer_name, contract_type, provider_id, token_value, user_id, notes)
-             VALUES (:customer_id, :customer_name, :contract_type, :provider_id, :token_value, :user_id, :notes)'
+            'INSERT INTO energy_contracts (tenant_id, customer_id, customer_name, contract_type, provider_id, token_value, user_id, notes)
+             VALUES (:tenant_id, :customer_id, :customer_name, :contract_type, :provider_id, :token_value, :user_id, :notes)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':customer_id' => $customerId,
             ':customer_name' => $validation['customer_name'],
             ':contract_type' => $validation['contract_type'],
@@ -72,16 +75,18 @@ final class EnergyContractService
      */
     public function listByPeriod(string $period = 'month', ?string $date = null): array
     {
+        $tenantId = TenantContext::id();
         $bounds = $this->resolvePeriodBounds($period, $date);
         $stmt = $this->pdo->prepare(
             'SELECT ec.id, ec.customer_name, ec.contract_type, ec.token_value, ec.created_at,
                     ec.notes, ep.name AS provider_name, ep.service_type
              FROM energy_contracts ec
              INNER JOIN energy_providers ep ON ep.id = ec.provider_id
-             WHERE ec.created_at BETWEEN :start AND :end
+             WHERE ec.tenant_id = :tenant_id AND ec.created_at BETWEEN :start AND :end
              ORDER BY ec.created_at DESC'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':start' => $bounds['start']->format('Y-m-d H:i:s'),
             ':end' => $bounds['end']->format('Y-m-d H:i:s'),
         ]);
@@ -108,6 +113,7 @@ final class EnergyContractService
      */
     public function searchContracts(string $term, int $limit = 5): array
     {
+        $tenantId = TenantContext::id();
         $term = trim($term);
         if ($term === '') {
             return [];
@@ -138,11 +144,12 @@ final class EnergyContractService
                        ep.name AS provider_name, ep.service_type
                 FROM energy_contracts ec
                 INNER JOIN energy_providers ep ON ep.id = ec.provider_id
-                WHERE ' . implode(' OR ', $conditions) . '
+            WHERE ec.tenant_id = :tenant_id AND (' . implode(' OR ', $conditions) . ')
                 ORDER BY ec.created_at DESC
                 LIMIT :limit';
 
         $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value);
         }
@@ -157,6 +164,7 @@ final class EnergyContractService
      */
     public function deleteContract(int $contractId): array
     {
+        $tenantId = TenantContext::id();
         if ($contractId <= 0) {
             return [
                 'success' => false,
@@ -165,8 +173,8 @@ final class EnergyContractService
             ];
         }
 
-        $stmt = $this->pdo->prepare('SELECT id FROM energy_contracts WHERE id = :id');
-        $stmt->execute([':id' => $contractId]);
+        $stmt = $this->pdo->prepare('SELECT id FROM energy_contracts WHERE id = :id AND tenant_id = :tenant_id');
+        $stmt->execute([':id' => $contractId, ':tenant_id' => $tenantId]);
         if ($stmt->fetchColumn() === false) {
             return [
                 'success' => false,
@@ -175,8 +183,8 @@ final class EnergyContractService
             ];
         }
 
-        $delete = $this->pdo->prepare('DELETE FROM energy_contracts WHERE id = :id');
-        $delete->execute([':id' => $contractId]);
+        $delete = $this->pdo->prepare('DELETE FROM energy_contracts WHERE id = :id AND tenant_id = :tenant_id');
+        $delete->execute([':id' => $contractId, ':tenant_id' => $tenantId]);
 
         return [
             'success' => true,
@@ -210,26 +218,28 @@ final class EnergyContractService
 
     private function findProvider(int $providerId): ?array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT id, name, service_type, token_luce, token_gas
-             FROM energy_providers WHERE id = :id'
+             FROM energy_providers WHERE id = :id AND tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $providerId]);
+        $stmt->execute([':id' => $providerId, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : $row;
     }
 
     private function ensureCustomer(string $customerName): ?int
     {
-        $stmt = $this->pdo->prepare('SELECT id FROM customers WHERE LOWER(fullname) = LOWER(:name)');
-        $stmt->execute([':name' => $customerName]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT id FROM customers WHERE tenant_id = :tenant_id AND LOWER(fullname) = LOWER(:name)');
+        $stmt->execute([':tenant_id' => $tenantId, ':name' => $customerName]);
         $existingId = $stmt->fetchColumn();
         if ($existingId !== false) {
             return (int) $existingId;
         }
 
-        $insert = $this->pdo->prepare('INSERT INTO customers (fullname) VALUES (:fullname)');
-        $insert->execute([':fullname' => $customerName]);
+        $insert = $this->pdo->prepare('INSERT INTO customers (tenant_id, fullname) VALUES (:tenant_id, :fullname)');
+        $insert->execute([':tenant_id' => $tenantId, ':fullname' => $customerName]);
         return (int) $this->pdo->lastInsertId();
     }
 

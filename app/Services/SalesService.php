@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PDO;
+use App\Services\TenantContext;
 
 final class SalesService
 {
@@ -39,6 +40,7 @@ final class SalesService
      */
     public function createSale(array $data): int
     {
+        $tenantId = TenantContext::id();
         $campaignId = null;
         $this->pdo->beginTransaction();
         try {
@@ -71,8 +73,10 @@ final class SalesService
             if (array_key_exists('customer_id', $data) && $data['customer_id'] !== null) {
                 $candidate = (int) $data['customer_id'];
                 if ($candidate > 0) {
-                    $stmtCustomer = $this->pdo->prepare('SELECT id, fullname FROM customers WHERE id = :id');
-                    $stmtCustomer->execute([':id' => $candidate]);
+                    $stmtCustomer = $this->pdo->prepare(
+                        'SELECT id, fullname FROM customers WHERE id = :id AND tenant_id = :tenant_id'
+                    );
+                    $stmtCustomer->execute([':id' => $candidate, ':tenant_id' => $tenantId]);
                     $customerRow = $stmtCustomer->fetch(PDO::FETCH_ASSOC);
                     if ($customerRow === false) {
                         throw new \RuntimeException('Cliente selezionato non trovato.');
@@ -185,14 +189,20 @@ final class SalesService
             $productMap = [];
             $uniqueProductIds = array_values(array_unique(array_filter($productIds, static fn (int $id): bool => $id > 0)));
             if ($uniqueProductIds !== []) {
-                $placeholders = implode(',', array_fill(0, count($uniqueProductIds), '?'));
+                $placeholders = [];
+                $productParams = [':tenant_id' => $tenantId];
+                foreach ($uniqueProductIds as $index => $productId) {
+                    $key = ':pid' . $index;
+                    $placeholders[] = $key;
+                    $productParams[$key] = $productId;
+                }
                 $stmtProducts = $this->pdo->prepare(
                     'SELECT id, name, tax_rate, stock_quantity, vat_code
                      FROM products
-                     WHERE id IN (' . $placeholders . ')
+                     WHERE tenant_id = :tenant_id AND id IN (' . implode(',', $placeholders) . ')
                      FOR UPDATE'
                 );
-                $stmtProducts->execute($uniqueProductIds);
+                $stmtProducts->execute($productParams);
                 while ($row = $stmtProducts->fetch(PDO::FETCH_ASSOC)) {
                     $productMap[(int) $row['id']] = [
                         'name' => (string) ($row['name'] ?? ''),
@@ -284,6 +294,7 @@ final class SalesService
 
             $stmtSale = $this->pdo->prepare(
                 'INSERT INTO sales (
+                    tenant_id,
                     user_id,
                     customer_id,
                     customer_name,
@@ -303,6 +314,7 @@ final class SalesService
                     credited_amount
                 )
                 VALUES (
+                    :tenant_id,
                     :u,
                     :customer_id,
                     :customer_name,
@@ -323,6 +335,7 @@ final class SalesService
                 )'
             );
             $stmtSale->execute([
+                ':tenant_id' => $tenantId,
                 ':u' => $data['user_id'],
                 ':customer_id' => $customerId,
                 ':customer_name' => $customerName,
@@ -342,22 +355,22 @@ final class SalesService
             $saleId = (int) $this->pdo->lastInsertId();
 
             $stmtItem = $this->pdo->prepare(
-                'INSERT INTO sale_items (sale_id, iccid_id, product_id, description, quantity, price, tax_rate, tax_amount, vat_code)
-                 VALUES (:s, :iccid, :product, :desc, :qty, :price, :tax_rate, :tax_amount, :vat_code)'
+                'INSERT INTO sale_items (tenant_id, sale_id, iccid_id, product_id, description, quantity, price, tax_rate, tax_amount, vat_code)
+                 VALUES (:tenant_id, :s, :iccid, :product, :desc, :qty, :price, :tax_rate, :tax_amount, :vat_code)'
             );
             $stmtUpdateICCID = $this->pdo->prepare(
                 "UPDATE iccid_stock
                  SET status = 'Sold', updated_at = NOW()
-                 WHERE id = :id AND status != 'Sold'"
+                 WHERE id = :id AND tenant_id = :tenant_id AND status != 'Sold'"
             );
             $stmtFetchICCID = $this->pdo->prepare(
-                'SELECT iccid FROM iccid_stock WHERE id = :id'
+                'SELECT iccid FROM iccid_stock WHERE id = :id AND tenant_id = :tenant_id'
             );
 
             foreach ($items as $index => $item) {
                 $iccidId = $item['iccid_id'] ?? null;
                 if ($iccidId !== null) {
-                    $stmtFetchICCID->execute([':id' => $iccidId]);
+                    $stmtFetchICCID->execute([':id' => $iccidId, ':tenant_id' => $tenantId]);
                     $iccidRow = $stmtFetchICCID->fetch();
                     if (!$iccidRow) {
                         throw new \RuntimeException('ICCID non trovato (ID ' . $iccidId . ').');
@@ -388,6 +401,7 @@ final class SalesService
                 }
 
                 $stmtItem->execute([
+                    ':tenant_id' => $tenantId,
                     ':s' => $saleId,
                     ':iccid' => $iccidId,
                     ':product' => $productId,
@@ -400,7 +414,7 @@ final class SalesService
                 ]);
 
                 if ($iccidId !== null) {
-                    $stmtUpdateICCID->execute([':id' => $iccidId]);
+                    $stmtUpdateICCID->execute([':id' => $iccidId, ':tenant_id' => $tenantId]);
                     if ($stmtUpdateICCID->rowCount() === 0) {
                         throw new \RuntimeException(
                             'ICCID ID ' . $iccidId . ' non disponibile o già venduto.'
@@ -411,11 +425,11 @@ final class SalesService
 
             if ($productUsage !== []) {
                 $stmtUpdateProductStock = $this->pdo->prepare(
-                    'UPDATE products SET stock_quantity = :stock WHERE id = :id'
+                    'UPDATE products SET stock_quantity = :stock WHERE id = :id AND tenant_id = :tenant_id'
                 );
                 $stmtInsertProductMovement = $this->pdo->prepare(
-                    'INSERT INTO product_stock_movements (product_id, quantity_change, balance_after, reason, reference_type, reference_id, user_id, note)
-                     VALUES (:product_id, :quantity_change, :balance_after, :reason, :reference_type, :reference_id, :user_id, :note)'
+                    'INSERT INTO product_stock_movements (tenant_id, product_id, quantity_change, balance_after, reason, reference_type, reference_id, user_id, note)
+                     VALUES (:tenant_id, :product_id, :quantity_change, :balance_after, :reason, :reference_type, :reference_id, :user_id, :note)'
                 );
 
                 foreach ($productUsage as $productId => $qtySold) {
@@ -424,10 +438,12 @@ final class SalesService
                     $stmtUpdateProductStock->execute([
                         ':stock' => $newStock,
                         ':id' => $productId,
+                        ':tenant_id' => $tenantId,
                     ]);
                     $productMap[$productId]['stock_quantity'] = $newStock;
 
                     $stmtInsertProductMovement->execute([
+                        ':tenant_id' => $tenantId,
                         ':product_id' => $productId,
                         ':quantity_change' => -$qtySold,
                         ':balance_after' => $newStock,
@@ -441,10 +457,11 @@ final class SalesService
             }
 
             $stmtAudit = $this->pdo->prepare(
-                "INSERT INTO audit_log (user_id, action, description)
-                 VALUES (:u, 'sale_create', :desc)"
+                "INSERT INTO audit_log (tenant_id, user_id, action, description)
+                 VALUES (:tenant_id, :u, 'sale_create', :desc)"
             );
             $stmtAudit->execute([
+                ':tenant_id' => $tenantId,
                 ':u' => $data['user_id'],
                 ':desc' => 'Vendita #' . $saleId . ', totale ' . number_format($total, 2),
             ]);
@@ -460,10 +477,11 @@ final class SalesService
 
     public function cancelSale(int $saleId, int $userId, ?string $reason = null): void
     {
+        $tenantId = TenantContext::id();
         $this->pdo->beginTransaction();
         try {
-            $stmtSale = $this->pdo->prepare('SELECT status FROM sales WHERE id = :id FOR UPDATE');
-            $stmtSale->execute([':id' => $saleId]);
+            $stmtSale = $this->pdo->prepare('SELECT status FROM sales WHERE id = :id AND tenant_id = :tenant_id FOR UPDATE');
+            $stmtSale->execute([':id' => $saleId, ':tenant_id' => $tenantId]);
             $sale = $stmtSale->fetch();
             if (!$sale) {
                 throw new \RuntimeException('Vendita non trovata.');
@@ -472,8 +490,10 @@ final class SalesService
                 throw new \RuntimeException('Impossibile annullare: stato attuale ' . $sale['status']);
             }
 
-            $stmtItems = $this->pdo->prepare('SELECT iccid_id, product_id, quantity FROM sale_items WHERE sale_id = :id');
-            $stmtItems->execute([':id' => $saleId]);
+            $stmtItems = $this->pdo->prepare(
+                'SELECT iccid_id, product_id, quantity FROM sale_items WHERE sale_id = :id AND tenant_id = :tenant_id'
+            );
+            $stmtItems->execute([':id' => $saleId, ':tenant_id' => $tenantId]);
             $iccids = [];
             $productRestock = [];
             while ($row = $stmtItems->fetch(PDO::FETCH_ASSOC)) {
@@ -491,31 +511,37 @@ final class SalesService
 
             if ($iccids !== []) {
                 $stmtRestore = $this->pdo->prepare(
-                    "UPDATE iccid_stock SET status = 'InStock', updated_at = NOW() WHERE id = :id"
+                    "UPDATE iccid_stock SET status = 'InStock', updated_at = NOW() WHERE id = :id AND tenant_id = :tenant_id"
                 );
                 foreach ($iccids as $iccidId) {
-                    $stmtRestore->execute([':id' => $iccidId]);
+                    $stmtRestore->execute([':id' => $iccidId, ':tenant_id' => $tenantId]);
                 }
             }
 
             if ($productRestock !== []) {
-                $stmtFetchProduct = $this->pdo->prepare('SELECT stock_quantity FROM products WHERE id = :id FOR UPDATE');
-                $stmtUpdateProduct = $this->pdo->prepare('UPDATE products SET stock_quantity = :stock WHERE id = :id');
+                $stmtFetchProduct = $this->pdo->prepare(
+                    'SELECT stock_quantity FROM products WHERE id = :id AND tenant_id = :tenant_id FOR UPDATE'
+                );
+                $stmtUpdateProduct = $this->pdo->prepare(
+                    'UPDATE products SET stock_quantity = :stock WHERE id = :id AND tenant_id = :tenant_id'
+                );
                 $stmtInsertMovement = $this->pdo->prepare(
-                    'INSERT INTO product_stock_movements (product_id, quantity_change, balance_after, reason, reference_type, reference_id, user_id, note)
-                     VALUES (:product_id, :quantity_change, :balance_after, :reason, :reference_type, :reference_id, :user_id, :note)'
+                    'INSERT INTO product_stock_movements (tenant_id, product_id, quantity_change, balance_after, reason, reference_type, reference_id, user_id, note)
+                     VALUES (:tenant_id, :product_id, :quantity_change, :balance_after, :reason, :reference_type, :reference_id, :user_id, :note)'
                 );
 
                 foreach ($productRestock as $productId => $qty) {
-                    $stmtFetchProduct->execute([':id' => $productId]);
+                    $stmtFetchProduct->execute([':id' => $productId, ':tenant_id' => $tenantId]);
                     $currentStock = (int) ($stmtFetchProduct->fetchColumn() ?: 0);
                     $newStock = $currentStock + $qty;
                     $stmtUpdateProduct->execute([
                         ':stock' => $newStock,
                         ':id' => $productId,
+                        ':tenant_id' => $tenantId,
                     ]);
 
                     $stmtInsertMovement->execute([
+                        ':tenant_id' => $tenantId,
                         ':product_id' => $productId,
                         ':quantity_change' => $qty,
                         ':balance_after' => $newStock,
@@ -531,18 +557,20 @@ final class SalesService
             $stmtUpdateSale = $this->pdo->prepare(
                 'UPDATE sales
                  SET status = "Cancelled", cancelled_at = NOW(), cancellation_note = :note
-                 WHERE id = :id'
+                 WHERE id = :id AND tenant_id = :tenant_id'
             );
             $stmtUpdateSale->execute([
                 ':note' => $reason !== null && trim($reason) !== '' ? trim($reason) : null,
                 ':id' => $saleId,
+                ':tenant_id' => $tenantId,
             ]);
 
             $stmtAudit = $this->pdo->prepare(
-                "INSERT INTO audit_log (user_id, action, description)
-                 VALUES (:u, 'sale_cancel', :desc)"
+                "INSERT INTO audit_log (tenant_id, user_id, action, description)
+                 VALUES (:tenant_id, :u, 'sale_cancel', :desc)"
             );
             $stmtAudit->execute([
+                ':tenant_id' => $tenantId,
                 ':u' => $userId,
                 ':desc' => 'Annullato scontrino #' . $saleId,
             ]);
@@ -559,13 +587,14 @@ final class SalesService
      */
     public function refundSale(int $saleId, int $userId, ?array $items = null, ?string $generalNote = null): void
     {
+        $tenantId = TenantContext::id();
         $this->pdo->beginTransaction();
         try {
             $stmtSale = $this->pdo->prepare(
                 'SELECT status, total, refunded_amount, credited_amount, refund_note
-                 FROM sales WHERE id = :id FOR UPDATE'
+                 FROM sales WHERE id = :id AND tenant_id = :tenant_id FOR UPDATE'
             );
-            $stmtSale->execute([':id' => $saleId]);
+            $stmtSale->execute([':id' => $saleId, ':tenant_id' => $tenantId]);
             $sale = $stmtSale->fetch();
             if (!$sale) {
                 throw new \RuntimeException('Vendita non trovata.');
@@ -577,10 +606,10 @@ final class SalesService
             $stmtItems = $this->pdo->prepare(
                 'SELECT id, iccid_id, product_id, quantity, price, refunded_quantity
                  FROM sale_items
-                 WHERE sale_id = :sale_id
+                  WHERE sale_id = :sale_id AND tenant_id = :tenant_id
                  FOR UPDATE'
             );
-            $stmtItems->execute([':sale_id' => $saleId]);
+              $stmtItems->execute([':sale_id' => $saleId, ':tenant_id' => $tenantId]);
             $saleItems = [];
             while ($row = $stmtItems->fetch(PDO::FETCH_ASSOC)) {
                 $saleItems[(int) $row['id']] = $row;
@@ -611,14 +640,14 @@ final class SalesService
             }
 
             $stmtInsertRefund = $this->pdo->prepare(
-                'INSERT INTO sale_item_refunds (sale_item_id, user_id, quantity, refund_type, note, amount)
-                 VALUES (:item, :user, :qty, :type, :note, :amount)'
+                'INSERT INTO sale_item_refunds (tenant_id, sale_item_id, user_id, quantity, refund_type, note, amount)
+                 VALUES (:tenant_id, :item, :user, :qty, :type, :note, :amount)'
             );
             $stmtUpdateItem = $this->pdo->prepare(
-                'UPDATE sale_items SET refunded_quantity = refunded_quantity + :qty WHERE id = :id'
+                'UPDATE sale_items SET refunded_quantity = refunded_quantity + :qty WHERE id = :id AND tenant_id = :tenant_id'
             );
             $stmtRestoreIccid = $this->pdo->prepare(
-                "UPDATE iccid_stock SET status = 'InStock', updated_at = NOW() WHERE id = :id"
+                "UPDATE iccid_stock SET status = 'InStock', updated_at = NOW() WHERE id = :id AND tenant_id = :tenant_id"
             );
 
             $totalRefundAmount = 0.0;
@@ -651,6 +680,7 @@ final class SalesService
                 $note = isset($item['note']) ? trim((string) $item['note']) : null;
 
                 $stmtInsertRefund->execute([
+                    ':tenant_id' => $tenantId,
                     ':item' => $itemId,
                     ':user' => $userId,
                     ':qty' => $quantity,
@@ -662,10 +692,11 @@ final class SalesService
                 $stmtUpdateItem->execute([
                     ':qty' => $quantity,
                     ':id' => $itemId,
+                    ':tenant_id' => $tenantId,
                 ]);
 
                 if ($saleItem['iccid_id'] !== null) {
-                    $stmtRestoreIccid->execute([':id' => $saleItem['iccid_id']]);
+                    $stmtRestoreIccid->execute([':id' => $saleItem['iccid_id'], ':tenant_id' => $tenantId]);
                 }
 
                 if ($type === 'Refund') {
@@ -689,23 +720,29 @@ final class SalesService
             }
 
             if ($productReturns !== []) {
-                $stmtFetchProduct = $this->pdo->prepare('SELECT stock_quantity FROM products WHERE id = :id FOR UPDATE');
-                $stmtUpdateProduct = $this->pdo->prepare('UPDATE products SET stock_quantity = :stock WHERE id = :id');
+                $stmtFetchProduct = $this->pdo->prepare(
+                    'SELECT stock_quantity FROM products WHERE id = :id AND tenant_id = :tenant_id FOR UPDATE'
+                );
+                $stmtUpdateProduct = $this->pdo->prepare(
+                    'UPDATE products SET stock_quantity = :stock WHERE id = :id AND tenant_id = :tenant_id'
+                );
                 $stmtInsertMovement = $this->pdo->prepare(
-                    'INSERT INTO product_stock_movements (product_id, quantity_change, balance_after, reason, reference_type, reference_id, user_id, note)
-                     VALUES (:product_id, :quantity_change, :balance_after, :reason, :reference_type, :reference_id, :user_id, :note)'
+                    'INSERT INTO product_stock_movements (tenant_id, product_id, quantity_change, balance_after, reason, reference_type, reference_id, user_id, note)
+                     VALUES (:tenant_id, :product_id, :quantity_change, :balance_after, :reason, :reference_type, :reference_id, :user_id, :note)'
                 );
 
                 foreach ($productReturns as $productId => $qtyReturn) {
-                    $stmtFetchProduct->execute([':id' => $productId]);
+                    $stmtFetchProduct->execute([':id' => $productId, ':tenant_id' => $tenantId]);
                     $currentStock = (int) ($stmtFetchProduct->fetchColumn() ?: 0);
                     $newStock = $currentStock + $qtyReturn;
                     $stmtUpdateProduct->execute([
                         ':stock' => $newStock,
                         ':id' => $productId,
+                        ':tenant_id' => $tenantId,
                     ]);
 
                     $stmtInsertMovement->execute([
+                        ':tenant_id' => $tenantId,
                         ':product_id' => $productId,
                         ':quantity_change' => $qtyReturn,
                         ':balance_after' => $newStock,
@@ -720,9 +757,9 @@ final class SalesService
 
             $stmtTotals = $this->pdo->prepare(
                 'SELECT SUM(quantity) AS total_qty, SUM(refunded_quantity) AS refunded_qty
-                 FROM sale_items WHERE sale_id = :sale_id'
+                  FROM sale_items WHERE sale_id = :sale_id AND tenant_id = :tenant_id'
             );
-            $stmtTotals->execute([':sale_id' => $saleId]);
+              $stmtTotals->execute([':sale_id' => $saleId, ':tenant_id' => $tenantId]);
             $totals = $stmtTotals->fetch() ?: ['total_qty' => 0, 'refunded_qty' => 0];
 
             $status = 'Completed';
@@ -746,7 +783,7 @@ final class SalesService
                      status = :status,
                      refunded_at = NOW(),
                      refund_note = :note
-                 WHERE id = :id'
+                 WHERE id = :id AND tenant_id = :tenant_id'
             );
             $stmtUpdateSale->execute([
                 ':refunded_amount' => $newRefundedAmount,
@@ -754,13 +791,15 @@ final class SalesService
                 ':status' => $status,
                 ':note' => $noteToStore,
                 ':id' => $saleId,
+                ':tenant_id' => $tenantId,
             ]);
 
             $stmtAudit = $this->pdo->prepare(
-                "INSERT INTO audit_log (user_id, action, description)
-                 VALUES (:u, 'sale_refund', :desc)"
+                "INSERT INTO audit_log (tenant_id, user_id, action, description)
+                 VALUES (:tenant_id, :u, 'sale_refund', :desc)"
             );
             $stmtAudit->execute([
+                ':tenant_id' => $tenantId,
                 ':u' => $userId,
                 ':desc' => 'Reso scontrino #' . $saleId . ': rimborso € ' . number_format($totalRefundAmount, 2, ',', '.') . ' / credito € ' . number_format($totalCreditAmount, 2, ',', '.'),
             ]);
@@ -777,6 +816,7 @@ final class SalesService
      */
     public function getSaleWithItems(int $saleId, ?int $customerId = null): ?array
     {
+        $tenantId = TenantContext::id();
         $sql = 'SELECT s.*, u.fullname, u.username,
                        c.fullname AS customer_fullname,
                        c.email AS customer_email,
@@ -785,9 +825,9 @@ final class SalesService
                 FROM sales s
                 LEFT JOIN users u ON u.id = s.user_id
                 LEFT JOIN customers c ON c.id = s.customer_id
-                WHERE s.id = :id';
+                WHERE s.id = :id AND s.tenant_id = :tenant_id';
 
-        $params = [':id' => $saleId];
+        $params = [':id' => $saleId, ':tenant_id' => $tenantId];
         if ($customerId !== null) {
             $sql .= ' AND s.customer_id = :customer_id';
             $params[':customer_id'] = $customerId;
@@ -805,9 +845,9 @@ final class SalesService
             'SELECT si.*, ic.iccid
              FROM sale_items si
              LEFT JOIN iccid_stock ic ON ic.id = si.iccid_id
-             WHERE si.sale_id = :id'
+               WHERE si.sale_id = :id AND si.tenant_id = :tenant_id'
         );
-        $stmtItems->execute([':id' => $saleId]);
+           $stmtItems->execute([':id' => $saleId, ':tenant_id' => $tenantId]);
         $items = $stmtItems->fetchAll();
 
         $sale['items'] = $items;
@@ -832,6 +872,9 @@ final class SalesService
     {
         $conditions = [];
         $params = [];
+        $tenantId = TenantContext::id();
+        $conditions[] = 's.tenant_id = :tenant_id';
+        $params[':tenant_id'] = $tenantId;
 
         if (!empty($filters['status']) && in_array($filters['status'], ['Completed', 'Cancelled', 'Refunded'], true)) {
             $conditions[] = 's.status = :status';
@@ -943,12 +986,13 @@ final class SalesService
         ?string $status = null,
         ?string $paymentStatus = null
     ): array {
+        $tenantId = TenantContext::id();
         $customerId = max(1, $customerId);
         $page = max(1, $page);
         $perPage = max(1, min($perPage, 30));
 
-        $conditions = ['s.customer_id = :customer_id'];
-        $params = [':customer_id' => $customerId];
+        $conditions = ['s.customer_id = :customer_id', 's.tenant_id = :tenant_id'];
+        $params = [':customer_id' => $customerId, ':tenant_id' => $tenantId];
 
         if ($status !== null && in_array($status, ['Completed', 'Cancelled', 'Refunded'], true)) {
             $conditions[] = 's.status = :status';

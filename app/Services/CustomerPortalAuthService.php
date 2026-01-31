@@ -7,6 +7,7 @@ use DateInterval;
 use DateTimeImmutable;
 use PDO;
 use PDOException;
+use App\Services\TenantContext;
 
 /**
  * Gestione autenticazione del portale clienti con sessioni persistenti opzionali.
@@ -37,12 +38,13 @@ final class CustomerPortalAuthService
             ];
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'SELECT id, customer_id, email, password_hash, invite_token, last_login_at
+            'SELECT id, customer_id, tenant_id, email, password_hash, invite_token, last_login_at
              FROM customer_portal_accounts
-             WHERE email = :email'
+             WHERE email = :email AND tenant_id = :tenant_id'
         );
-        $stmt->execute([':email' => $normalizedEmail]);
+        $stmt->execute([':email' => $normalizedEmail, ':tenant_id' => $tenantId]);
         $account = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$account || !is_string($account['password_hash']) || $account['password_hash'] === '') {
@@ -63,13 +65,14 @@ final class CustomerPortalAuthService
             'id' => (int) $account['id'],
             'customer_id' => (int) $account['customer_id'],
             'email' => (string) $account['email'],
+            'tenant_id' => (int) ($account['tenant_id'] ?? $tenantId),
         ];
 
         $this->persistPortalSession($accountData, $remember);
 
         $this->pdo->prepare(
-            'UPDATE customer_portal_accounts SET last_login_at = NOW() WHERE id = :id'
-        )->execute([':id' => $accountData['id']]);
+            'UPDATE customer_portal_accounts SET last_login_at = NOW() WHERE id = :id AND tenant_id = :tenant_id'
+        )->execute([':id' => $accountData['id'], ':tenant_id' => (int) $accountData['tenant_id']]);
 
         return [
             'success' => true,
@@ -104,13 +107,14 @@ final class CustomerPortalAuthService
         }
 
         $tokenHash = hash('sha256', $cookieToken);
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.portal_account_id, a.email, a.customer_id
+            'SELECT s.id, s.portal_account_id, a.email, a.customer_id, a.tenant_id
              FROM customer_portal_sessions s
              INNER JOIN customer_portal_accounts a ON a.id = s.portal_account_id
-             WHERE s.session_token = :token AND s.expires_at > NOW()'
+             WHERE s.session_token = :token AND s.expires_at > NOW() AND a.tenant_id = :tenant_id'
         );
-        $stmt->execute([':token' => $tokenHash]);
+        $stmt->execute([':token' => $tokenHash, ':tenant_id' => $tenantId]);
         $session = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$session) {
             $this->clearRememberCookie();
@@ -122,6 +126,7 @@ final class CustomerPortalAuthService
             'customer_id' => (int) $session['customer_id'],
             'email' => (string) $session['email'],
             'session_token' => $tokenHash,
+            'tenant_id' => (int) ($session['tenant_id'] ?? $tenantId),
         ];
 
         $_SESSION[self::SESSION_KEY] = $accountData;
@@ -144,8 +149,9 @@ final class CustomerPortalAuthService
             ];
         }
 
-        $customerExists = $this->pdo->prepare('SELECT id FROM customers WHERE id = :id');
-        $customerExists->execute([':id' => $customerId]);
+        $tenantId = TenantContext::id();
+        $customerExists = $this->pdo->prepare('SELECT id FROM customers WHERE id = :id AND tenant_id = :tenant_id');
+        $customerExists->execute([':id' => $customerId, ':tenant_id' => $tenantId]);
         if ($customerExists->fetchColumn() === false) {
             return [
                 'success' => false,
@@ -160,8 +166,10 @@ final class CustomerPortalAuthService
         try {
             $this->pdo->beginTransaction();
 
-            $check = $this->pdo->prepare('SELECT id FROM customer_portal_accounts WHERE email = :email');
-            $check->execute([':email' => $normalizedEmail]);
+            $check = $this->pdo->prepare(
+                'SELECT id FROM customer_portal_accounts WHERE email = :email AND tenant_id = :tenant_id'
+            );
+            $check->execute([':email' => $normalizedEmail, ':tenant_id' => $tenantId]);
             $existing = $check->fetch(PDO::FETCH_ASSOC);
 
             if ($existing) {
@@ -176,10 +184,11 @@ final class CustomerPortalAuthService
                 ]);
             } else {
                 $insert = $this->pdo->prepare(
-                    'INSERT INTO customer_portal_accounts (customer_id, email, password_hash, invite_token, invite_sent_at)
-                     VALUES (:customer_id, :email, "", :token, NOW())'
+                    'INSERT INTO customer_portal_accounts (tenant_id, customer_id, email, password_hash, invite_token, invite_sent_at)
+                     VALUES (:tenant_id, :customer_id, :email, "", :token, NOW())'
                 );
                 $insert->execute([
+                    ':tenant_id' => $tenantId,
                     ':customer_id' => $customerId,
                     ':email' => $normalizedEmail,
                     ':token' => $inviteTokenHash,
@@ -229,10 +238,11 @@ final class CustomerPortalAuthService
         }
 
         $tokenHash = hash('sha256', $token);
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'SELECT id FROM customer_portal_accounts WHERE invite_token = :token'
+            'SELECT id FROM customer_portal_accounts WHERE invite_token = :token AND tenant_id = :tenant_id'
         );
-        $stmt->execute([':token' => $tokenHash]);
+        $stmt->execute([':token' => $tokenHash, ':tenant_id' => $tenantId]);
         $account = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$account) {
             return [
@@ -246,11 +256,12 @@ final class CustomerPortalAuthService
         $update = $this->pdo->prepare(
             'UPDATE customer_portal_accounts
              SET password_hash = :hash, invite_token = NULL, invite_sent_at = NULL
-             WHERE id = :id'
+             WHERE id = :id AND tenant_id = :tenant_id'
         );
         $update->execute([
             ':hash' => $hash,
             ':id' => $account['id'],
+            ':tenant_id' => $tenantId,
         ]);
 
         return [
@@ -272,10 +283,11 @@ final class CustomerPortalAuthService
             ];
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'SELECT password_hash FROM customer_portal_accounts WHERE id = :id'
+            'SELECT password_hash FROM customer_portal_accounts WHERE id = :id AND tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $accountId]);
+        $stmt->execute([':id' => $accountId, ':tenant_id' => $tenantId]);
         $account = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$account || !is_string($account['password_hash']) || $account['password_hash'] === '') {
             return [
@@ -295,11 +307,12 @@ final class CustomerPortalAuthService
 
         $hash = password_hash($newPassword, PASSWORD_DEFAULT);
         $update = $this->pdo->prepare(
-            'UPDATE customer_portal_accounts SET password_hash = :hash WHERE id = :id'
+            'UPDATE customer_portal_accounts SET password_hash = :hash WHERE id = :id AND tenant_id = :tenant_id'
         );
         $update->execute([
             ':hash' => $hash,
             ':id' => $accountId,
+            ':tenant_id' => $tenantId,
         ]);
 
         return [
@@ -324,10 +337,12 @@ final class CustomerPortalAuthService
             ->add(new DateInterval('P' . self::REMEMBER_LIFETIME_DAYS . 'D'))
             ->format('Y-m-d H:i:s');
 
+        $tenantId = TenantContext::id();
         $this->pdo->prepare(
-            'INSERT INTO customer_portal_sessions (portal_account_id, session_token, created_at, expires_at, user_agent, ip_address)
-             VALUES (:account_id, :token, NOW(), :expires, :agent, :ip)'
+            'INSERT INTO customer_portal_sessions (tenant_id, portal_account_id, session_token, created_at, expires_at, user_agent, ip_address)
+             VALUES (:tenant_id, :account_id, :token, NOW(), :expires, :agent, :ip)'
         )->execute([
+            ':tenant_id' => $tenantId,
             ':account_id' => $account['id'],
             ':token' => $tokenHash,
             ':expires' => $expiresAt,
@@ -353,11 +368,13 @@ final class CustomerPortalAuthService
             ->add(new DateInterval('P' . self::REMEMBER_LIFETIME_DAYS . 'D'))
             ->format('Y-m-d H:i:s');
 
+        $tenantId = TenantContext::id();
         $this->pdo->prepare(
-            'UPDATE customer_portal_sessions SET expires_at = :expires WHERE session_token = :token'
+            'UPDATE customer_portal_sessions SET expires_at = :expires WHERE session_token = :token AND tenant_id = :tenant_id'
         )->execute([
             ':expires' => $expiresAt,
             ':token' => $tokenHash,
+            ':tenant_id' => $tenantId,
         ]);
 
         setcookie(self::REMEMBER_COOKIE, $_COOKIE[self::REMEMBER_COOKIE] ?? '', [
@@ -371,9 +388,10 @@ final class CustomerPortalAuthService
 
     private function deletePersistentSession(string $tokenHash): void
     {
+        $tenantId = TenantContext::id();
         $this->pdo->prepare(
-            'DELETE FROM customer_portal_sessions WHERE session_token = :token'
-        )->execute([':token' => $tokenHash]);
+            'DELETE FROM customer_portal_sessions WHERE session_token = :token AND tenant_id = :tenant_id'
+        )->execute([':token' => $tokenHash, ':tenant_id' => $tenantId]);
     }
 
     private function clearRememberCookie(): void

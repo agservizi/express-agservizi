@@ -6,6 +6,7 @@ namespace App\Services;
 use App\Helpers\Validator;
 use PDO;
 use PDOException;
+use App\Services\TenantContext;
 
 final class ICCIDService
 {
@@ -18,19 +19,23 @@ final class ICCIDService
      */
     public function listStock(?string $status = null): array
     {
+        $tenantId = TenantContext::id();
         if ($status !== null) {
             $stmt = $this->pdo->prepare(
                 'SELECT iccid_stock.*, providers.name AS provider_name FROM iccid_stock
                  JOIN providers ON providers.id = iccid_stock.provider_id
-                 WHERE status = :status ORDER BY iccid_stock.created_at DESC'
+                 WHERE iccid_stock.tenant_id = :tenant_id AND status = :status
+                 ORDER BY iccid_stock.created_at DESC'
             );
-            $stmt->execute([':status' => $status]);
+            $stmt->execute([':status' => $status, ':tenant_id' => $tenantId]);
         } else {
             $stmt = $this->pdo->query(
                 'SELECT iccid_stock.*, providers.name AS provider_name FROM iccid_stock
                  JOIN providers ON providers.id = iccid_stock.provider_id
+                 WHERE iccid_stock.tenant_id = :tenant_id
                  ORDER BY iccid_stock.created_at DESC'
             );
+            $stmt->execute([':tenant_id' => $tenantId]);
         }
 
         return $stmt->fetchAll();
@@ -49,6 +54,9 @@ final class ICCIDService
 
         $conditions = [];
         $params = [];
+        $tenantId = TenantContext::id();
+        $conditions[] = 'iccid_stock.tenant_id = :tenant_id';
+        $params[':tenant_id'] = $tenantId;
 
         if ($status !== null) {
             $conditions[] = 'status = :status';
@@ -85,11 +93,11 @@ final class ICCIDService
         $offset = ($currentPage - 1) * $perPage;
 
         $dataSql = 'SELECT iccid_stock.*, providers.name AS provider_name
-                FROM iccid_stock
-                JOIN providers ON providers.id = iccid_stock.provider_id
-                ' . $where . '
-                ORDER BY iccid_stock.created_at DESC
-                LIMIT :limit OFFSET :offset';
+            FROM iccid_stock
+            JOIN providers ON providers.id = iccid_stock.provider_id
+            ' . $where . '
+            ORDER BY iccid_stock.created_at DESC
+            LIMIT :limit OFFSET :offset';
 
         $stmtData = $this->pdo->prepare($dataSql);
         foreach ($params as $key => $value) {
@@ -116,7 +124,9 @@ final class ICCIDService
      */
     public function listProviders(): array
     {
-        $stmt = $this->pdo->query('SELECT id, name, reorder_threshold FROM providers ORDER BY name');
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT id, name, reorder_threshold FROM providers WHERE tenant_id = :tenant_id ORDER BY name');
+        $stmt->execute([':tenant_id' => $tenantId]);
         return $stmt->fetchAll();
     }
 
@@ -135,8 +145,10 @@ final class ICCIDService
 
         $this->pdo->beginTransaction();
         try {
+            $tenantId = TenantContext::id();
             $stmtInsert = $this->pdo->prepare(
-                "INSERT INTO iccid_stock (iccid, provider_id, status, notes) VALUES (:iccid, :provider, 'InStock', :notes)"
+                "INSERT INTO iccid_stock (tenant_id, iccid, provider_id, status, notes)
+                 VALUES (:tenant_id, :iccid, :provider, 'InStock', :notes)"
             );
 
             while (($row = fgetcsv($fh, 1000, ',')) !== false) {
@@ -150,6 +162,7 @@ final class ICCIDService
 
                 try {
                     $stmtInsert->execute([
+                        ':tenant_id' => $tenantId,
                         ':iccid' => $iccid,
                         ':provider' => $providerId,
                         ':notes' => $notes,
@@ -206,8 +219,10 @@ final class ICCIDService
 
         $this->pdo->beginTransaction();
         try {
+            $tenantId = TenantContext::id();
             $stmt = $this->pdo->prepare(
-                "INSERT INTO iccid_stock (iccid, provider_id, status, notes) VALUES (:iccid, :provider, 'InStock', :notes)"
+                "INSERT INTO iccid_stock (tenant_id, iccid, provider_id, status, notes)
+                 VALUES (:tenant_id, :iccid, :provider, 'InStock', :notes)"
             );
 
             foreach ($cleaned as $iccid) {
@@ -218,6 +233,7 @@ final class ICCIDService
 
                 try {
                     $stmt->execute([
+                        ':tenant_id' => $tenantId,
                         ':iccid' => $iccid,
                         ':provider' => $providerId,
                         ':notes' => $notes,
@@ -278,14 +294,15 @@ final class ICCIDService
      */
     public function listAvailable(): array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             "SELECT iccid_stock.*, providers.name AS provider_name
              FROM iccid_stock
              JOIN providers ON providers.id = iccid_stock.provider_id
-             WHERE iccid_stock.status = 'InStock'
+             WHERE iccid_stock.status = 'InStock' AND iccid_stock.tenant_id = :tenant_id
              ORDER BY iccid_stock.created_at ASC"
         );
-        $stmt->execute();
+        $stmt->execute([':tenant_id' => $tenantId]);
 
         return $stmt->fetchAll();
     }
@@ -305,10 +322,13 @@ final class ICCIDService
         }
 
         try {
+            $tenantId = TenantContext::id();
             $stmt = $this->pdo->prepare(
-                "INSERT INTO iccid_stock (iccid, provider_id, status, notes) VALUES (:iccid, :provider, 'InStock', :notes)"
+                "INSERT INTO iccid_stock (tenant_id, iccid, provider_id, status, notes)
+                 VALUES (:tenant_id, :iccid, :provider, 'InStock', :notes)"
             );
             $stmt->execute([
+                ':tenant_id' => $tenantId,
                 ':iccid' => $iccid,
                 ':provider' => $providerId,
                 ':notes' => $notes,

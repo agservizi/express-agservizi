@@ -26,8 +26,40 @@ use App\Services\PrivacyPolicyService;
 use App\Services\ProductService;
 use App\Services\SalesService;
 use App\Services\SystemNotificationService;
+use App\Services\TenantContext;
 
 $pdo = Database::getConnection();
+$tenantHint = $_GET['tenant_id'] ?? ($_GET['tenant'] ?? ($_GET['tenant_slug'] ?? null));
+$resolvedTenantId = null;
+if (is_string($tenantHint) && $tenantHint !== '') {
+    if (ctype_digit($tenantHint)) {
+        $stmtTenant = $pdo->prepare('SELECT id FROM tenants WHERE id = :id AND is_active = 1');
+        $stmtTenant->execute([':id' => (int) $tenantHint]);
+        $tenantValue = $stmtTenant->fetchColumn();
+        $resolvedTenantId = $tenantValue !== false ? (int) $tenantValue : null;
+    } else {
+        $stmtTenant = $pdo->prepare('SELECT id FROM tenants WHERE slug = :slug AND is_active = 1');
+        $stmtTenant->execute([':slug' => $tenantHint]);
+        $tenantValue = $stmtTenant->fetchColumn();
+        $resolvedTenantId = $tenantValue !== false ? (int) $tenantValue : null;
+    }
+}
+
+if ($resolvedTenantId === null && isset($_SESSION['tenant_id'])) {
+    $sessionTenant = $_SESSION['tenant_id'];
+    if (is_int($sessionTenant)) {
+        $resolvedTenantId = $sessionTenant;
+    } elseif (is_string($sessionTenant) && ctype_digit($sessionTenant)) {
+        $resolvedTenantId = (int) $sessionTenant;
+    }
+}
+
+if ($resolvedTenantId === null) {
+    $resolvedTenantId = 1;
+}
+
+$_SESSION['tenant_id'] = $resolvedTenantId;
+TenantContext::setTenantId($resolvedTenantId);
 $notificationsConfig = $GLOBALS['config']['notifications'] ?? [];
 $notificationsLog = __DIR__ . '/../../storage/logs/notifications.log';
 $notificationDispatcher = new NotificationDispatcher(

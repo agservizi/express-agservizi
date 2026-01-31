@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PDO;
+use App\Services\TenantContext;
 
 final class OffersService
 {
@@ -16,22 +17,25 @@ final class OffersService
      */
     public function listOffers(?string $status = null): array
     {
+        $tenantId = TenantContext::id();
         if ($status !== null) {
             $stmt = $this->pdo->prepare(
                 'SELECT operator_offers.*, providers.name AS provider_name
                  FROM operator_offers
                  LEFT JOIN providers ON providers.id = operator_offers.provider_id
-                 WHERE operator_offers.status = :status
+                 WHERE operator_offers.status = :status AND operator_offers.tenant_id = :tenant_id
                  ORDER BY operator_offers.updated_at DESC'
             );
-            $stmt->execute([':status' => $status]);
+            $stmt->execute([':status' => $status, ':tenant_id' => $tenantId]);
         } else {
-            $stmt = $this->pdo->query(
+            $stmt = $this->pdo->prepare(
                 'SELECT operator_offers.*, providers.name AS provider_name
                  FROM operator_offers
                  LEFT JOIN providers ON providers.id = operator_offers.provider_id
+                 WHERE operator_offers.tenant_id = :tenant_id
                  ORDER BY operator_offers.updated_at DESC'
             );
+            $stmt->execute([':tenant_id' => $tenantId]);
         }
 
         return $stmt->fetchAll();
@@ -50,6 +54,9 @@ final class OffersService
 
         $conditions = [];
         $params = [];
+        $tenantId = TenantContext::id();
+        $conditions[] = 'operator_offers.tenant_id = :tenant_id';
+        $params[':tenant_id'] = $tenantId;
 
         if ($status !== null) {
             $conditions[] = 'operator_offers.status = :status';
@@ -130,15 +137,18 @@ final class OffersService
      */
     public function listActiveOffers(): array
     {
-                $stmt = $this->pdo->query(
+                $tenantId = TenantContext::id();
+                $stmt = $this->pdo->prepare(
                         'SELECT operator_offers.*, providers.name AS provider_name
                          FROM operator_offers
                          LEFT JOIN providers ON providers.id = operator_offers.provider_id
                          WHERE operator_offers.status = "Active"
+                             AND operator_offers.tenant_id = :tenant_id
                              AND (operator_offers.valid_from IS NULL OR operator_offers.valid_from <= CURRENT_DATE())
                              AND (operator_offers.valid_to IS NULL OR operator_offers.valid_to >= CURRENT_DATE())
                          ORDER BY providers.name, operator_offers.title'
                 );
+                $stmt->execute([':tenant_id' => $tenantId]);
 
                 return $stmt->fetchAll();
     }
@@ -148,13 +158,14 @@ final class OffersService
      */
     public function getOffer(int $id): ?array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT operator_offers.*, providers.name AS provider_name
              FROM operator_offers
              LEFT JOIN providers ON providers.id = operator_offers.provider_id
-             WHERE operator_offers.id = :id'
+             WHERE operator_offers.id = :id AND operator_offers.tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $id]);
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $offer = $stmt->fetch();
 
         return $offer === false ? null : $offer;
@@ -171,11 +182,13 @@ final class OffersService
             return ['success' => false, 'errors' => $validation['errors']];
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO operator_offers (provider_id, title, description, price, status, valid_from, valid_to)
-             VALUES (:provider_id, :title, :description, :price, :status, :valid_from, :valid_to)'
+            'INSERT INTO operator_offers (tenant_id, provider_id, title, description, price, status, valid_from, valid_to)
+             VALUES (:tenant_id, :provider_id, :title, :description, :price, :status, :valid_from, :valid_to)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':provider_id' => $validation['provider_id'],
             ':title' => $validation['title'],
             ':description' => $validation['description'],
@@ -207,6 +220,7 @@ final class OffersService
             return ['success' => false, 'errors' => $validation['errors']];
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'UPDATE operator_offers
              SET provider_id = :provider_id,
@@ -216,7 +230,7 @@ final class OffersService
                  status = :status,
                  valid_from = :valid_from,
                  valid_to = :valid_to
-             WHERE id = :id'
+             WHERE id = :id AND tenant_id = :tenant_id'
         );
         $stmt->execute([
             ':provider_id' => $validation['provider_id'],
@@ -227,6 +241,7 @@ final class OffersService
             ':valid_from' => $validation['valid_from'],
             ':valid_to' => $validation['valid_to'],
             ':id' => $id,
+            ':tenant_id' => $tenantId,
         ]);
 
         return ['success' => true];

@@ -6,6 +6,7 @@ namespace App\Services;
 use DateInterval;
 use DateTimeImmutable;
 use PDO;
+use App\Services\TenantContext;
 
 final class ReportsService
 {
@@ -69,12 +70,14 @@ final class ReportsService
      */
     private function fetchEnergyTotals(DateTimeImmutable $start, DateTimeImmutable $end): array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT COUNT(*) AS contract_count, COALESCE(SUM(token_value), 0) AS total_commission
              FROM energy_contracts
-             WHERE created_at >= :start AND created_at < :end'
+             WHERE tenant_id = :tenant_id AND created_at >= :start AND created_at < :end'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':start' => $start->format('Y-m-d H:i:s'),
             ':end' => $end->format('Y-m-d H:i:s'),
         ]);
@@ -98,18 +101,20 @@ final class ReportsService
      */
     private function fetchEnergyProviderBreakdown(DateTimeImmutable $start, DateTimeImmutable $end): array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT ep.name AS provider_name,
                     COUNT(*) AS contract_count,
                     COALESCE(SUM(ec.token_value), 0) AS total_commission
              FROM energy_contracts ec
              LEFT JOIN energy_providers ep ON ep.id = ec.provider_id
-             WHERE ec.created_at >= :start AND ec.created_at < :end
+             WHERE ec.tenant_id = :tenant_id AND ec.created_at >= :start AND ec.created_at < :end
              GROUP BY ec.provider_id, provider_name
              ORDER BY total_commission DESC, contract_count DESC
              LIMIT 8'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':start' => $start->format('Y-m-d H:i:s'),
             ':end' => $end->format('Y-m-d H:i:s'),
         ]);
@@ -136,16 +141,18 @@ final class ReportsService
      */
     private function fetchEnergyTypeBreakdown(DateTimeImmutable $start, DateTimeImmutable $end): array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT contract_type,
                     COUNT(*) AS contract_count,
                     COALESCE(SUM(token_value), 0) AS total_commission
              FROM energy_contracts
-             WHERE created_at >= :start AND created_at < :end
+             WHERE tenant_id = :tenant_id AND created_at >= :start AND created_at < :end
              GROUP BY contract_type
              ORDER BY total_commission DESC, contract_count DESC'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':start' => $start->format('Y-m-d H:i:s'),
             ':end' => $end->format('Y-m-d H:i:s'),
         ]);
@@ -179,6 +186,7 @@ final class ReportsService
     private function fetchEnergyTrend(string $granularity, DateTimeImmutable $reference): array
     {
         $config = $this->resolveTrendConfig($granularity, $reference);
+        $tenantId = TenantContext::id();
 
         $stmt = $this->pdo->prepare(
             'SELECT
@@ -186,11 +194,12 @@ final class ReportsService
                 COUNT(*) AS contract_count,
                 COALESCE(SUM(token_value), 0) AS total_commission
             FROM energy_contracts
-            WHERE created_at >= :start AND created_at < :end
+            WHERE tenant_id = :tenant_id AND created_at >= :start AND created_at < :end
             GROUP BY bucket
             ORDER BY bucket ASC'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':start' => $config['start']->format('Y-m-d H:i:s'),
             ':end' => $config['end']->format('Y-m-d H:i:s'),
         ]);
@@ -310,12 +319,15 @@ final class ReportsService
      */
     private function buildWhereClause(DateTimeImmutable $start, DateTimeImmutable $end, array $filters, string $alias = 'sales'): array
     {
+        $tenantId = TenantContext::id();
         $conditions = [
+            sprintf('%s.tenant_id = :tenant_id', $alias),
             sprintf('%s.status IN ("Completed", "Refunded")', $alias),
             sprintf('%s.created_at >= :start', $alias),
             sprintf('%s.created_at < :end', $alias),
         ];
         $params = [
+            ':tenant_id' => $tenantId,
             ':start' => $start->format('Y-m-d H:i:s'),
             ':end' => $end->format('Y-m-d H:i:s'),
         ];
@@ -342,12 +354,15 @@ final class ReportsService
             return $this->operatorCache;
         }
 
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             'SELECT id, COALESCE(NULLIF(fullname, ""), username, CONCAT("Operatore #", id)) AS name
              FROM users
+             WHERE tenant_id = :tenant_id
              ORDER BY name ASC'
         );
-        $rows = $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $stmt->execute([':tenant_id' => $tenantId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $operators = [];
         foreach ($rows as $row) {
             $operators[] = [

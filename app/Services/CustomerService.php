@@ -7,6 +7,7 @@ use App\Services\CustomerPortalAuthService;
 use PDO;
 use PDOException;
 use RuntimeException;
+use App\Services\TenantContext;
 
 /**
  * Gestione anagrafiche clienti con validazioni e controlli di utilizzo.
@@ -28,11 +29,14 @@ final class CustomerService
 	 */
 	public function listAll(): array
 	{
-		$stmt = $this->pdo->query(
+		$tenantId = TenantContext::id();
+		$stmt = $this->pdo->prepare(
 			'SELECT id, fullname, email, phone, tax_code, note, created_at, updated_at
 			 FROM customers
+			 WHERE tenant_id = :tenant_id
 			 ORDER BY fullname ASC'
 		);
+		$stmt->execute([':tenant_id' => $tenantId]);
 
 		return $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 	}
@@ -44,12 +48,14 @@ final class CustomerService
 	{
 		$page = max(1, $page);
 		$perPage = max(1, min($perPage, 50));
+		$tenantId = TenantContext::id();
 
 		$searchTerm = trim((string) ($search ?? ''));
 		$params = [];
-		$where = '';
+		$where = 'WHERE tenant_id = :tenant_id';
+		$params[':tenant_id'] = $tenantId;
 		if ($searchTerm !== '') {
-			$where = 'WHERE fullname LIKE :term_fullname OR email LIKE :term_email OR phone LIKE :term_phone OR tax_code LIKE :term_tax';
+			$where .= ' AND (fullname LIKE :term_fullname OR email LIKE :term_email OR phone LIKE :term_phone OR tax_code LIKE :term_tax)';
 			$wildcard = '%' . $searchTerm . '%';
 			$params[':term_fullname'] = $wildcard;
 			$params[':term_email'] = $wildcard;
@@ -123,11 +129,13 @@ final class CustomerService
 
 		try {
 			$this->pdo->beginTransaction();
+			$tenantId = TenantContext::id();
 			$stmt = $this->pdo->prepare(
-				'INSERT INTO customers (fullname, email, phone, tax_code, note)
-				 VALUES (:fullname, :email, :phone, :tax_code, :note)'
+				'INSERT INTO customers (tenant_id, fullname, email, phone, tax_code, note)
+				 VALUES (:tenant_id, :fullname, :email, :phone, :tax_code, :note)'
 			);
 			$stmt->execute([
+				':tenant_id' => $tenantId,
 				':fullname' => $normalised['values']['fullname'],
 				':email' => $normalised['values']['email'],
 				':phone' => $normalised['values']['phone'],
@@ -208,6 +216,7 @@ final class CustomerService
 
 		try {
 			$this->pdo->beginTransaction();
+			$tenantId = TenantContext::id();
 			$stmt = $this->pdo->prepare(
 				'UPDATE customers
 				 SET fullname = :fullname,
@@ -215,7 +224,7 @@ final class CustomerService
 					 phone = :phone,
 					 tax_code = :tax_code,
 					 note = :note
-				 WHERE id = :id'
+				 WHERE id = :id AND tenant_id = :tenant_id'
 			);
 			$stmt->execute([
 				':fullname' => $normalised['values']['fullname'],
@@ -224,6 +233,7 @@ final class CustomerService
 				':tax_code' => $normalised['values']['tax_code'],
 				':note' => $normalised['values']['note'],
 				':id' => $customerId,
+				':tenant_id' => $tenantId,
 			]);
 
 			$portalAccount = $this->syncPortalAccount($customerId, $normalised['values']['email']);
@@ -268,6 +278,7 @@ final class CustomerService
 	 */
 	public function delete(int $customerId): array
 	{
+		$tenantId = TenantContext::id();
 		$existing = $this->find($customerId);
 		if ($existing === null) {
 			return [
@@ -277,8 +288,8 @@ final class CustomerService
 			];
 		}
 
-		$usageStmt = $this->pdo->prepare('SELECT COUNT(*) FROM sales WHERE customer_id = :id');
-		$usageStmt->execute([':id' => $customerId]);
+		$usageStmt = $this->pdo->prepare('SELECT COUNT(*) FROM sales WHERE customer_id = :id AND tenant_id = :tenant_id');
+		$usageStmt->execute([':id' => $customerId, ':tenant_id' => $tenantId]);
 		$usage = (int) ($usageStmt->fetchColumn() ?: 0);
 		if ($usage > 0) {
 			return [
@@ -289,8 +300,8 @@ final class CustomerService
 		}
 
 		try {
-			$stmt = $this->pdo->prepare('DELETE FROM customers WHERE id = :id');
-			$stmt->execute([':id' => $customerId]);
+			$stmt = $this->pdo->prepare('DELETE FROM customers WHERE id = :id AND tenant_id = :tenant_id');
+			$stmt->execute([':id' => $customerId, ':tenant_id' => $tenantId]);
 		} catch (PDOException $exception) {
 			return [
 				'success' => false,
@@ -310,12 +321,13 @@ final class CustomerService
 	 */
 	public function find(int $customerId): ?array
 	{
+		$tenantId = TenantContext::id();
 		$stmt = $this->pdo->prepare(
 			'SELECT id, fullname, email, phone, tax_code, note, created_at, updated_at
 			 FROM customers
-			 WHERE id = :id'
+			 WHERE id = :id AND tenant_id = :tenant_id'
 		);
-		$stmt->execute([':id' => $customerId]);
+		$stmt->execute([':id' => $customerId, ':tenant_id' => $tenantId]);
 		$row = $stmt->fetch(PDO::FETCH_ASSOC);
 
 		return $row !== false ? $row : null;
@@ -330,15 +342,16 @@ final class CustomerService
 		if ($term === '') {
 			return [];
 		}
+		$tenantId = TenantContext::id();
 
 		$stmt = $this->pdo->prepare(
 			'SELECT id, fullname, email, phone, tax_code
 			 FROM customers
-			 WHERE fullname LIKE :term OR email LIKE :term OR phone LIKE :term OR tax_code LIKE :term
+			 WHERE tenant_id = :tenant_id AND (fullname LIKE :term OR email LIKE :term OR phone LIKE :term OR tax_code LIKE :term)
 			 ORDER BY fullname ASC
 			 LIMIT 10'
 		);
-		$stmt->execute([':term' => '%' . $term . '%']);
+		$stmt->execute([':term' => '%' . $term . '%', ':tenant_id' => $tenantId]);
 
 		return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 	}
@@ -371,8 +384,11 @@ final class CustomerService
 
 		try {
 			$this->pdo->beginTransaction();
-			$stmt = $this->pdo->prepare('SELECT id, email FROM customer_portal_accounts WHERE customer_id = :customer LIMIT 1');
-			$stmt->execute([':customer' => $customerId]);
+			$tenantId = TenantContext::id();
+			$stmt = $this->pdo->prepare(
+				'SELECT id, email FROM customer_portal_accounts WHERE customer_id = :customer AND tenant_id = :tenant_id LIMIT 1'
+			);
+			$stmt->execute([':customer' => $customerId, ':tenant_id' => $tenantId]);
 			$account = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
 			if ($account === null) {
@@ -380,10 +396,13 @@ final class CustomerService
 				$portalAccount['status'] = 'resent';
 			} else {
 				if ((string) ($account['email'] ?? '') !== $normalizedEmail) {
-					$updateEmail = $this->pdo->prepare('UPDATE customer_portal_accounts SET email = :email, updated_at = NOW() WHERE id = :id');
+					$updateEmail = $this->pdo->prepare(
+						'UPDATE customer_portal_accounts SET email = :email, updated_at = NOW() WHERE id = :id AND tenant_id = :tenant_id'
+					);
 					$updateEmail->execute([
 						':email' => $normalizedEmail,
 						':id' => (int) $account['id'],
+						':tenant_id' => $tenantId,
 					]);
 				}
 
@@ -395,11 +414,12 @@ final class CustomerService
 						 invite_token = NULL,
 						 invite_sent_at = NOW(),
 						 updated_at = NOW()
-					 WHERE id = :id'
+					 WHERE id = :id AND tenant_id = :tenant_id'
 				);
 				$updatePassword->execute([
 					':hash' => $hash,
 					':id' => (int) $account['id'],
+					':tenant_id' => $tenantId,
 				]);
 
 				$portalAccount = [
@@ -544,11 +564,13 @@ final class CustomerService
 		$password = $this->generatePortalPassword();
 		$hash = password_hash($password, PASSWORD_DEFAULT);
 
+		$tenantId = TenantContext::id();
 		$stmt = $this->pdo->prepare(
-			'INSERT INTO customer_portal_accounts (customer_id, email, password_hash)
-			 VALUES (:customer_id, :email, :hash)'
+			'INSERT INTO customer_portal_accounts (tenant_id, customer_id, email, password_hash)
+			 VALUES (:tenant_id, :customer_id, :email, :hash)'
 		);
 		$stmt->execute([
+			':tenant_id' => $tenantId,
 			':customer_id' => $customerId,
 			':email' => $normalizedEmail,
 			':hash' => $hash,
@@ -575,10 +597,11 @@ final class CustomerService
 			return ['status' => 'skipped'];
 		}
 
+		$tenantId = TenantContext::id();
 		$stmt = $this->pdo->prepare(
-			'SELECT id, email FROM customer_portal_accounts WHERE customer_id = :customer_id LIMIT 1'
+			'SELECT id, email FROM customer_portal_accounts WHERE customer_id = :customer_id AND tenant_id = :tenant_id LIMIT 1'
 		);
-		$stmt->execute([':customer_id' => $customerId]);
+		$stmt->execute([':customer_id' => $customerId, ':tenant_id' => $tenantId]);
 		$account = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
 		if ($account === null) {
@@ -593,11 +616,12 @@ final class CustomerService
 		}
 
 		$update = $this->pdo->prepare(
-			'UPDATE customer_portal_accounts SET email = :email, updated_at = NOW() WHERE id = :id'
+			'UPDATE customer_portal_accounts SET email = :email, updated_at = NOW() WHERE id = :id AND tenant_id = :tenant_id'
 		);
 		$update->execute([
 			':email' => $normalizedEmail,
 			':id' => (int) $account['id'],
+			':tenant_id' => $tenantId,
 		]);
 
 		return [
@@ -664,10 +688,11 @@ final class CustomerService
 	private function ensureUniqueConstraints(array $values, int $ignoreId = 0): array
 	{
 		$errors = [];
+		$tenantId = TenantContext::id();
 
 		if ($values['email'] !== null) {
-			$sql = 'SELECT id FROM customers WHERE email = :email';
-			$params = [':email' => $values['email']];
+			$sql = 'SELECT id FROM customers WHERE email = :email AND tenant_id = :tenant_id';
+			$params = [':email' => $values['email'], ':tenant_id' => $tenantId];
 			if ($ignoreId > 0) {
 				$sql .= ' AND id <> :ignore';
 				$params[':ignore'] = $ignoreId;
@@ -681,8 +706,8 @@ final class CustomerService
 		}
 
 		if ($values['tax_code'] !== null) {
-			$sql = 'SELECT id FROM customers WHERE tax_code = :tax_code';
-			$params = [':tax_code' => $values['tax_code']];
+			$sql = 'SELECT id FROM customers WHERE tax_code = :tax_code AND tenant_id = :tenant_id';
+			$params = [':tax_code' => $values['tax_code'], ':tenant_id' => $tenantId];
 			if ($ignoreId > 0) {
 				$sql .= ' AND id <> :ignore';
 				$params[':ignore'] = $ignoreId;

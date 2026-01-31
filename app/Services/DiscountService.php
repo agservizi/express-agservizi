@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PDO;
+use App\Services\TenantContext;
 
 final class DiscountService
 {
@@ -16,11 +17,14 @@ final class DiscountService
      */
     public function listAll(): array
     {
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             'SELECT id, name, type, value, description, is_active, created_at
              FROM discount_schemes
+             WHERE tenant_id = :tenant_id
              ORDER BY is_active DESC, name ASC'
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
 
         return $stmt->fetchAll();
     }
@@ -30,24 +34,27 @@ final class DiscountService
      */
     public function listActive(): array
     {
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             'SELECT id, name, type, value, description
              FROM discount_schemes
-             WHERE is_active = 1
+             WHERE tenant_id = :tenant_id AND is_active = 1
              ORDER BY name ASC'
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
 
         return $stmt->fetchAll();
     }
 
     public function find(int $id): ?array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT id, name, type, value, description, is_active
              FROM discount_schemes
-             WHERE id = :id'
+             WHERE id = :id AND tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $id]);
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $discount = $stmt->fetch();
 
         return $discount === false ? null : $discount;
@@ -81,8 +88,9 @@ final class DiscountService
             return ['success' => false, 'errors' => $errors];
         }
 
-        $stmtDuplicate = $this->pdo->prepare('SELECT COUNT(*) FROM discount_schemes WHERE name = :name');
-        $stmtDuplicate->execute([':name' => $name]);
+        $tenantId = TenantContext::id();
+        $stmtDuplicate = $this->pdo->prepare('SELECT COUNT(*) FROM discount_schemes WHERE name = :name AND tenant_id = :tenant_id');
+        $stmtDuplicate->execute([':name' => $name, ':tenant_id' => $tenantId]);
         if ((int) $stmtDuplicate->fetchColumn() > 0) {
             return [
                 'success' => false,
@@ -91,10 +99,11 @@ final class DiscountService
         }
 
         $stmt = $this->pdo->prepare(
-            'INSERT INTO discount_schemes (name, type, value, description, is_active)
-             VALUES (:name, :type, :value, :description, 1)'
+            'INSERT INTO discount_schemes (tenant_id, name, type, value, description, is_active)
+             VALUES (:tenant_id, :name, :type, :value, :description, 1)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':name' => $name,
             ':type' => $type,
             ':value' => $value,
@@ -124,10 +133,12 @@ final class DiscountService
             ];
         }
 
-        $stmt = $this->pdo->prepare('UPDATE discount_schemes SET is_active = :active WHERE id = :id');
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('UPDATE discount_schemes SET is_active = :active WHERE id = :id AND tenant_id = :tenant_id');
         $stmt->execute([
             ':active' => $active ? 1 : 0,
             ':id' => $id,
+            ':tenant_id' => $tenantId,
         ]);
 
         return [

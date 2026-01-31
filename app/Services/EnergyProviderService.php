@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PDO;
+use App\Services\TenantContext;
 
 final class EnergyProviderService
 {
@@ -16,13 +17,16 @@ final class EnergyProviderService
      */
     public function listProviders(): array
     {
-        $stmt = $this->pdo->query(
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare(
             'SELECT id, name, service_type, token_luce, token_gas, notes, created_at, updated_at
              FROM energy_providers
+             WHERE tenant_id = :tenant_id
              ORDER BY name'
         );
+        $stmt->execute([':tenant_id' => $tenantId]);
 
-        return $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     /**
@@ -31,6 +35,7 @@ final class EnergyProviderService
      */
     public function createProvider(array $data, ?int $userId = null): array
     {
+        $tenantId = TenantContext::id();
         $validation = $this->validate($data);
         if ($validation['errors'] !== []) {
             return [
@@ -41,10 +46,11 @@ final class EnergyProviderService
         }
 
         $stmt = $this->pdo->prepare(
-            'INSERT INTO energy_providers (name, service_type, token_luce, token_gas, notes)
-             VALUES (:name, :service_type, :token_luce, :token_gas, :notes)'
+            'INSERT INTO energy_providers (tenant_id, name, service_type, token_luce, token_gas, notes)
+             VALUES (:tenant_id, :name, :service_type, :token_luce, :token_gas, :notes)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':name' => $validation['name'],
             ':service_type' => $validation['service_type'],
             ':token_luce' => $validation['token_luce'],
@@ -66,6 +72,7 @@ final class EnergyProviderService
      */
     public function updateProvider(int $id, array $data, ?int $userId = null): array
     {
+        $tenantId = TenantContext::id();
         if ($id <= 0) {
             return [
                 'success' => false,
@@ -95,7 +102,7 @@ final class EnergyProviderService
         $stmt = $this->pdo->prepare(
             'UPDATE energy_providers
              SET name = :name, service_type = :service_type, token_luce = :token_luce, token_gas = :token_gas, notes = :notes
-             WHERE id = :id'
+             WHERE id = :id AND tenant_id = :tenant_id'
         );
         $stmt->execute([
             ':name' => $validation['name'],
@@ -104,6 +111,7 @@ final class EnergyProviderService
             ':token_gas' => $validation['token_gas'],
             ':notes' => $validation['notes'],
             ':id' => $id,
+            ':tenant_id' => $tenantId,
         ]);
 
         $this->logAudit(
@@ -123,6 +131,7 @@ final class EnergyProviderService
      */
     public function deleteProvider(int $id, ?int $userId = null): array
     {
+        $tenantId = TenantContext::id();
         if ($id <= 0) {
             return [
                 'success' => false,
@@ -149,8 +158,8 @@ final class EnergyProviderService
             ];
         }
 
-        $stmt = $this->pdo->prepare('DELETE FROM energy_providers WHERE id = :id');
-        $stmt->execute([':id' => $id]);
+        $stmt = $this->pdo->prepare('DELETE FROM energy_providers WHERE id = :id AND tenant_id = :tenant_id');
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
 
         $this->logAudit($userId, 'energy_provider_delete', 'Eliminato gestore energia #' . $id . ' (' . $existing['name'] . ')');
 
@@ -162,11 +171,12 @@ final class EnergyProviderService
 
     public function findProvider(int $id): ?array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT id, name, service_type, token_luce, token_gas
-             FROM energy_providers WHERE id = :id'
+             FROM energy_providers WHERE id = :id AND tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $id]);
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : $row;
     }
@@ -177,6 +187,7 @@ final class EnergyProviderService
      */
     private function validate(array $data, ?int $currentId = null): array
     {
+        $tenantId = TenantContext::id();
         $errors = [];
         $name = trim((string) ($data['energy_provider_name'] ?? $data['name'] ?? ''));
         if ($name === '') {
@@ -207,10 +218,10 @@ final class EnergyProviderService
 
         if ($name !== '') {
             $stmt = $this->pdo->prepare(
-                'SELECT id FROM energy_providers WHERE LOWER(name) = LOWER(:name)'
+                'SELECT id FROM energy_providers WHERE tenant_id = :tenant_id AND LOWER(name) = LOWER(:name)'
                 . ($currentId !== null ? ' AND id <> :id' : '')
             );
-            $params = [':name' => $name];
+            $params = [':tenant_id' => $tenantId, ':name' => $name];
             if ($currentId !== null) {
                 $params[':id'] = $currentId;
             }
@@ -232,18 +243,21 @@ final class EnergyProviderService
 
     private function countDependencies(int $providerId): int
     {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM energy_contracts WHERE provider_id = :id');
-        $stmt->execute([':id' => $providerId]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM energy_contracts WHERE tenant_id = :tenant_id AND provider_id = :id');
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $providerId]);
         return (int) $stmt->fetchColumn();
     }
 
     private function logAudit(?int $userId, string $action, string $description): void
     {
+        $tenantId = TenantContext::id();
         $userId = $userId !== null && $userId > 0 ? $userId : null;
         $stmt = $this->pdo->prepare(
-            'INSERT INTO audit_log (user_id, action, description) VALUES (:user_id, :action, :description)'
+            'INSERT INTO audit_log (tenant_id, user_id, action, description) VALUES (:tenant_id, :user_id, :action, :description)'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':user_id' => $userId,
             ':action' => $action,
             ':description' => $description,

@@ -485,6 +485,7 @@ use App\Services\PdaImportService;
 use App\Services\ReceiptSettingsService;
 use App\Services\LicenseService;
 use App\Services\TenantService;
+use App\Services\TenantContext;
 
 $pdo = Database::getConnection();
 
@@ -543,7 +544,7 @@ $energyOfferService = new EnergyOfferService($pdo);
 $licenseService = new LicenseService($pdo);
 $tenantService = new TenantService($pdo);
 $supportRequestService = new SupportRequestService($pdo);
-$userService = new UserService($pdo);
+$userService = new UserService($pdo, $resendApiKey, $resendFrom, $resendFromName, $appName);
 $stockMonitorService = new StockMonitorService($pdo, $alertEmail, $logPath, $resendApiKey, $resendFrom, $systemNotificationService);
 $saleNotificationService = new SaleNotificationService(
     $resendApiKey,
@@ -573,6 +574,7 @@ $energyContractController = new EnergyContractController($energyContractService)
 $page = $_GET['page'] ?? 'dashboard';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $currentUser = $authService->currentUser();
+TenantContext::setTenantId(isset($currentUser['tenant_id']) ? (int) $currentUser['tenant_id'] : 1);
 
 if ($currentUser !== null && $authService->hasRole('admin')) {
     maybeScheduleEnergyOffersImport();
@@ -1919,6 +1921,7 @@ switch ($page) {
                 $licensesOpen = true;
             }
         }
+        $tenantsList = $isAdmin ? $tenantService->listTenants() : [];
 
         if ($isAdmin) {
             maybeScheduleEnergyOffersImport();
@@ -2004,6 +2007,23 @@ switch ($page) {
                     ];
                 } else {
                     $result = $userService->createOperator($_POST);
+                    if (($result['success'] ?? false)) {
+                        $licenseId = isset($_POST['operator_license_id']) ? (int) $_POST['operator_license_id'] : 0;
+                        $tenantId = isset($_POST['operator_tenant_id']) ? (int) $_POST['operator_tenant_id'] : 0;
+                        if ($licenseId > 0 && $tenantId > 0) {
+                            $assignment = $tenantService->assignLicense([
+                                'tenant_id' => $tenantId,
+                                'license_id' => $licenseId,
+                            ]);
+                            if (!($assignment['success'] ?? false)) {
+                                $result = [
+                                    'success' => false,
+                                    'message' => 'Operatore creato, ma licenza non assegnata.',
+                                    'error' => $assignment['error'] ?? 'Verifica assegnazione licenza.',
+                                ];
+                            }
+                        }
+                    }
                 }
                 if (!($result['success'] ?? false)) {
                     $redirectParams['operators_open'] = 1;
@@ -2021,6 +2041,8 @@ switch ($page) {
                         'fullname' => trim((string) ($_POST['operator_edit_fullname'] ?? '')),
                         'username' => trim((string) ($_POST['operator_edit_username'] ?? '')),
                         'role_id' => isset($_POST['operator_edit_role']) ? (int) $_POST['operator_edit_role'] : 0,
+                        'email' => trim((string) ($_POST['operator_edit_email'] ?? '')),
+                        'tenant_id' => isset($_POST['operator_edit_tenant_id']) ? (int) $_POST['operator_edit_tenant_id'] : 0,
                     ];
                     $result = $userService->updateOperator($operatorId, $_POST);
                     if (!($result['success'] ?? false)) {
@@ -2455,12 +2477,13 @@ switch ($page) {
             'pageTitle' => 'Impostazioni',
             'roles' => $isAdmin ? $userService->getRoles() : [],
             'operators' => $isAdmin ? $userService->listOperators() : [],
+            'tenants' => $tenantsList,
+            'licenses' => $licenses,
             'providers' => $isAdmin ? $providerService->listProviders() : [],
             'energyProviders' => $energyProviders,
             'energyOffersImportStatus' => $energyOffersImportStatus,
             'energyOpen' => $energyOpen,
             'energyFeedback' => $energySettingsFeedback,
-            'licenses' => $licenses,
             'licenseFeedback' => $licenseSettingsFeedback,
             'licenseGeneratedCode' => $licenseGeneratedCode,
             'licensesOpen' => $licensesOpen,

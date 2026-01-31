@@ -5,6 +5,7 @@ namespace App\Services;
 
 use DateTimeImmutable;
 use PDO;
+use App\Services\TenantContext;
 
 /**
  * Gestione centralizzata delle notifiche mostrate nel layout e inviate verso canali esterni.
@@ -28,6 +29,7 @@ final class SystemNotificationService
      */
     public function push(string $type, string $title, string $body, array $options = []): array
     {
+        $tenantId = TenantContext::id();
         $normalizedType = $type !== '' ? strtolower($type) : 'system';
         $normalizedLevel = $this->normalizeLevel((string) ($options['level'] ?? 'info'));
         $channel = isset($options['channel']) && (string) $options['channel'] !== ''
@@ -48,11 +50,12 @@ final class SystemNotificationService
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO system_notifications (
-                 type, title, body, level, channel, source, link, meta_json, recipient_user_id, is_read, created_at
-             ) VALUES (:type, :title, :body, :level, :channel, :source, :link, :meta, :recipient, 0, NOW())'
+                 tenant_id, type, title, body, level, channel, source, link, meta_json, recipient_user_id, is_read, created_at
+             ) VALUES (:tenant_id, :type, :title, :body, :level, :channel, :source, :link, :meta, :recipient, 0, NOW())'
         );
 
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':type' => $normalizedType,
             ':title' => trim($title),
             ':body' => trim($body),
@@ -95,11 +98,12 @@ final class SystemNotificationService
      */
     public function getTopbarFeed(?int $userId, int $limit = 10): array
     {
+        $tenantId = TenantContext::id();
         $limit = max(1, min($limit, 30));
-        $conditions = 'recipient_user_id IS NULL';
-        $params = [];
+        $conditions = 'tenant_id = :tenant_id AND recipient_user_id IS NULL';
+        $params = [':tenant_id' => $tenantId];
         if ($userId !== null) {
-            $conditions = '(recipient_user_id IS NULL OR recipient_user_id = :uid)';
+            $conditions = 'tenant_id = :tenant_id AND (recipient_user_id IS NULL OR recipient_user_id = :uid)';
             $params[':uid'] = $userId;
         }
 
@@ -110,6 +114,7 @@ final class SystemNotificationService
                 LIMIT :limit';
 
         $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         if (array_key_exists(':uid', $params)) {
             $stmt->bindValue(':uid', (int) $params[':uid'], PDO::PARAM_INT);
         }
@@ -130,11 +135,13 @@ final class SystemNotificationService
      */
     public function getStreamPayload(?int $userId, int $afterId, int $limit = 15): array
     {
+        $tenantId = TenantContext::id();
         $limit = max(1, min($limit, 50));
         $afterId = max(0, $afterId);
 
-        $baseCondition = 'id > :after';
+        $baseCondition = 'tenant_id = :tenant_id AND id > :after';
         $params = [
+            ':tenant_id' => $tenantId,
             ':after' => $afterId,
         ];
 
@@ -152,6 +159,7 @@ final class SystemNotificationService
                 LIMIT :limit';
 
         $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':after', $params[':after'], PDO::PARAM_INT);
         if (array_key_exists(':uid', $params)) {
             $stmt->bindValue(':uid', (int) $params[':uid'], PDO::PARAM_INT);
@@ -180,14 +188,15 @@ final class SystemNotificationService
      */
     public function getPaginatedFeed(?int $userId, int $page = 1, int $perPage = 20): array
     {
+        $tenantId = TenantContext::id();
         $page = max(1, $page);
         $perPage = max(5, min($perPage, 50));
         $offset = ($page - 1) * $perPage;
 
-        $conditions = 'recipient_user_id IS NULL';
-        $params = [];
+        $conditions = 'tenant_id = :tenant_id AND recipient_user_id IS NULL';
+        $params = [':tenant_id' => $tenantId];
         if ($userId !== null) {
-            $conditions = '(recipient_user_id IS NULL OR recipient_user_id = :uid)';
+            $conditions = 'tenant_id = :tenant_id AND (recipient_user_id IS NULL OR recipient_user_id = :uid)';
             $params[':uid'] = $userId;
         }
 
@@ -198,6 +207,7 @@ final class SystemNotificationService
                 LIMIT :limit OFFSET :offset';
 
         $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         if (array_key_exists(':uid', $params)) {
             $stmt->bindValue(':uid', (int) $params[':uid'], PDO::PARAM_INT);
         }
@@ -224,16 +234,17 @@ final class SystemNotificationService
 
     public function markAllRead(?int $userId = null): int
     {
+        $tenantId = TenantContext::id();
         if ($userId === null) {
-            $stmt = $this->pdo->prepare('UPDATE system_notifications SET is_read = 1, read_at = NOW() WHERE is_read = 0');
-            $stmt->execute();
+            $stmt = $this->pdo->prepare('UPDATE system_notifications SET is_read = 1, read_at = NOW() WHERE tenant_id = :tenant_id AND is_read = 0');
+            $stmt->execute([':tenant_id' => $tenantId]);
         } else {
             $stmt = $this->pdo->prepare(
                 'UPDATE system_notifications
                  SET is_read = 1, read_at = NOW()
-                 WHERE is_read = 0 AND (recipient_user_id IS NULL OR recipient_user_id = :uid)'
+                 WHERE tenant_id = :tenant_id AND is_read = 0 AND (recipient_user_id IS NULL OR recipient_user_id = :uid)'
             );
-            $stmt->execute([':uid' => $userId]);
+            $stmt->execute([':tenant_id' => $tenantId, ':uid' => $userId]);
         }
 
         $count = (int) $stmt->rowCount();
@@ -246,8 +257,9 @@ final class SystemNotificationService
 
     public function markAsRead(int $notificationId, ?int $userId = null): bool
     {
-        $sql = 'UPDATE system_notifications SET is_read = 1, read_at = NOW() WHERE id = :id';
-        $params = [':id' => $notificationId];
+        $tenantId = TenantContext::id();
+        $sql = 'UPDATE system_notifications SET is_read = 1, read_at = NOW() WHERE tenant_id = :tenant_id AND id = :id';
+        $params = [':tenant_id' => $tenantId, ':id' => $notificationId];
         if ($userId !== null) {
             $sql .= ' AND (recipient_user_id IS NULL OR recipient_user_id = :uid)';
             $params[':uid'] = $userId;
@@ -266,8 +278,9 @@ final class SystemNotificationService
 
     private function countUnread(?int $userId): int
     {
-        $sql = 'SELECT COUNT(*) FROM system_notifications WHERE is_read = 0';
-        $params = [];
+        $tenantId = TenantContext::id();
+        $sql = 'SELECT COUNT(*) FROM system_notifications WHERE tenant_id = :tenant_id AND is_read = 0';
+        $params = [':tenant_id' => $tenantId];
         if ($userId !== null) {
             $sql .= ' AND (recipient_user_id IS NULL OR recipient_user_id = :uid)';
             $params[':uid'] = $userId;
@@ -281,10 +294,11 @@ final class SystemNotificationService
 
     private function countAll(?int $userId): int
     {
-        $sql = 'SELECT COUNT(*) FROM system_notifications';
-        $params = [];
+        $tenantId = TenantContext::id();
+        $sql = 'SELECT COUNT(*) FROM system_notifications WHERE tenant_id = :tenant_id';
+        $params = [':tenant_id' => $tenantId];
         if ($userId !== null) {
-            $sql .= ' WHERE recipient_user_id IS NULL OR recipient_user_id = :uid';
+            $sql .= ' AND (recipient_user_id IS NULL OR recipient_user_id = :uid)';
             $params[':uid'] = $userId;
         }
 

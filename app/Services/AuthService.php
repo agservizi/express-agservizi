@@ -6,6 +6,7 @@ namespace App\Services;
 use PDO;
 use PDOException;
 use Throwable;
+use App\Services\TenantContext;
 
 final class AuthService
 {
@@ -46,7 +47,8 @@ final class AuthService
     public function login(string $username, string $password, bool $remember = false): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, username, password_hash, role_id, fullname, mfa_enabled, mfa_secret FROM users WHERE username = :u LIMIT 1'
+            'SELECT id, username, password_hash, role_id, fullname, tenant_id, mfa_enabled, mfa_secret
+             FROM users WHERE username = :u LIMIT 1'
         );
         $stmt->execute([':u' => $username]);
         $user = $stmt->fetch();
@@ -64,6 +66,7 @@ final class AuthService
             'username' => (string) $user['username'],
             'role_id' => (int) $user['role_id'],
             'fullname' => $user['fullname'] ?? '',
+            'tenant_id' => isset($user['tenant_id']) ? (int) $user['tenant_id'] : 1,
         ];
 
         $requiresMfa = ((int) ($user['mfa_enabled'] ?? 0) === 1) && isset($user['mfa_secret']) && (string) $user['mfa_secret'] !== '';
@@ -406,8 +409,9 @@ final class AuthService
             );
             $stmt->execute([':id' => $userId]);
 
-            $deleteCodes = $this->pdo->prepare('DELETE FROM user_mfa_recovery_codes WHERE user_id = :id');
-            $deleteCodes->execute([':id' => $userId]);
+            $tenantId = TenantContext::id();
+            $deleteCodes = $this->pdo->prepare('DELETE FROM user_mfa_recovery_codes WHERE user_id = :id AND tenant_id = :tenant_id');
+            $deleteCodes->execute([':id' => $userId, ':tenant_id' => $tenantId]);
         } catch (PDOException $exception) {
             return [
                 'success' => false,
@@ -648,8 +652,9 @@ final class AuthService
         $codes = [];
         try {
             $this->pdo->beginTransaction();
-            $delete = $this->pdo->prepare('DELETE FROM user_mfa_recovery_codes WHERE user_id = :id');
-            $delete->execute([':id' => $userId]);
+            $tenantId = TenantContext::id();
+            $delete = $this->pdo->prepare('DELETE FROM user_mfa_recovery_codes WHERE user_id = :id AND tenant_id = :tenant_id');
+            $delete->execute([':id' => $userId, ':tenant_id' => $tenantId]);
 
             for ($i = 0; $i < 8; $i++) {
                 $code = $this->generateRecoveryCode();
@@ -659,9 +664,10 @@ final class AuthService
                 }
 
                 $insert = $this->pdo->prepare(
-                    'INSERT INTO user_mfa_recovery_codes (user_id, code_hash) VALUES (:id, :hash)'
+                    'INSERT INTO user_mfa_recovery_codes (tenant_id, user_id, code_hash) VALUES (:tenant_id, :id, :hash)'
                 );
                 $insert->execute([
+                    ':tenant_id' => $tenantId,
                     ':id' => $userId,
                     ':hash' => $hash,
                 ]);
@@ -696,10 +702,11 @@ final class AuthService
 
     private function useRecoveryCode(int $userId, string $code): bool
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'SELECT id, code_hash FROM user_mfa_recovery_codes WHERE user_id = :id AND used_at IS NULL'
+            'SELECT id, code_hash FROM user_mfa_recovery_codes WHERE tenant_id = :tenant_id AND user_id = :id AND used_at IS NULL'
         );
-        $stmt->execute([':id' => $userId]);
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $userId]);
         $codes = $stmt->fetchAll();
         if (!is_array($codes) || $codes === []) {
             return false;
@@ -707,8 +714,8 @@ final class AuthService
 
         foreach ($codes as $row) {
             if (password_verify($code, (string) $row['code_hash'])) {
-                $update = $this->pdo->prepare('UPDATE user_mfa_recovery_codes SET used_at = NOW() WHERE id = :id');
-                $update->execute([':id' => (int) $row['id']]);
+                $update = $this->pdo->prepare('UPDATE user_mfa_recovery_codes SET used_at = NOW() WHERE id = :id AND tenant_id = :tenant_id');
+                $update->execute([':id' => (int) $row['id'], ':tenant_id' => $tenantId]);
                 return true;
             }
         }
@@ -721,7 +728,7 @@ final class AuthService
      */
     private function findUserById(int $userId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, username, fullname, mfa_enabled FROM users WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, username, fullname, mfa_enabled, tenant_id FROM users WHERE id = :id LIMIT 1');
         $stmt->execute([':id' => $userId]);
         $user = $stmt->fetch();
 
@@ -823,7 +830,7 @@ final class AuthService
         try {
             $this->ensureRememberTableExists();
             $stmt = $this->pdo->prepare(
-                'SELECT u.id, u.username, u.role_id, u.fullname
+                'SELECT u.id, u.username, u.role_id, u.fullname, u.tenant_id
                  FROM user_remember_tokens t
                  INNER JOIN users u ON u.id = t.user_id
                  WHERE t.token_hash = :hash AND t.expires_at > NOW()
@@ -842,6 +849,7 @@ final class AuthService
                 'username' => $user['username'],
                 'role_id' => (int) $user['role_id'],
                 'fullname' => $user['fullname'] ?? '',
+                'tenant_id' => isset($user['tenant_id']) ? (int) $user['tenant_id'] : 1,
             ];
 
             $this->createRememberToken($sessionUser['id']);

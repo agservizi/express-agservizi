@@ -15,6 +15,8 @@ $migrations = [
     __DIR__ . '/../migrations/20260129_alter_energy_offers_supply_type.sql',
     __DIR__ . '/../migrations/20260201_add_licenses.sql',
     __DIR__ . '/../migrations/20260202_add_tenants.sql',
+    __DIR__ . '/../migrations/20260203_add_user_email.sql',
+    __DIR__ . '/../migrations/20260204_add_tenant_scopes.sql',
 ];
 
 $ignorableErrors = [1060, 1061, 1091, 1050];

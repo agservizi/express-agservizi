@@ -27,6 +27,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name);
 CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(100) NOT NULL UNIQUE,
+  email VARCHAR(150) NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   tenant_id INT NOT NULL DEFAULT 1,
   role_id INT NOT NULL,
@@ -40,10 +41,12 @@ CREATE TABLE users (
 -- Providers
 CREATE TABLE providers (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   name VARCHAR(100) NOT NULL UNIQUE,
   reorder_threshold INT NOT NULL DEFAULT 10,
   notes TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 INSERT INTO providers (name, reorder_threshold) VALUES
@@ -57,6 +60,7 @@ INSERT INTO providers (name, reorder_threshold) VALUES
 -- ICCID stock
 CREATE TABLE iccid_stock (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   iccid VARCHAR(32) NOT NULL UNIQUE,
   provider_id INT NOT NULL,
   status ENUM('InStock','Reserved','Sold') NOT NULL DEFAULT 'InStock',
@@ -64,12 +68,14 @@ CREATE TABLE iccid_stock (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   notes TEXT,
   row_version TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (provider_id) REFERENCES providers(id)
+  FOREIGN KEY (provider_id) REFERENCES providers(id),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Products catalog
 CREATE TABLE products (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   name VARCHAR(150) NOT NULL,
   sku VARCHAR(100) NULL,
   imei VARCHAR(100) NULL,
@@ -82,12 +88,14 @@ CREATE TABLE products (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY idx_products_sku (sku),
-  UNIQUE KEY idx_products_imei (imei)
+  UNIQUE KEY idx_products_imei (imei),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Stock alerts per provider
 CREATE TABLE stock_alerts (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   provider_id INT NOT NULL,
   current_stock INT NOT NULL,
   threshold INT NOT NULL,
@@ -99,12 +107,14 @@ CREATE TABLE stock_alerts (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   resolved_at TIMESTAMP NULL,
-  FOREIGN KEY (provider_id) REFERENCES providers(id)
+  FOREIGN KEY (provider_id) REFERENCES providers(id),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Discount schemes (legacy semplice)
 CREATE TABLE IF NOT EXISTS discount_schemes (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   name VARCHAR(150) NOT NULL,
   type ENUM('Amount','Percent') NOT NULL DEFAULT 'Amount',
   value DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -112,12 +122,14 @@ CREATE TABLE IF NOT EXISTS discount_schemes (
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY idx_discount_schemes_name (name)
+  UNIQUE KEY idx_discount_schemes_name (name),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Discount campaigns
 CREATE TABLE discount_campaigns (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   name VARCHAR(150) NOT NULL,
   description VARCHAR(255) NULL,
   type ENUM('Fixed','Percent') NOT NULL DEFAULT 'Fixed',
@@ -126,12 +138,14 @@ CREATE TABLE discount_campaigns (
   starts_at DATETIME NULL,
   ends_at DATETIME NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Sales
 CREATE TABLE sales (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   user_id INT NOT NULL,
   customer_name VARCHAR(200),
   total DECIMAL(10,2) NOT NULL,
@@ -149,12 +163,14 @@ CREATE TABLE sales (
   vat_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id),
-  FOREIGN KEY (discount_campaign_id) REFERENCES discount_campaigns(id) ON DELETE SET NULL
+  FOREIGN KEY (discount_campaign_id) REFERENCES discount_campaigns(id) ON DELETE SET NULL,
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Sale items (link ICCID to sale or generic product)
 CREATE TABLE sale_items (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   sale_id INT NOT NULL,
   iccid_id INT NULL,
   product_id INT NULL,
@@ -168,22 +184,26 @@ CREATE TABLE sale_items (
   refunded_quantity INT NOT NULL DEFAULT 0,
   FOREIGN KEY (sale_id) REFERENCES sales(id),
   FOREIGN KEY (iccid_id) REFERENCES iccid_stock(id),
-  FOREIGN KEY (product_id) REFERENCES products(id)
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Audit log
 CREATE TABLE audit_log (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   user_id INT NULL,
   action VARCHAR(100) NOT NULL,
   description TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Operator offers (listini e canvass)
 CREATE TABLE operator_offers (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   provider_id INT NULL,
   title VARCHAR(150) NOT NULL,
   description TEXT,
@@ -193,7 +213,8 @@ CREATE TABLE operator_offers (
   valid_to DATE NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (provider_id) REFERENCES providers(id)
+  FOREIGN KEY (provider_id) REFERENCES providers(id),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 INSERT INTO operator_offers (provider_id, title, description, price, status)
@@ -205,6 +226,7 @@ VALUES
 -- Sale item refunds (storico resi parziali)
 CREATE TABLE sale_item_refunds (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id INT NOT NULL DEFAULT 1,
   sale_item_id INT NOT NULL,
   user_id INT NOT NULL,
   quantity INT NOT NULL,
@@ -213,7 +235,8 @@ CREATE TABLE sale_item_refunds (
   amount DECIMAL(10,2) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (sale_item_id) REFERENCES sale_items(id),
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 );
 
 -- Remember-me tokens

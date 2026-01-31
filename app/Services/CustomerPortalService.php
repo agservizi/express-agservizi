@@ -6,6 +6,7 @@ namespace App\Services;
 use DateTimeImmutable;
 use PDO;
 use PDOException;
+use App\Services\TenantContext;
 
 /**
  * Servizi dedicati al portale clienti: riepiloghi, vendite, pagamenti e richieste di supporto.
@@ -25,6 +26,7 @@ final class CustomerPortalService
      */
     public function getAccountProfile(int $accountId): ?array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT a.id,
                     a.email,
@@ -38,9 +40,9 @@ final class CustomerPortalService
                     c.created_at
              FROM customer_portal_accounts a
              INNER JOIN customers c ON c.id = a.customer_id
-             WHERE a.id = :id'
+             WHERE a.id = :id AND a.tenant_id = :tenant_id AND c.tenant_id = :tenant_id'
         );
-        $stmt->execute([':id' => $accountId]);
+        $stmt->execute([':id' => $accountId, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row !== false ? $row : null;
@@ -51,6 +53,7 @@ final class CustomerPortalService
      */
     public function getDashboard(int $customerId, int $portalAccountId): array
     {
+           $tenantId = TenantContext::id();
         $summaryStmt = $this->pdo->prepare(
             'SELECT
                 COALESCE(SUM(total), 0) AS total_spent,
@@ -59,38 +62,39 @@ final class CustomerPortalService
                 SUM(CASE WHEN payment_status = "Overdue" THEN 1 ELSE 0 END) AS overdue_sales,
                 SUM(CASE WHEN payment_status IN ("Pending", "Partial") THEN 1 ELSE 0 END) AS pending_sales
              FROM sales
-             WHERE customer_id = :customer_id'
+               WHERE tenant_id = :tenant_id AND customer_id = :customer_id'
         );
-        $summaryStmt->execute([':customer_id' => $customerId]);
+           $summaryStmt->execute([':tenant_id' => $tenantId, ':customer_id' => $customerId]);
         $summary = $summaryStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
         $nextDueStmt = $this->pdo->prepare(
             'SELECT MIN(due_date) FROM sales
-             WHERE customer_id = :customer_id
+               WHERE tenant_id = :tenant_id AND customer_id = :customer_id
                AND balance_due > 0
                AND due_date IS NOT NULL'
         );
-        $nextDueStmt->execute([':customer_id' => $customerId]);
+           $nextDueStmt->execute([':tenant_id' => $tenantId, ':customer_id' => $customerId]);
         $nextDue = $nextDueStmt->fetchColumn();
 
         $recentSalesStmt = $this->pdo->prepare(
             'SELECT id, created_at, total, payment_status, balance_due
              FROM sales
-             WHERE customer_id = :customer_id
+               WHERE tenant_id = :tenant_id AND customer_id = :customer_id
              ORDER BY created_at DESC
              LIMIT 5'
         );
-        $recentSalesStmt->execute([':customer_id' => $customerId]);
+           $recentSalesStmt->execute([':tenant_id' => $tenantId, ':customer_id' => $customerId]);
         $recentSales = $recentSalesStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $supportCountStmt = $this->pdo->prepare(
             'SELECT COUNT(*)
              FROM customer_support_requests
-             WHERE customer_id = :customer_id
+               WHERE tenant_id = :tenant_id AND customer_id = :customer_id
                AND portal_account_id = :portal_account_id
                AND status IN ("Open", "InProgress")'
         );
         $supportCountStmt->execute([
+              ':tenant_id' => $tenantId,
             ':customer_id' => $customerId,
             ':portal_account_id' => $portalAccountId,
         ]);
@@ -131,11 +135,12 @@ final class CustomerPortalService
      */
     public function listCatalogProducts(int $page, int $perPage, ?string $category, ?string $search): array
     {
+        $tenantId = TenantContext::id();
         $page = max(1, $page);
         $perPage = max(1, min($perPage, 48));
 
-        $conditions = ['is_active = 1'];
-        $params = [];
+        $conditions = ['tenant_id = :tenant_id', 'is_active = 1'];
+        $params = [':tenant_id' => $tenantId];
 
         if ($category !== null && $category !== '') {
             $conditions[] = 'category = :category';
@@ -185,15 +190,14 @@ final class CustomerPortalService
         unset($row);
 
         $categories = [];
-        $categoriesStmt = $this->pdo->query(
+        $categoriesStmt = $this->pdo->prepare(
             'SELECT DISTINCT category
              FROM products
-             WHERE category IS NOT NULL AND category != ""
+             WHERE tenant_id = :tenant_id AND category IS NOT NULL AND category != ""
              ORDER BY category ASC'
         );
-        if ($categoriesStmt !== false) {
-            $categories = array_map(static fn ($value): string => (string) $value, $categoriesStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
-        }
+        $categoriesStmt->execute([':tenant_id' => $tenantId]);
+        $categories = array_map(static fn ($value): string => (string) $value, $categoriesStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
         return [
             'rows' => $rows,
@@ -238,6 +242,7 @@ final class CustomerPortalService
      */
     public function getSaleDetail(int $customerId, int $saleId): ?array
     {
+        $tenantId = TenantContext::id();
         $sale = $this->salesService->getSaleWithItems($saleId, $customerId);
         if ($sale === null) {
             return null;
@@ -246,10 +251,10 @@ final class CustomerPortalService
         $paymentsStmt = $this->pdo->prepare(
             'SELECT id, amount, payment_method, status, provider_reference, note, created_at, portal_account_id
              FROM customer_payments
-             WHERE sale_id = :sale_id
+               WHERE tenant_id = :tenant_id AND sale_id = :sale_id
              ORDER BY created_at DESC'
         );
-        $paymentsStmt->execute([':sale_id' => $saleId]);
+           $paymentsStmt->execute([':tenant_id' => $tenantId, ':sale_id' => $saleId]);
         $sale['payments'] = $paymentsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         return $sale;
@@ -260,6 +265,7 @@ final class CustomerPortalService
      */
     public function createProductRequest(int $customerId, int $portalAccountId, array $payload): array
     {
+        $tenantId = TenantContext::id();
         $customerId = max(1, $customerId);
         $portalAccountId = max(1, $portalAccountId);
 
@@ -361,10 +367,11 @@ final class CustomerPortalService
         $duplicateStmt = $this->pdo->prepare(
             'SELECT COUNT(*)
              FROM customer_product_requests
-             WHERE customer_id = :customer AND portal_account_id = :account AND product_id = :product
+             WHERE tenant_id = :tenant_id AND customer_id = :customer AND portal_account_id = :account AND product_id = :product
                AND status IN ("Pending","InReview")'
         );
         $duplicateStmt->execute([
+            ':tenant_id' => $tenantId,
             ':customer' => $customerId,
             ':account' => $portalAccountId,
             ':product' => $productId,
@@ -381,6 +388,7 @@ final class CustomerPortalService
         try {
             $stmt = $this->pdo->prepare(
                 'INSERT INTO customer_product_requests (
+                    tenant_id,
                     customer_id,
                     portal_account_id,
                     product_id,
@@ -397,6 +405,7 @@ final class CustomerPortalService
                     created_at,
                     updated_at
                 ) VALUES (
+                    :tenant_id,
                     :customer,
                     :account,
                     :product,
@@ -415,6 +424,7 @@ final class CustomerPortalService
                 )'
             );
             $stmt->execute([
+                ':tenant_id' => $tenantId,
                 ':customer' => $customerId,
                 ':account' => $portalAccountId,
                 ':product' => $productId,
@@ -504,6 +514,7 @@ final class CustomerPortalService
      */
     public function listProductRequests(int $customerId, int $portalAccountId): array
     {
+        $tenantId = TenantContext::id();
         $customerId = max(1, $customerId);
         $portalAccountId = max(1, $portalAccountId);
 
@@ -525,10 +536,11 @@ final class CustomerPortalService
                     p.category AS current_category
              FROM customer_product_requests r
              LEFT JOIN products p ON p.id = r.product_id
-             WHERE r.customer_id = :customer AND r.portal_account_id = :account
+            WHERE r.tenant_id = :tenant_id AND r.customer_id = :customer AND r.portal_account_id = :account
              ORDER BY r.created_at DESC'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':customer' => $customerId,
             ':account' => $portalAccountId,
         ]);
@@ -544,12 +556,13 @@ final class CustomerPortalService
      */
     public function listPayments(int $portalAccountId, int $page, int $perPage, ?string $status = null): array
     {
+        $tenantId = TenantContext::id();
         $portalAccountId = max(1, $portalAccountId);
         $page = max(1, $page);
         $perPage = max(1, min($perPage, 30));
 
-        $conditions = ['portal_account_id = :account_id'];
-        $params = [':account_id' => $portalAccountId];
+        $conditions = ['tenant_id = :tenant_id', 'portal_account_id = :account_id'];
+        $params = [':tenant_id' => $tenantId, ':account_id' => $portalAccountId];
 
         if ($status !== null && in_array($status, ['Pending', 'Succeeded', 'Failed'], true)) {
             $conditions[] = 'status = :status';
@@ -601,6 +614,7 @@ final class CustomerPortalService
      */
     public function createPaymentRequest(int $portalAccountId, int $customerId, array $payload): array
     {
+        $tenantId = TenantContext::id();
         $saleId = isset($payload['sale_id']) ? (int) $payload['sale_id'] : 0;
         $amount = isset($payload['amount']) ? (float) $payload['amount'] : 0.0;
         $method = isset($payload['payment_method']) ? trim((string) $payload['payment_method']) : 'BankTransfer';
@@ -655,10 +669,11 @@ final class CustomerPortalService
 
         try {
             $stmt = $this->pdo->prepare(
-                'INSERT INTO customer_payments (sale_id, portal_account_id, amount, payment_method, status, note, created_at)
-                 VALUES (:sale_id, :account_id, :amount, :method, "Pending", :note, NOW())'
+                'INSERT INTO customer_payments (tenant_id, sale_id, portal_account_id, amount, payment_method, status, note, created_at)
+                 VALUES (:tenant_id, :sale_id, :account_id, :amount, :method, "Pending", :note, NOW())'
             );
             $stmt->execute([
+                ':tenant_id' => $tenantId,
                 ':sale_id' => $saleId,
                 ':account_id' => $portalAccountId,
                 ':amount' => $amount,
@@ -733,16 +748,19 @@ final class CustomerPortalService
      */
     public function listSupportRequests(int $customerId, int $portalAccountId, int $page, int $perPage, ?string $status = null): array
     {
+        $tenantId = TenantContext::id();
         $customerId = max(1, $customerId);
         $portalAccountId = max(1, $portalAccountId);
         $page = max(1, $page);
         $perPage = max(1, min($perPage, 30));
 
         $conditions = [
+            'tenant_id = :tenant_id',
             'customer_id = :customer_id',
             'portal_account_id = :portal_account_id',
         ];
         $params = [
+            ':tenant_id' => $tenantId,
             ':customer_id' => $customerId,
             ':portal_account_id' => $portalAccountId,
         ];
@@ -797,6 +815,7 @@ final class CustomerPortalService
      */
     public function createSupportRequest(int $customerId, int $portalAccountId, array $payload): array
     {
+        $tenantId = TenantContext::id();
         $type = isset($payload['type']) ? (string) $payload['type'] : 'Support';
         $subject = isset($payload['subject']) ? trim((string) $payload['subject']) : '';
         $message = isset($payload['message']) ? trim((string) $payload['message']) : '';
@@ -830,10 +849,11 @@ final class CustomerPortalService
 
         try {
             $stmt = $this->pdo->prepare(
-                'INSERT INTO customer_support_requests (customer_id, portal_account_id, type, subject, message, preferred_slot, status, created_at, updated_at)
-                 VALUES (:customer_id, :account_id, :type, :subject, :message, :slot, "Open", NOW(), NOW())'
+                'INSERT INTO customer_support_requests (tenant_id, customer_id, portal_account_id, type, subject, message, preferred_slot, status, created_at, updated_at)
+                 VALUES (:tenant_id, :customer_id, :account_id, :type, :subject, :message, :slot, "Open", NOW(), NOW())'
             );
             $stmt->execute([
+                ':tenant_id' => $tenantId,
                 ':customer_id' => $customerId,
                 ':account_id' => $portalAccountId,
                 ':type' => $type,
@@ -894,12 +914,14 @@ final class CustomerPortalService
      */
     public function getSupportRequest(int $customerId, int $portalAccountId, int $requestId): ?array
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT id, type, subject, message, preferred_slot, status, resolution_note, created_at, updated_at
              FROM customer_support_requests
-             WHERE id = :id AND customer_id = :customer_id AND portal_account_id = :account_id'
+             WHERE tenant_id = :tenant_id AND id = :id AND customer_id = :customer_id AND portal_account_id = :account_id'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':id' => $requestId,
             ':customer_id' => $customerId,
             ':account_id' => $portalAccountId,

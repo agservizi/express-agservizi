@@ -191,25 +191,10 @@ if ($urlE === null || $urlG === null) {
     throw new RuntimeException('Impossibile individuare i CSV PLACET.');
 }
 
-$providers = [];
-$providersByNormalized = [];
-$pivaMap = [];
-$stmtProviders = $pdo->query('SELECT id, name FROM energy_providers');
-foreach ($stmtProviders->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
-    $normalized = normalizeName((string) $row['name']);
-    $provider = [
-        'id' => (int) $row['id'],
-        'name' => (string) $row['name'],
-        'normalized' => $normalized,
-    ];
-    $providers[] = $provider;
-    if ($normalized !== '') {
-        $providersByNormalized[$normalized] = $provider;
-    }
-}
-
-if ($providers === []) {
-    echo "Nessun gestore energia configurato.\n";
+$tenantsStmt = $pdo->query('SELECT id, name FROM tenants WHERE is_active = 1 ORDER BY id ASC');
+$tenants = $tenantsStmt !== false ? $tenantsStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+if ($tenants === []) {
+    echo "Nessun tenant attivo.\n";
     exit(0);
 }
 
@@ -240,41 +225,6 @@ function matchProvider(array $providers, array $providersByNormalized, string $p
     }
     return null;
 }
-
-$insert = $pdo->prepare(
-    'INSERT INTO energy_offers
-        (provider_id, provider_name, offer_code, offer_name, supply_type, customer_type, offer_type, price_type,
-         p_fix_f, p_fix_v, p_vol_f1, p_vol_f2, p_vol_f3, p_vol_bf1, p_vol_bf23, p_vol_mono, p_vol, alpha,
-         region, province, municipality, offer_url, valid_from, valid_to)
-     VALUES
-        (:provider_id, :provider_name, :offer_code, :offer_name, :supply_type, :customer_type, :offer_type, :price_type,
-         :p_fix_f, :p_fix_v, :p_vol_f1, :p_vol_f2, :p_vol_f3, :p_vol_bf1, :p_vol_bf23, :p_vol_mono, :p_vol, :alpha,
-         :region, :province, :municipality, :offer_url, :valid_from, :valid_to)
-     ON DUPLICATE KEY UPDATE
-        provider_id = VALUES(provider_id),
-        provider_name = VALUES(provider_name),
-        offer_name = VALUES(offer_name),
-        supply_type = VALUES(supply_type),
-        customer_type = VALUES(customer_type),
-        offer_type = VALUES(offer_type),
-        price_type = VALUES(price_type),
-        p_fix_f = VALUES(p_fix_f),
-        p_fix_v = VALUES(p_fix_v),
-        p_vol_f1 = VALUES(p_vol_f1),
-        p_vol_f2 = VALUES(p_vol_f2),
-        p_vol_f3 = VALUES(p_vol_f3),
-        p_vol_bf1 = VALUES(p_vol_bf1),
-        p_vol_bf23 = VALUES(p_vol_bf23),
-        p_vol_mono = VALUES(p_vol_mono),
-        p_vol = VALUES(p_vol),
-        alpha = VALUES(alpha),
-        region = VALUES(region),
-        province = VALUES(province),
-        municipality = VALUES(municipality),
-        offer_url = VALUES(offer_url),
-        valid_from = VALUES(valid_from),
-        valid_to = VALUES(valid_to)'
-);
 
 function toDate(?string $value): ?string
 {
@@ -365,122 +315,194 @@ $datasets = [
 ];
 
 $imported = 0;
-foreach ($datasets as $dataset) {
-    $rows = downloadCsv($dataset['url']);
-    foreach ($rows as $row) {
-        $providerName = (string) ($row['denominazione'] ?? '');
-        $providerInfo = matchProvider($providers, $providersByNormalized, $providerName);
-        if ($providerName === '' || $providerInfo === null) {
-            continue;
-        }
-
-        $piva = trim((string) ($row['p_iva'] ?? $row['codice_fiscale'] ?? ''));
-        if ($piva !== '') {
-            $pivaMap[$piva] = [
-                'id' => $providerInfo['id'],
-                'name' => $providerInfo['name'],
-            ];
-        }
-
-        $insert->execute([
-            ':provider_id' => $providerInfo['id'],
-            ':provider_name' => $providerName,
-            ':offer_code' => (string) ($row['cod_offerta'] ?? ''),
-            ':offer_name' => (string) ($row['nome_offerta'] ?? ''),
-            ':supply_type' => $dataset['supply'],
-            ':customer_type' => (string) ($row['tipo_cliente'] ?? ''),
-            ':offer_type' => (string) ($row['tipo_offerta'] ?? ''),
-            ':price_type' => (string) ($row['tipo_offerta'] ?? ''),
-            ':p_fix_f' => toFloat($row['p_fix_f'] ?? null),
-            ':p_fix_v' => toFloat($row['p_fix_v'] ?? null),
-            ':p_vol_f1' => toFloat($row['p_vol_f1'] ?? null),
-            ':p_vol_f2' => toFloat($row['p_vol_f2'] ?? null),
-            ':p_vol_f3' => toFloat($row['p_vol_f3'] ?? null),
-            ':p_vol_bf1' => toFloat($row['p_vol_bf1'] ?? null),
-            ':p_vol_bf23' => toFloat($row['p_vol_bf23'] ?? null),
-            ':p_vol_mono' => toFloat($row['p_vol_mono'] ?? null),
-            ':p_vol' => toFloat($row['p_vol'] ?? null),
-            ':alpha' => toFloat($row['alpha'] ?? null),
-            ':region' => (string) ($row['regione'] ?? ''),
-            ':province' => (string) ($row['provincia'] ?? ''),
-            ':municipality' => (string) ($row['comune'] ?? ''),
-            ':offer_url' => (string) ($row['url_offerta'] ?? ''),
-            ':valid_from' => toDate($row['data_inizio'] ?? null),
-            ':valid_to' => toDate($row['data_fine'] ?? null),
-        ]);
-        $imported++;
+foreach ($tenants as $tenant) {
+    $tenantId = (int) ($tenant['id'] ?? 0);
+    if ($tenantId <= 0) {
+        continue;
     }
-}
 
-if ($urlEml !== null || $urlGml !== null || $urlDml !== null) {
-    $xmlSources = array_filter([
-        ['url' => $urlEml, 'supply' => 'luce'],
-        ['url' => $urlGml, 'supply' => 'gas'],
-        ['url' => $urlDml, 'supply' => 'luce_gas'],
-    ], static fn (array $item): bool => !empty($item['url']));
-
-    foreach ($xmlSources as $source) {
-        $xml = downloadXml($source['url']);
-        $namespaces = $xml->getNamespaces(true);
-        $ns = $namespaces[''] ?? '';
-        if ($ns !== '') {
-            $xml->registerXPathNamespace('ns', $ns);
-            $offers = $xml->xpath('//ns:offerta');
-        } else {
-            $offers = $xml->xpath('//offerta');
+    $providers = [];
+    $providersByNormalized = [];
+    $pivaMap = [];
+    $stmtProviders = $pdo->prepare('SELECT id, name FROM energy_providers WHERE tenant_id = :tenant_id');
+    $stmtProviders->execute([':tenant_id' => $tenantId]);
+    foreach ($stmtProviders->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $normalized = normalizeName((string) $row['name']);
+        $provider = [
+            'id' => (int) $row['id'],
+            'name' => (string) $row['name'],
+            'normalized' => $normalized,
+        ];
+        $providers[] = $provider;
+        if ($normalized !== '') {
+            $providersByNormalized[$normalized] = $provider;
         }
+    }
 
-        if (!is_array($offers)) {
-            continue;
-        }
+    if ($providers === []) {
+        echo 'Nessun gestore energia configurato per tenant #' . $tenantId . ".\n";
+        continue;
+    }
 
-        foreach ($offers as $offer) {
-            $prefix = $ns !== '' ? 'ns:' : '';
-            $piva = xmlValue($offer, $prefix . 'IdentificativiOfferta/' . $prefix . 'PIVA_UTENTE', $ns);
-            $code = xmlValue($offer, $prefix . 'IdentificativiOfferta/' . $prefix . 'COD_OFFERTA', $ns);
-            if ($piva === '' || $code === '' || !isset($pivaMap[$piva])) {
+    $insert = $pdo->prepare(
+        'INSERT INTO energy_offers
+            (tenant_id, provider_id, provider_name, offer_code, offer_name, supply_type, customer_type, offer_type, price_type,
+             p_fix_f, p_fix_v, p_vol_f1, p_vol_f2, p_vol_f3, p_vol_bf1, p_vol_bf23, p_vol_mono, p_vol, alpha,
+             region, province, municipality, offer_url, valid_from, valid_to)
+         VALUES
+            (:tenant_id, :provider_id, :provider_name, :offer_code, :offer_name, :supply_type, :customer_type, :offer_type, :price_type,
+             :p_fix_f, :p_fix_v, :p_vol_f1, :p_vol_f2, :p_vol_f3, :p_vol_bf1, :p_vol_bf23, :p_vol_mono, :p_vol, :alpha,
+             :region, :province, :municipality, :offer_url, :valid_from, :valid_to)
+         ON DUPLICATE KEY UPDATE
+            provider_id = VALUES(provider_id),
+            provider_name = VALUES(provider_name),
+            offer_name = VALUES(offer_name),
+            supply_type = VALUES(supply_type),
+            customer_type = VALUES(customer_type),
+            offer_type = VALUES(offer_type),
+            price_type = VALUES(price_type),
+            p_fix_f = VALUES(p_fix_f),
+            p_fix_v = VALUES(p_fix_v),
+            p_vol_f1 = VALUES(p_vol_f1),
+            p_vol_f2 = VALUES(p_vol_f2),
+            p_vol_f3 = VALUES(p_vol_f3),
+            p_vol_bf1 = VALUES(p_vol_bf1),
+            p_vol_bf23 = VALUES(p_vol_bf23),
+            p_vol_mono = VALUES(p_vol_mono),
+            p_vol = VALUES(p_vol),
+            alpha = VALUES(alpha),
+            region = VALUES(region),
+            province = VALUES(province),
+            municipality = VALUES(municipality),
+            offer_url = VALUES(offer_url),
+            valid_from = VALUES(valid_from),
+            valid_to = VALUES(valid_to)'
+    );
+
+    $importedTenant = 0;
+    foreach ($datasets as $dataset) {
+        $rows = downloadCsv($dataset['url']);
+        foreach ($rows as $row) {
+            $providerName = (string) ($row['denominazione'] ?? '');
+            $providerInfo = matchProvider($providers, $providersByNormalized, $providerName);
+            if ($providerName === '' || $providerInfo === null) {
                 continue;
             }
 
-            $name = xmlValue($offer, $prefix . 'DettaglioOfferta/' . $prefix . 'NOME_OFFERTA', $ns);
-            $customerType = xmlValue($offer, $prefix . 'DettaglioOfferta/' . $prefix . 'TIPO_CLIENTE', $ns);
-            $offerType = xmlValue($offer, $prefix . 'DettaglioOfferta/' . $prefix . 'TIPO_OFFERTA', $ns);
-            $validFrom = toDate(xmlValue($offer, $prefix . 'ValiditaOfferta/' . $prefix . 'DATA_INIZIO', $ns));
-            $validTo = toDate(xmlValue($offer, $prefix . 'ValiditaOfferta/' . $prefix . 'DATA_FINE', $ns));
-            $offerUrl = xmlValue($offer, $prefix . 'DettaglioOfferta/' . $prefix . 'Contatti/' . $prefix . 'URL_SITO_VENDITORE', $ns);
-            $prices = parseMlPrices($offer, $ns, $source['supply']);
-
-            $providerInfo = $pivaMap[$piva];
+            $piva = trim((string) ($row['p_iva'] ?? $row['codice_fiscale'] ?? ''));
+            if ($piva !== '') {
+                $pivaMap[$piva] = [
+                    'id' => $providerInfo['id'],
+                    'name' => $providerInfo['name'],
+                ];
+            }
 
             $insert->execute([
+                ':tenant_id' => $tenantId,
                 ':provider_id' => $providerInfo['id'],
-                ':provider_name' => $providerInfo['name'],
-                ':offer_code' => $code,
-                ':offer_name' => $name !== '' ? $name : 'Offerta mercato libero',
-                ':supply_type' => $source['supply'],
-                ':customer_type' => $customerType,
-                ':offer_type' => $offerType,
-                ':price_type' => 'mercato_libero',
-                ':p_fix_f' => $prices['p_fix_f'],
-                ':p_fix_v' => null,
-                ':p_vol_f1' => $prices['p_vol_f1'],
-                ':p_vol_f2' => $prices['p_vol_f2'],
-                ':p_vol_f3' => $prices['p_vol_f3'],
-                ':p_vol_bf1' => null,
-                ':p_vol_bf23' => null,
-                ':p_vol_mono' => $prices['p_vol_mono'],
-                ':p_vol' => $prices['p_vol'],
-                ':alpha' => null,
-                ':region' => null,
-                ':province' => null,
-                ':municipality' => null,
-                ':offer_url' => $offerUrl !== '' ? $offerUrl : null,
-                ':valid_from' => $validFrom,
-                ':valid_to' => $validTo,
+                ':provider_name' => $providerName,
+                ':offer_code' => (string) ($row['cod_offerta'] ?? ''),
+                ':offer_name' => (string) ($row['nome_offerta'] ?? ''),
+                ':supply_type' => $dataset['supply'],
+                ':customer_type' => (string) ($row['tipo_cliente'] ?? ''),
+                ':offer_type' => (string) ($row['tipo_offerta'] ?? ''),
+                ':price_type' => (string) ($row['tipo_offerta'] ?? ''),
+                ':p_fix_f' => toFloat($row['p_fix_f'] ?? null),
+                ':p_fix_v' => toFloat($row['p_fix_v'] ?? null),
+                ':p_vol_f1' => toFloat($row['p_vol_f1'] ?? null),
+                ':p_vol_f2' => toFloat($row['p_vol_f2'] ?? null),
+                ':p_vol_f3' => toFloat($row['p_vol_f3'] ?? null),
+                ':p_vol_bf1' => toFloat($row['p_vol_bf1'] ?? null),
+                ':p_vol_bf23' => toFloat($row['p_vol_bf23'] ?? null),
+                ':p_vol_mono' => toFloat($row['p_vol_mono'] ?? null),
+                ':p_vol' => toFloat($row['p_vol'] ?? null),
+                ':alpha' => toFloat($row['alpha'] ?? null),
+                ':region' => (string) ($row['regione'] ?? ''),
+                ':province' => (string) ($row['provincia'] ?? ''),
+                ':municipality' => (string) ($row['comune'] ?? ''),
+                ':offer_url' => (string) ($row['url_offerta'] ?? ''),
+                ':valid_from' => toDate($row['data_inizio'] ?? null),
+                ':valid_to' => toDate($row['data_fine'] ?? null),
             ]);
+            $importedTenant++;
             $imported++;
         }
     }
+
+    if ($urlEml !== null || $urlGml !== null || $urlDml !== null) {
+        $xmlSources = array_filter([
+            ['url' => $urlEml, 'supply' => 'luce'],
+            ['url' => $urlGml, 'supply' => 'gas'],
+            ['url' => $urlDml, 'supply' => 'luce_gas'],
+        ], static fn (array $item): bool => !empty($item['url']));
+
+        foreach ($xmlSources as $source) {
+            $xml = downloadXml($source['url']);
+            $namespaces = $xml->getNamespaces(true);
+            $ns = $namespaces[''] ?? '';
+            if ($ns !== '') {
+                $xml->registerXPathNamespace('ns', $ns);
+                $offers = $xml->xpath('//ns:offerta');
+            } else {
+                $offers = $xml->xpath('//offerta');
+            }
+
+            if (!is_array($offers)) {
+                continue;
+            }
+
+            foreach ($offers as $offer) {
+                $prefix = $ns !== '' ? 'ns:' : '';
+                $piva = xmlValue($offer, $prefix . 'IdentificativiOfferta/' . $prefix . 'PIVA_UTENTE', $ns);
+                $code = xmlValue($offer, $prefix . 'IdentificativiOfferta/' . $prefix . 'COD_OFFERTA', $ns);
+                if ($piva === '' || $code === '' || !isset($pivaMap[$piva])) {
+                    continue;
+                }
+
+                $name = xmlValue($offer, $prefix . 'DettaglioOfferta/' . $prefix . 'NOME_OFFERTA', $ns);
+                $customerType = xmlValue($offer, $prefix . 'DettaglioOfferta/' . $prefix . 'TIPO_CLIENTE', $ns);
+                $offerType = xmlValue($offer, $prefix . 'DettaglioOfferta/' . $prefix . 'TIPO_OFFERTA', $ns);
+                $validFrom = toDate(xmlValue($offer, $prefix . 'ValiditaOfferta/' . $prefix . 'DATA_INIZIO', $ns));
+                $validTo = toDate(xmlValue($offer, $prefix . 'ValiditaOfferta/' . $prefix . 'DATA_FINE', $ns));
+                $offerUrl = xmlValue($offer, $prefix . 'DettaglioOfferta/' . $prefix . 'Contatti/' . $prefix . 'URL_SITO_VENDITORE', $ns);
+                $prices = parseMlPrices($offer, $ns, $source['supply']);
+
+                $providerInfo = $pivaMap[$piva];
+
+                $insert->execute([
+                    ':tenant_id' => $tenantId,
+                    ':provider_id' => $providerInfo['id'],
+                    ':provider_name' => $providerInfo['name'],
+                    ':offer_code' => $code,
+                    ':offer_name' => $name !== '' ? $name : 'Offerta mercato libero',
+                    ':supply_type' => $source['supply'],
+                    ':customer_type' => $customerType,
+                    ':offer_type' => $offerType,
+                    ':price_type' => 'mercato_libero',
+                    ':p_fix_f' => $prices['p_fix_f'],
+                    ':p_fix_v' => null,
+                    ':p_vol_f1' => $prices['p_vol_f1'],
+                    ':p_vol_f2' => $prices['p_vol_f2'],
+                    ':p_vol_f3' => $prices['p_vol_f3'],
+                    ':p_vol_bf1' => null,
+                    ':p_vol_bf23' => null,
+                    ':p_vol_mono' => $prices['p_vol_mono'],
+                    ':p_vol' => $prices['p_vol'],
+                    ':alpha' => null,
+                    ':region' => null,
+                    ':province' => null,
+                    ':municipality' => null,
+                    ':offer_url' => $offerUrl !== '' ? $offerUrl : null,
+                    ':valid_from' => $validFrom,
+                    ':valid_to' => $validTo,
+                ]);
+                $importedTenant++;
+                $imported++;
+            }
+        }
+    }
+
+    echo 'Tenant #' . $tenantId . ' import completato. Offerte importate: ' . $importedTenant . "\n";
 }
 
 echo "Import completato. Offerte importate: {$imported}\n";

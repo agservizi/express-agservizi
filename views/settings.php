@@ -36,6 +36,7 @@ declare(strict_types=1);
  * @var array{last_run?:int,last_started?:int,last_status?:string,last_message?:string,last_output?:string} $energyOffersImportStatus
  * @var array{success:bool,message:string,errors?:array<int,string>}|null $energyFeedback
  * @var bool $energyOpen
+ * @var array<int, array<string, mixed>> $tenants
  * @var array<int, array<string, mixed>> $licenses
  * @var array{success:bool,message:string,error?:string}|null $licenseFeedback
  * @var array{code:string,label?:string}|null $licenseGeneratedCode
@@ -96,6 +97,7 @@ $energyOffersImportStatus = isset($energyOffersImportStatus) && is_array($energy
 $energyFeedback = isset($energyFeedback) && is_array($energyFeedback) ? $energyFeedback : null;
 $energyOpen = isset($energyOpen) ? (bool) $energyOpen : false;
 $energyOpen = $energyOpen || $energyFeedback !== null;
+$tenants = isset($tenants) && is_array($tenants) ? $tenants : [];
 $licenses = isset($licenses) && is_array($licenses) ? $licenses : [];
 $licenseFeedback = isset($licenseFeedback) && is_array($licenseFeedback) ? $licenseFeedback : null;
 $licenseGeneratedCode = isset($licenseGeneratedCode) && is_array($licenseGeneratedCode) ? $licenseGeneratedCode : null;
@@ -1051,11 +1053,26 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                         <input type="text" id="operator_username" name="operator_username" minlength="3" required>
                                     </div>
                                     <div class="settings-form__field">
+                                        <label for="operator_email">Email</label>
+                                        <input type="email" id="operator_email" name="operator_email" placeholder="nome@azienda.it">
+                                    </div>
+                                    <div class="settings-form__field">
                                         <label for="operator_role">Ruolo</label>
                                         <select id="operator_role" name="operator_role" required>
                                             <option value="">Seleziona...</option>
                                             <?php foreach ($roles as $role): ?>
                                                 <option value="<?= (int) $role['id'] ?>"><?= htmlspecialchars((string) $role['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="settings-form__field">
+                                        <label for="operator_tenant_id">Tenant</label>
+                                        <select id="operator_tenant_id" name="operator_tenant_id" required>
+                                            <option value="">Seleziona...</option>
+                                            <?php foreach ($tenants as $tenant): ?>
+                                                <option value="<?= (int) $tenant['id'] ?>">
+                                                    <?= htmlspecialchars((string) $tenant['name']) ?> (<?= htmlspecialchars((string) $tenant['slug']) ?>)
+                                                </option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
@@ -1066,6 +1083,24 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                     <div class="settings-form__field">
                                         <label for="operator_password_confirmation">Conferma password</label>
                                         <input type="password" id="operator_password_confirmation" name="operator_password_confirmation" minlength="8" required>
+                                    </div>
+                                    <div class="settings-form__field">
+                                        <label for="operator_license_id">Licenza da assegnare</label>
+                                        <select id="operator_license_id" name="operator_license_id">
+                                            <option value="">Nessuna</option>
+                                            <?php foreach ($licenses as $license): ?>
+                                                <option value="<?= (int) $license['id'] ?>">
+                                                    <?= htmlspecialchars((string) $license['code']) ?><?= $license['label'] ? ' - ' . htmlspecialchars((string) $license['label']) : '' ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="settings-form__field">
+                                        <label class="checkbox">
+                                            <input type="checkbox" name="operator_send_credentials" value="1" checked>
+                                            <span>Invia credenziali via email</span>
+                                        </label>
+                                        <p class="muted">L'invio richiede un'email valida e un provider configurato.</p>
                                     </div>
                                 </div>
                                 <button type="submit" class="btn btn--primary">Crea operatore</button>
@@ -1083,6 +1118,8 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                             <tr>
                                                 <th>Nome</th>
                                                 <th>Nome utente</th>
+                                                <th>Email</th>
+                                                <th>Tenant</th>
                                                 <th>Ruolo</th>
                                                 <th>MFA</th>
                                                 <th>Creato il</th>
@@ -1110,6 +1147,8 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                                 <tr>
                                                     <td><?= htmlspecialchars((string) ($operator['fullname'] ?? '')) ?></td>
                                                     <td><?= htmlspecialchars((string) $operator['username']) ?></td>
+                                                    <td><?= !empty($operator['email']) ? htmlspecialchars((string) $operator['email']) : '—' ?></td>
+                                                    <td><?= !empty($operator['tenant_name']) ? htmlspecialchars((string) $operator['tenant_name']) : '—' ?></td>
                                                     <td><?= htmlspecialchars((string) $operator['role_name']) ?></td>
                                                     <td>
                                                         <?php if ($mfaEnabled): ?>
@@ -1155,6 +1194,8 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                     $editFullname = trim((string) ($operatorEditForm['fullname'] ?? ($operatorEdit['fullname'] ?? '')));
                                     $editUsername = trim((string) ($operatorEditForm['username'] ?? ($operatorEdit['username'] ?? '')));
                                     $editRoleId = (int) ($operatorEditForm['role_id'] ?? ($operatorEdit['role_id'] ?? 0));
+                                    $editEmail = trim((string) ($operatorEditForm['email'] ?? ($operatorEdit['email'] ?? '')));
+                                    $editTenantId = (int) ($operatorEditForm['tenant_id'] ?? ($operatorEdit['tenant_id'] ?? 0));
                                     $editUpdatedAt = !empty($operatorEdit['updated_at'])
                                         ? date('d/m/Y H:i', strtotime((string) $operatorEdit['updated_at']))
                                         : null;
@@ -1175,12 +1216,28 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                                 <input type="text" id="operator_edit_username" name="operator_edit_username" value="<?= htmlspecialchars($editUsername) ?>" minlength="3" required>
                                             </div>
                                             <div class="settings-form__field">
+                                                <label for="operator_edit_email">Email</label>
+                                                <input type="email" id="operator_edit_email" name="operator_edit_email" value="<?= htmlspecialchars($editEmail) ?>" placeholder="nome@azienda.it">
+                                            </div>
+                                            <div class="settings-form__field">
                                                 <label for="operator_edit_role">Ruolo</label>
                                                 <select id="operator_edit_role" name="operator_edit_role" required>
                                                     <option value="">Seleziona...</option>
                                                     <?php foreach ($roles as $role): ?>
                                                         <?php $roleId = (int) ($role['id'] ?? 0); ?>
                                                         <option value="<?= $roleId ?>" <?= $roleId === $editRoleId ? 'selected' : '' ?>><?= htmlspecialchars((string) $role['name']) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div class="settings-form__field">
+                                                <label for="operator_edit_tenant_id">Tenant</label>
+                                                <select id="operator_edit_tenant_id" name="operator_edit_tenant_id" required>
+                                                    <option value="">Seleziona...</option>
+                                                    <?php foreach ($tenants as $tenant): ?>
+                                                        <?php $tenantId = (int) ($tenant['id'] ?? 0); ?>
+                                                        <option value="<?= $tenantId ?>" <?= $tenantId === $editTenantId ? 'selected' : '' ?>>
+                                                            <?= htmlspecialchars((string) $tenant['name']) ?> (<?= htmlspecialchars((string) $tenant['slug']) ?>)
+                                                        </option>
                                                     <?php endforeach; ?>
                                                 </select>
                                             </div>

@@ -12,6 +12,7 @@ final class PdaImportService
     private const DEFAULT_OCR_MIN_CHARS = 200;
 
     /**
+use App\Services\TenantContext;
      * @var array<string, array<string, array<int, string>>>
      */
     private const FIELD_ALIASES = [
@@ -296,8 +297,9 @@ final class PdaImportService
      */
     private function fetchProvider(int $providerId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, name FROM providers WHERE id = :id LIMIT 1');
-        $stmt->execute([':id' => $providerId]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT id, name FROM providers WHERE tenant_id = :tenant_id AND id = :id LIMIT 1');
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $providerId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row !== false ? $row : null;
@@ -814,6 +816,7 @@ final class PdaImportService
      */
     private function ensureCustomer(array $profile): array
     {
+        $tenantId = TenantContext::id();
         $warnings = [];
 
         $fullname = $this->stringOrNull($profile['fullname'] ?? null);
@@ -824,13 +827,13 @@ final class PdaImportService
 
         $existing = null;
         if ($taxCode !== null) {
-            $stmt = $this->pdo->prepare('SELECT id, fullname, email, phone, tax_code, note FROM customers WHERE tax_code = :tax LIMIT 1');
-            $stmt->execute([':tax' => $taxCode]);
+            $stmt = $this->pdo->prepare('SELECT id, fullname, email, phone, tax_code, note FROM customers WHERE tenant_id = :tenant_id AND tax_code = :tax LIMIT 1');
+            $stmt->execute([':tenant_id' => $tenantId, ':tax' => $taxCode]);
             $existing = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         }
         if ($existing === null && $email !== null) {
-            $stmt = $this->pdo->prepare('SELECT id, fullname, email, phone, tax_code, note FROM customers WHERE email = :email LIMIT 1');
-            $stmt->execute([':email' => $email]);
+            $stmt = $this->pdo->prepare('SELECT id, fullname, email, phone, tax_code, note FROM customers WHERE tenant_id = :tenant_id AND email = :email LIMIT 1');
+            $stmt->execute([':tenant_id' => $tenantId, ':email' => $email]);
             $existing = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         }
 
@@ -928,11 +931,12 @@ final class PdaImportService
      */
     private function resolveItems(array $items, int $providerId): array
     {
+        $tenantId = TenantContext::id();
         $resolved = [];
         $warnings = [];
 
         $iccidStmt = $this->pdo->prepare(
-            "SELECT id, provider_id, status FROM iccid_stock WHERE iccid = :iccid ORDER BY FIELD(status, 'InStock', 'Reserved', 'Sold') LIMIT 1"
+            "SELECT id, provider_id, status FROM iccid_stock WHERE tenant_id = :tenant_id AND iccid = :iccid ORDER BY FIELD(status, 'InStock', 'Reserved', 'Sold') LIMIT 1"
         );
 
         foreach ($items as $item) {
@@ -977,7 +981,7 @@ final class PdaImportService
 
             $iccidId = null;
             if ($iccid !== null) {
-                $iccidStmt->execute([':iccid' => $iccid]);
+                $iccidStmt->execute([':tenant_id' => $tenantId, ':iccid' => $iccid]);
                 $row = $iccidStmt->fetch(PDO::FETCH_ASSOC) ?: null;
                 if ($row !== null) {
                     if ((int) $row['provider_id'] !== $providerId) {
@@ -1209,6 +1213,7 @@ final class PdaImportService
 
     private function matchActiveOffer(int $providerId, array $candidatePlans, ?float $price): ?array
     {
+        $tenantId = TenantContext::id();
         $normalizedCandidates = [];
         foreach ($candidatePlans as $candidate) {
             if (!is_string($candidate)) {
@@ -1231,12 +1236,12 @@ final class PdaImportService
 
         $stmt = $this->pdo->prepare(
             'SELECT id, title, price FROM operator_offers
-             WHERE provider_id = :provider_id
+                         WHERE tenant_id = :tenant_id AND provider_id = :provider_id
                AND status = "Active"
                AND (valid_from IS NULL OR valid_from <= CURRENT_DATE())
                AND (valid_to IS NULL OR valid_to >= CURRENT_DATE())'
         );
-        $stmt->execute([':provider_id' => $providerId]);
+                $stmt->execute([':tenant_id' => $tenantId, ':provider_id' => $providerId]);
         $offers = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $bestOffer = null;
@@ -1328,10 +1333,11 @@ final class PdaImportService
         $amount = $price !== null && $price > 0 ? round($price, 2) : 0.00;
 
         $insert = $this->pdo->prepare(
-            'INSERT INTO operator_offers (provider_id, title, description, price, status, valid_from, valid_to)
-             VALUES (:provider_id, :title, NULL, :price, "Active", NULL, NULL)'
+            'INSERT INTO operator_offers (tenant_id, provider_id, title, description, price, status, valid_from, valid_to)
+             VALUES (:tenant_id, :provider_id, :title, NULL, :price, "Active", NULL, NULL)'
         );
         $insert->execute([
+            ':tenant_id' => TenantContext::id(),
             ':provider_id' => $providerId,
             ':title' => $trimmedTitle,
             ':price' => $amount,
@@ -1456,10 +1462,12 @@ final class PdaImportService
 
     private function findDuplicateImport(string $fileHash, int $providerId): ?int
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
-            'SELECT id FROM pda_imports WHERE file_hash = :hash AND provider_id = :provider_id ORDER BY id DESC LIMIT 1'
+            'SELECT id FROM pda_imports WHERE tenant_id = :tenant_id AND file_hash = :hash AND provider_id = :provider_id ORDER BY id DESC LIMIT 1'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':hash' => $fileHash,
             ':provider_id' => $providerId,
         ]);
@@ -1473,12 +1481,14 @@ final class PdaImportService
             return null;
         }
 
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'SELECT id FROM pda_imports
-             WHERE customer_id = :customer_id AND provider_id = :provider_id AND contract_date = :contract_date
+             WHERE tenant_id = :tenant_id AND customer_id = :customer_id AND provider_id = :provider_id AND contract_date = :contract_date
              ORDER BY id DESC LIMIT 1'
         );
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':customer_id' => $customerId,
             ':provider_id' => $providerId,
             ':contract_date' => $contractDate,
@@ -1493,12 +1503,13 @@ final class PdaImportService
      */
     private function matchCustomer(array $customer): array
     {
+        $tenantId = TenantContext::id();
         $taxCode = $this->normalizeTaxCode($customer['tax_code'] ?? null);
         $email = $this->stringOrNull($customer['email'] ?? null);
 
         if ($taxCode !== null) {
-            $stmt = $this->pdo->prepare('SELECT id, fullname, email, phone, tax_code FROM customers WHERE tax_code = :tax_code LIMIT 1');
-            $stmt->execute([':tax_code' => $taxCode]);
+            $stmt = $this->pdo->prepare('SELECT id, fullname, email, phone, tax_code FROM customers WHERE tenant_id = :tenant_id AND tax_code = :tax_code LIMIT 1');
+            $stmt->execute([':tenant_id' => $tenantId, ':tax_code' => $taxCode]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($row !== false) {
                 return [
@@ -1512,8 +1523,8 @@ final class PdaImportService
         }
 
         if ($email !== null) {
-            $stmt = $this->pdo->prepare('SELECT id, fullname, email, phone, tax_code FROM customers WHERE email = :email LIMIT 1');
-            $stmt->execute([':email' => $email]);
+            $stmt = $this->pdo->prepare('SELECT id, fullname, email, phone, tax_code FROM customers WHERE tenant_id = :tenant_id AND email = :email LIMIT 1');
+            $stmt->execute([':tenant_id' => $tenantId, ':email' => $email]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($row !== false) {
                 return [
@@ -1831,8 +1842,9 @@ final class PdaImportService
 
     private function fetchImport(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM pda_imports WHERE id = :id LIMIT 1');
-        $stmt->execute([':id' => $id]);
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT * FROM pda_imports WHERE tenant_id = :tenant_id AND id = :id LIMIT 1');
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row !== false ? $row : null;
     }
@@ -1842,6 +1854,7 @@ final class PdaImportService
      */
     private function updateImport(int $id, array $data): void
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'UPDATE pda_imports
              SET status = :status,
@@ -1852,7 +1865,7 @@ final class PdaImportService
                  errors = :errors,
                  error_message = :error_message,
                  user_id = :user_id
-             WHERE id = :id'
+             WHERE tenant_id = :tenant_id AND id = :id'
         );
         $stmt->execute([
             ':status' => $data['status'] ?? 'Processed',
@@ -1863,6 +1876,7 @@ final class PdaImportService
             ':errors' => $this->encodeJson($data['errors'] ?? null),
             ':error_message' => $data['error_message'] ?? null,
             ':user_id' => $data['user_id'] ?? null,
+            ':tenant_id' => $tenantId,
             ':id' => $id,
         ]);
     }
@@ -1872,10 +1886,13 @@ final class PdaImportService
      */
     public function listImports(int $page, int $perPage): array
     {
+        $tenantId = TenantContext::id();
         $page = max(1, $page);
         $perPage = max(1, min($perPage, 50));
 
-        $total = (int) ($this->pdo->query('SELECT COUNT(*) FROM pda_imports')->fetchColumn() ?: 0);
+        $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM pda_imports WHERE tenant_id = :tenant_id');
+        $countStmt->execute([':tenant_id' => $tenantId]);
+        $total = (int) ($countStmt->fetchColumn() ?: 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
         if ($page > $totalPages) {
             $page = $totalPages;
@@ -1885,9 +1902,11 @@ final class PdaImportService
         $stmt = $this->pdo->prepare(
             'SELECT id, provider_name, source_filename, status, created_at, template_key, ocr_used, contract_date
              FROM pda_imports
+               WHERE tenant_id = :tenant_id
              ORDER BY created_at DESC
              LIMIT :limit OFFSET :offset'
         );
+           $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
@@ -1994,13 +2013,16 @@ final class PdaImportService
      */
     private function recordImport(array $data): int
     {
+        $tenantId = TenantContext::id();
         $stmt = $this->pdo->prepare(
             'INSERT INTO pda_imports (
+                tenant_id,
                 user_id, provider_id, provider_name, source_filename, stored_path, file_hash, contract_date,
                 template_key, ocr_used, status,
                 customer_id, customer_payload, sale_payload, raw_text, ocr_text, warnings, errors, preview_payload,
                 notes, error_message
             ) VALUES (
+                :tenant_id,
                 :user_id, :provider_id, :provider_name, :source_filename, :stored_path, :file_hash, :contract_date,
                 :template_key, :ocr_used, :status,
                 :customer_id, :customer_payload, :sale_payload, :raw_text, :ocr_text, :warnings, :errors, :preview_payload,
@@ -2009,6 +2031,7 @@ final class PdaImportService
         );
 
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':user_id' => $data['user_id'] ?? null,
             ':provider_id' => $data['provider_id'] ?? null,
             ':provider_name' => $data['provider_name'] ?? '',
