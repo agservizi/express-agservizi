@@ -325,7 +325,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                             </td>
                             <td><?= htmlspecialchars($maxUsersLabel) ?></td>
                             <td><?= $assignment['notes'] ? htmlspecialchars((string) $assignment['notes']) : '—' ?></td>
-                            <td><?= htmlspecialchars($formatDate($assignment['assigned_at'] ?? null)) ?></td>
+                            <td><?= htmlspecialchars($formatDate($assignment['assigned_at'] ?? null, 'd/m/Y H:i')) ?></td>
                             <td>
                                 <span class="badge badge--<?= $isRevoked ? 'muted' : 'success' ?>">
                                     <?= $isRevoked ? 'Revocata' : 'Attiva' ?>

@@ -358,7 +358,7 @@ if (is_array($currentUser)) {
                                 ?>
                                 <li class="activity-entry <?= $statusRaw !== 'completed' ? 'activity-entry--warning' : '' ?>">
                                     <span class="activity-entry__title">Scontrino #<?= (int) ($entry['sale_id'] ?? 0) ?><?= !empty($entry['user']) ? ' · ' . htmlspecialchars((string) $entry['user']) : '' ?></span>
-                                    <span class="activity-entry__meta"><?= htmlspecialchars($formatDateTime($entry['created_at'] ?? '')) ?> · <?= htmlspecialchars((string) ($entry['payment_method'] ?? '')) ?></span>
+                                    <span class="activity-entry__meta"><?= htmlspecialchars($formatDateTime($entry['created_at'] ?? '', 'd/m/Y H:i')) ?> · <?= htmlspecialchars((string) ($entry['payment_method'] ?? '')) ?></span>
                                     <span class="activity-entry__value">Incasso <?= $formatValue((float) ($entry['total'] ?? 0.0), 'currency') ?></span>
                                     <span class="activity-entry__status">Stato: <?= htmlspecialchars($statusLabel ?: '-') ?></span>
                                 </li>
@@ -480,7 +480,7 @@ if (is_array($currentUser)) {
                                 <?php if (!empty($event['description'])): ?>
                                     <p class="timeline__description"><?= htmlspecialchars((string) $event['description']) ?></p>
                                 <?php endif; ?>
-                                <span class="timeline__meta"><?= htmlspecialchars($formatDateTime($event['created_at'] ?? '')) ?></span>
+                                <span class="timeline__meta"><?= htmlspecialchars($formatDateTime($event['created_at'] ?? '', 'd/m/Y H:i')) ?></span>
                             </div>
                         </li>
                     <?php endforeach; ?>
@@ -646,7 +646,7 @@ if (is_array($currentUser)) {
                                 </td>
                                 <td>
                                     <?php if (!empty($insight['last_movement'])): ?>
-                                        <?= htmlspecialchars($formatDateTime((string) $insight['last_movement'])) ?>
+                                        <?= htmlspecialchars($formatDateTime((string) $insight['last_movement'], 'd/m/Y H:i')) ?>
                                     <?php else: ?>
                                         n/d
                                     <?php endif; ?>
@@ -699,7 +699,7 @@ if (is_array($currentUser)) {
                                 </td>
                                 <td>
                                     <?php if (!empty($insight['last_movement'])): ?>
-                                        <?= htmlspecialchars($formatDateTime((string) $insight['last_movement'])) ?>
+                                        <?= htmlspecialchars($formatDateTime((string) $insight['last_movement'], 'd/m/Y H:i')) ?>
                                     <?php else: ?>
                                         n/d
                                     <?php endif; ?>
@@ -726,7 +726,7 @@ if (is_array($currentUser)) {
                             <span class="badge badge--warning">Sotto soglia</span>
                         </header>
                         <p class="alert-card__message"><?= htmlspecialchars((string) ($alert['message'] ?? '')) ?></p>
-                        <p class="alert-card__meta">Ultimo controllo <?= htmlspecialchars($formatDateTime($alert['updated_at'] ?? '')) ?></p>
+                        <p class="alert-card__meta">Ultimo controllo <?= htmlspecialchars($formatDateTime($alert['updated_at'] ?? '', 'd/m/Y H:i')) ?></p>
                     </article>
                 <?php } ?>
             </div>
@@ -741,7 +741,7 @@ if (is_array($currentUser)) {
                             <span class="badge badge--warning">Sotto soglia</span>
                         </header>
                         <p class="alert-card__message"><?= htmlspecialchars((string) ($alert['message'] ?? '')) ?></p>
-                        <p class="alert-card__meta">Ultimo controllo <?= htmlspecialchars($formatDateTime($alert['updated_at'] ?? '')) ?></p>
+                        <p class="alert-card__meta">Ultimo controllo <?= htmlspecialchars($formatDateTime($alert['updated_at'] ?? '', 'd/m/Y H:i')) ?></p>
                     </article>
                 <?php } ?>
             </div>
