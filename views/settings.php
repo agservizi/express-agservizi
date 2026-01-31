@@ -1304,8 +1304,12 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                 <input type="number" min="1" id="license_max_users" name="license_max_users" value="1" required>
                             </div>
                             <div class="settings-form__field">
-                                <label for="license_expires_at">Scadenza</label>
-                                <input type="date" id="license_expires_at" name="license_expires_at">
+                                <label for="license_term_months">Durata licenza</label>
+                                <select id="license_term_months" name="license_term_months" required>
+                                    <option value="12">12 mesi</option>
+                                    <option value="24">24 mesi</option>
+                                    <option value="36">36 mesi</option>
+                                </select>
                             </div>
                         </div>
                         <button type="submit" class="btn btn--primary">Genera licenza</button>

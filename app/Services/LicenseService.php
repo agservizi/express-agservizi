@@ -19,7 +19,7 @@ final class LicenseService
     public function listLicenses(): array
     {
         $stmt = $this->pdo->query(
-            'SELECT id, code, label, max_users, is_active, expires_at, created_at, updated_at
+            'SELECT id, code, label, max_users, term_months, is_active, expires_at, created_at, updated_at
              FROM licenses
              ORDER BY created_at DESC'
         );
@@ -50,7 +50,7 @@ final class LicenseService
     /**
      * @return array{success:bool,message:string,error?:string,code?:string}
      */
-    public function createLicense(?string $label, int $maxUsers, ?string $expiresAt): array
+    public function createLicense(?string $label, int $maxUsers, int $termMonths): array
     {
         if ($maxUsers <= 0) {
             return [
@@ -60,23 +60,16 @@ final class LicenseService
             ];
         }
 
-        $expiresValue = null;
-        if ($expiresAt !== null && trim($expiresAt) !== '') {
-            $expiresAt = trim($expiresAt);
-            $date = DateTimeImmutable::createFromFormat('Y-m-d', $expiresAt);
-            if ($date === false) {
-                $timestamp = strtotime($expiresAt);
-                if ($timestamp === false) {
-                    return [
-                        'success' => false,
-                        'message' => 'Impossibile creare la licenza.',
-                        'error' => 'Data di scadenza non valida.',
-                    ];
-                }
-                $date = (new DateTimeImmutable())->setTimestamp($timestamp);
-            }
-            $expiresValue = $date->format('Y-m-d');
+        if (!in_array($termMonths, [12, 24, 36], true)) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile creare la licenza.',
+                'error' => 'Durata licenza non valida.',
+            ];
         }
+
+        $now = new DateTimeImmutable('now');
+        $expiresValue = $now->modify('+' . $termMonths . ' months')->format('Y-m-d');
 
         $labelValue = $label !== null ? trim($label) : null;
         if ($labelValue === '') {
@@ -89,13 +82,14 @@ final class LicenseService
             $code = $this->generateCode();
             try {
                 $stmt = $this->pdo->prepare(
-                    'INSERT INTO licenses (code, label, max_users, is_active, expires_at)
-                     VALUES (:code, :label, :max_users, 1, :expires_at)'
+                    'INSERT INTO licenses (code, label, max_users, term_months, is_active, expires_at)
+                     VALUES (:code, :label, :max_users, :term_months, 1, :expires_at)'
                 );
                 $stmt->execute([
                     ':code' => $code,
                     ':label' => $labelValue,
                     ':max_users' => $maxUsers,
+                    ':term_months' => $termMonths,
                     ':expires_at' => $expiresValue,
                 ]);
 

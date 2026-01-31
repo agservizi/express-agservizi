@@ -1859,11 +1859,14 @@ switch ($page) {
             } elseif ($action === 'revoke_tenant_license') {
                 $assignmentId = (int) ($_POST['assignment_id'] ?? 0);
                 $result = $tenantService->revokeTenantLicense($assignmentId);
+            } elseif ($action === 'renew_tenant_license') {
+                $assignmentId = (int) ($_POST['assignment_id'] ?? 0);
+                $result = $tenantService->renewTenantLicense($assignmentId);
             } elseif ($action === 'create_license') {
                 $label = isset($_POST['license_label']) ? trim((string) $_POST['license_label']) : null;
                 $maxUsers = isset($_POST['license_max_users']) ? (int) $_POST['license_max_users'] : 1;
-                $expiresAt = isset($_POST['license_expires_at']) ? (string) $_POST['license_expires_at'] : null;
-                $result = $licenseService->createLicense($label, $maxUsers, $expiresAt);
+                $termMonths = isset($_POST['license_term_months']) ? (int) $_POST['license_term_months'] : 0;
+                $result = $licenseService->createLicense($label, $maxUsers, $termMonths);
                 if (($result['success'] ?? false) && isset($result['code'])) {
                     $_SESSION['license_generated_code'] = [
                         'code' => (string) $result['code'],
@@ -2189,8 +2192,8 @@ switch ($page) {
                 } else {
                     $label = trim((string) ($_POST['license_label'] ?? ''));
                     $maxUsers = isset($_POST['license_max_users']) ? (int) $_POST['license_max_users'] : 1;
-                    $expiresAt = isset($_POST['license_expires_at']) ? trim((string) $_POST['license_expires_at']) : null;
-                    $result = $licenseService->createLicense($label !== '' ? $label : null, $maxUsers, $expiresAt);
+                    $termMonths = isset($_POST['license_term_months']) ? (int) $_POST['license_term_months'] : 0;
+                    $result = $licenseService->createLicense($label !== '' ? $label : null, $maxUsers, $termMonths);
                     if (($result['success'] ?? false) && isset($result['code'])) {
                         $_SESSION['license_generated_code'] = [
                             'code' => $result['code'],

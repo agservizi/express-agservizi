@@ -938,6 +938,12 @@ use App\Services\TenantContext;
         $iccidStmt = $this->pdo->prepare(
             "SELECT id, provider_id, status FROM iccid_stock WHERE tenant_id = :tenant_id AND iccid = :iccid ORDER BY FIELD(status, 'InStock', 'Reserved', 'Sold') LIMIT 1"
         );
+        if ($iccidStmt === false) {
+            return [
+                'items' => [],
+                'warnings' => ['Impossibile verificare ICCID: query non preparata.'],
+            ];
+        }
 
         foreach ($items as $item) {
             $iccid = $this->normalizeIccid($item['iccid'] ?? null);

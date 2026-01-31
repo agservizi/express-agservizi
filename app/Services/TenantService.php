@@ -32,8 +32,10 @@ final class TenantService
     {
         $stmt = $this->pdo->query(
             'SELECT tl.id, tl.tenant_id, t.name AS tenant_name, t.slug AS tenant_slug,
-                    tl.license_id, l.code AS license_code, l.label AS license_label,
-                    tl.max_users_override, tl.assigned_at, tl.revoked_at, tl.notes
+                tl.license_id, l.code AS license_code, l.label AS license_label,
+                l.expires_at AS license_expires_at, l.term_months AS license_term_months,
+                tl.max_users_override, tl.assigned_at, tl.revoked_at, tl.renewal_notice_sent_at,
+                tl.renewal_paid_at, tl.notes
              FROM tenant_licenses tl
              INNER JOIN tenants t ON t.id = tl.tenant_id
              INNER JOIN licenses l ON l.id = tl.license_id
@@ -224,6 +226,96 @@ final class TenantService
         return [
             'success' => true,
             'message' => 'Assegnazione revocata.',
+        ];
+    }
+
+    /**
+     * @return array{success:bool,message:string,error?:string,expires_at?:string}
+     */
+    public function renewTenantLicense(int $assignmentId): array
+    {
+        if ($assignmentId <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile rinnovare la licenza.',
+                'error' => 'Assegnazione non valida.',
+            ];
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT tl.id, tl.revoked_at, tl.license_id, l.expires_at, l.term_months, l.is_active
+             FROM tenant_licenses tl
+             INNER JOIN licenses l ON l.id = tl.license_id
+             WHERE tl.id = :id
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $assignmentId]);
+        $assignment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($assignment === false) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile rinnovare la licenza.',
+                'error' => 'Assegnazione non trovata.',
+            ];
+        }
+
+        if (!empty($assignment['revoked_at'])) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile rinnovare la licenza.',
+                'error' => 'Assegnazione revocata.',
+            ];
+        }
+
+        if ((int) ($assignment['is_active'] ?? 0) !== 1) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile rinnovare la licenza.',
+                'error' => 'Licenza non attiva.',
+            ];
+        }
+
+        $termMonths = (int) ($assignment['term_months'] ?? 0);
+        if (!in_array($termMonths, [12, 24, 36], true)) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile rinnovare la licenza.',
+                'error' => 'Durata licenza non valida.',
+            ];
+        }
+
+        $baseDate = new \DateTimeImmutable('now');
+        if (!empty($assignment['expires_at'])) {
+            try {
+                $expiresAt = new \DateTimeImmutable((string) $assignment['expires_at']);
+                if ($expiresAt > $baseDate) {
+                    $baseDate = $expiresAt;
+                }
+            } catch (\Throwable) {
+                // usa now
+            }
+        }
+
+        $newExpiry = $baseDate->modify('+' . $termMonths . ' months')->format('Y-m-d');
+
+        $updateLicense = $this->pdo->prepare('UPDATE licenses SET expires_at = :expires WHERE id = :id');
+        $updateLicense->execute([
+            ':expires' => $newExpiry,
+            ':id' => (int) $assignment['license_id'],
+        ]);
+
+        $updateAssignment = $this->pdo->prepare(
+            'UPDATE tenant_licenses
+             SET renewal_paid_at = NOW(), renewal_notice_sent_at = NULL
+             WHERE id = :id'
+        );
+        $updateAssignment->execute([':id' => $assignmentId]);
+
+        return [
+            'success' => true,
+            'message' => 'Licenza rinnovata correttamente.',
+            'expires_at' => $newExpiry,
         ];
     }
 }

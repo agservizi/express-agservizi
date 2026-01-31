@@ -185,8 +185,12 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                     <input type="number" min="1" step="1" name="license_max_users" id="license_max_users" value="1" required>
                 </div>
                 <div class="form__group">
-                    <label for="license_expires_at">Scadenza</label>
-                    <input type="date" name="license_expires_at" id="license_expires_at">
+                    <label for="license_term_months">Durata licenza</label>
+                    <select name="license_term_months" id="license_term_months" required>
+                        <option value="12">12 mesi</option>
+                        <option value="24">24 mesi</option>
+                        <option value="36">36 mesi</option>
+                    </select>
                 </div>
             </div>
             <footer class="form__footer">
@@ -300,19 +304,22 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                         <th>Max utenti</th>
                         <th>Note</th>
                         <th>Assegnata</th>
+                        <th>Scadenza</th>
+                        <th>Quota adesione</th>
                         <th>Stato</th>
                         <th>Azioni</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if ($assignments === []): ?>
-                        <tr><td colspan="7">Nessuna assegnazione registrata.</td></tr>
+                        <tr><td colspan="9">Nessuna assegnazione registrata.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($assignments as $assignment): ?>
                         <?php
                             $override = $assignment['max_users_override'] ?? null;
                             $maxUsersLabel = $override !== null ? (string) $override : 'Default licenza';
                             $isRevoked = !empty($assignment['revoked_at']);
+                            $renewalPaidAt = $assignment['renewal_paid_at'] ?? null;
                         ?>
                         <tr>
                             <td>
@@ -326,6 +333,15 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                             <td><?= htmlspecialchars($maxUsersLabel) ?></td>
                             <td><?= $assignment['notes'] ? htmlspecialchars((string) $assignment['notes']) : '—' ?></td>
                             <td><?= htmlspecialchars($formatDate($assignment['assigned_at'] ?? null, 'd/m/Y H:i')) ?></td>
+                            <td><?= htmlspecialchars($formatDate($assignment['license_expires_at'] ?? null, 'd/m/Y')) ?></td>
+                            <td>
+                                <?php if ($renewalPaidAt): ?>
+                                    <span class="badge badge--success">Pagata</span><br>
+                                    <small><?= htmlspecialchars($formatDate($renewalPaidAt, 'd/m/Y')) ?></small>
+                                <?php else: ?>
+                                    <span class="badge badge--muted">Da pagare</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <span class="badge badge--<?= $isRevoked ? 'muted' : 'success' ?>">
                                     <?= $isRevoked ? 'Revocata' : 'Attiva' ?>
@@ -337,6 +353,11 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                                         <input type="hidden" name="action" value="revoke_tenant_license">
                                         <input type="hidden" name="assignment_id" value="<?= (int) $assignment['id'] ?>">
                                         <button type="submit" class="btn btn--secondary">Revoca</button>
+                                    </form>
+                                    <form method="post" class="table-actions">
+                                        <input type="hidden" name="action" value="renew_tenant_license">
+                                        <input type="hidden" name="assignment_id" value="<?= (int) $assignment['id'] ?>">
+                                        <button type="submit" class="btn btn--primary">Rinnova</button>
                                     </form>
                                 <?php else: ?>
                                     —
