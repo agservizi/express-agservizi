@@ -125,6 +125,7 @@ if ($currentRoute === '' || $currentRoute === '/') {
             <a href="index.php?page=offers" class="sidebar__link" data-tooltip="Listini">🗂️ <span>Listini</span></a>
             <a href="index.php?page=sales_create" class="sidebar__link" data-tooltip="Nuova vendita">🧾 <span>Nuova vendita</span></a>
             <a href="index.php?page=sales_list" class="sidebar__link" data-tooltip="Storico vendite">📊 <span>Storico vendite</span></a>
+            <a href="index.php?page=energy_contracts" class="sidebar__link" data-tooltip="Contratti energia">⚡ <span>Contratti energia</span></a>
             <a href="index.php?page=product_requests" class="sidebar__link" data-tooltip="Ordini store">📦 <span>Ordini store</span></a>
             <a href="index.php?page=support_requests" class="sidebar__link" data-tooltip="Supporto clienti">💬 <span>Richieste supporto</span></a>
             <a href="index.php?page=reports" class="sidebar__link" data-tooltip="Report vendite">📈 <span>Report</span></a>

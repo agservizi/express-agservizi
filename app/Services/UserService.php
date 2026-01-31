@@ -125,6 +125,11 @@ final class UserService
             $errors[] = 'Seleziona un tenant valido.';
         }
 
+        $roleName = strtolower((string) ($role['name'] ?? ''));
+        if ($roleName === 'admin' && $tenantId !== 1) {
+            $errors[] = 'I tenant non possono avere utenti con ruolo admin.';
+        }
+
         if ($errors !== []) {
             return [
                 'success' => false,
@@ -262,6 +267,11 @@ final class UserService
         $tenant = $this->findTenant($tenantId);
         if ($tenant === null) {
             $errors[] = 'Seleziona un tenant valido.';
+        }
+
+        $roleName = strtolower((string) ($role['name'] ?? ''));
+        if ($roleName === 'admin' && $tenantId !== 1) {
+            $errors[] = 'I tenant non possono avere utenti con ruolo admin.';
         }
 
         $normalizedUsername = function_exists('mb_strtolower') ? mb_strtolower($username) : strtolower($username);

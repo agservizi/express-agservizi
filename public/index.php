@@ -3845,6 +3845,14 @@ function render(string $view, array $params = [], bool $layout = true): void
         }
     }
 
+    if ($layout && !array_key_exists('isAdmin', $params)) {
+        $defaultIsAdmin = false;
+        if (isset($GLOBALS['authService']) && $GLOBALS['authService'] instanceof \App\Services\AuthService) {
+            $defaultIsAdmin = $GLOBALS['authService']->hasRole('admin');
+        }
+        $params['isAdmin'] = $defaultIsAdmin;
+    }
+
     extract($params, EXTR_SKIP);
 
     if ($layout) {
