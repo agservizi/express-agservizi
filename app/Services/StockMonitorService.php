@@ -434,14 +434,19 @@ final class StockMonitorService
                          FROM sale_items si
                          JOIN sales s ON s.id = si.sale_id
                          JOIN iccid_stock ic ON ic.id = si.iccid_id
-                         WHERE s.tenant_id = :tenant_id
-                             AND si.tenant_id = :tenant_id
-                             AND ic.tenant_id = :tenant_id
+                         WHERE s.tenant_id = :tenant_id_s
+                             AND si.tenant_id = :tenant_id_si
+                             AND ic.tenant_id = :tenant_id_ic
                              AND s.status = 'Completed'
                              AND s.created_at >= :from_date
                          GROUP BY ic.provider_id"
                 );
-                $stmt->execute([':tenant_id' => $tenantId, ':from_date' => $fromDate]);
+                $stmt->execute([
+                    ':tenant_id_s' => $tenantId,
+                    ':tenant_id_si' => $tenantId,
+                    ':tenant_id_ic' => $tenantId,
+                    ':from_date' => $fromDate,
+                ]);
         $rows = $stmt->fetchAll();
 
         $sales = [];
@@ -460,18 +465,22 @@ final class StockMonitorService
         $fromDate = (new \DateTimeImmutable('-' . $lookbackDays . ' days'))->format('Y-m-d 00:00:00');
 
         try {
-            $stmt = $this->pdo->prepare(
-                'SELECT si.product_id, SUM(si.quantity) AS sold
-                 FROM sale_items si
-                 JOIN sales s ON s.id = si.sale_id
-                 WHERE si.product_id IS NOT NULL
-                   AND s.tenant_id = :tenant_id
-                   AND si.tenant_id = :tenant_id
-                   AND s.status = "Completed"
-                   AND s.created_at >= :from_date
-                 GROUP BY si.product_id'
-            );
-            $stmt->execute([':tenant_id' => $tenantId, ':from_date' => $fromDate]);
+                        $stmt = $this->pdo->prepare(
+                                'SELECT si.product_id, SUM(si.quantity) AS sold
+                                 FROM sale_items si
+                                 JOIN sales s ON s.id = si.sale_id
+                                 WHERE si.product_id IS NOT NULL
+                                     AND s.tenant_id = :tenant_id_s
+                                     AND si.tenant_id = :tenant_id_si
+                                     AND s.status = "Completed"
+                                     AND s.created_at >= :from_date
+                                 GROUP BY si.product_id'
+                        );
+                        $stmt->execute([
+                                ':tenant_id_s' => $tenantId,
+                                ':tenant_id_si' => $tenantId,
+                                ':from_date' => $fromDate,
+                        ]);
             $rows = $stmt->fetchAll();
         } catch (\PDOException $exception) {
             if ($this->isSchemaNotReady($exception)) {
