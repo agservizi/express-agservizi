@@ -1635,6 +1635,9 @@ switch ($page) {
                 $lines[] = 'Piano Business (36 mesi, max 4 cassieri) - € 1200';
                 $lines[] = '- Tutto del Core + Report personalizzati, SLA dedicato, onboarding/training, integrazioni avanzate.';
                 $lines[] = '';
+                if ($name !== '') {
+                    $lines[] = 'Nome e cognome: ' . $name;
+                }
                 if ($company !== '') {
                     $lines[] = 'Azienda: ' . $company;
                 }
@@ -1690,6 +1693,10 @@ switch ($page) {
 
                 if ($company !== '' || $message !== '') {
                     $htmlMessage .= '<div style="border:1px dashed #334155;border-radius:16px;padding:16px 18px;margin:24px 0 20px;background:#0b1120;">';
+                    if ($name !== '') {
+                        $htmlMessage .= '<p style="margin:0 0 8px;font-size:12px;color:#94a3b8;">Nome e cognome</p>';
+                        $htmlMessage .= '<p style="margin:0 0 12px;font-size:15px;color:#f8fafc;font-weight:600;">' . $escape($name) . '</p>';
+                    }
                     if ($company !== '') {
                         $htmlMessage .= '<p style="margin:0 0 8px;font-size:12px;color:#94a3b8;">Azienda</p>';
                         $htmlMessage .= '<p style="margin:0 0 12px;font-size:15px;color:#f8fafc;font-weight:600;">' . $escape($company) . '</p>';
