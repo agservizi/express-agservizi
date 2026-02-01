@@ -1128,7 +1128,7 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                     <?php endif; ?>
                                     <div class="settings-form__field">
                                         <label class="checkbox">
-                                            <input type="checkbox" name="operator_send_credentials" value="1" checked>
+                                            <input type="checkbox" name="operator_send_credentials" value="1" checked style="width:14px;height:14px;border-radius:4px;">
                                             <span>Invia credenziali via email</span>
                                         </label>
                                         <p class="muted">L'invio richiede un'email valida e un provider configurato.</p>
