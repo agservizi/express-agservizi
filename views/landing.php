@@ -4,6 +4,8 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Gestionale multi-tenant');
 $loginUrl = 'index.php?page=login';
+$feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
+$oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
 ?>
 <!doctype html>
 <html lang="it">
@@ -130,6 +132,61 @@ $loginUrl = 'index.php?page=login';
                     </ul>
                 </div>
             </div>
+        </section>
+
+        <section id="contatto" class="landing-section">
+            <div class="landing-section__header">
+                <h2>Richiedi informazioni sui piani</h2>
+                <p>Seleziona “Richiesta informazioni piani” e riceverai subito una mail con tutti i dettagli.</p>
+            </div>
+            <?php if ($feedback): ?>
+                <div class="alert <?= ($feedback['success'] ?? false) ? 'alert--success' : 'alert--error' ?>">
+                    <p><?= htmlspecialchars((string) ($feedback['message'] ?? '')) ?></p>
+                    <?php if (!empty($feedback['error'])): ?>
+                        <p><?= htmlspecialchars((string) $feedback['error']) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($feedback['errors']) && is_array($feedback['errors'])): ?>
+                        <ul>
+                            <?php foreach ($feedback['errors'] as $error): ?>
+                                <li><?= htmlspecialchars((string) $error) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            <form method="post" class="form">
+                <input type="hidden" name="action" value="landing_contact">
+                <div class="form__grid">
+                    <div class="form__group">
+                        <label for="contact_name">Nome e cognome</label>
+                        <input type="text" id="contact_name" name="contact_name" value="<?= htmlspecialchars((string) ($oldInput['contact_name'] ?? '')) ?>">
+                    </div>
+                    <div class="form__group">
+                        <label for="contact_email">Email *</label>
+                        <input type="email" id="contact_email" name="contact_email" required value="<?= htmlspecialchars((string) ($oldInput['contact_email'] ?? '')) ?>">
+                    </div>
+                    <div class="form__group">
+                        <label for="contact_company">Azienda</label>
+                        <input type="text" id="contact_company" name="contact_company" value="<?= htmlspecialchars((string) ($oldInput['contact_company'] ?? '')) ?>">
+                    </div>
+                    <div class="form__group">
+                        <label for="contact_request">Tipo richiesta *</label>
+                        <select id="contact_request" name="contact_request" required>
+                            <option value="">Seleziona</option>
+                            <option value="info_piani" <?= (($oldInput['contact_request'] ?? '') === 'info_piani') ? 'selected' : '' ?>>Richiesta informazioni piani</option>
+                            <option value="demo" <?= (($oldInput['contact_request'] ?? '') === 'demo') ? 'selected' : '' ?>>Richiesta demo</option>
+                            <option value="contatto" <?= (($oldInput['contact_request'] ?? '') === 'contatto') ? 'selected' : '' ?>>Richiesta contatto commerciale</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form__group">
+                    <label for="contact_message">Messaggio</label>
+                    <textarea id="contact_message" name="contact_message" rows="4"><?= htmlspecialchars((string) ($oldInput['contact_message'] ?? '')) ?></textarea>
+                </div>
+                <footer class="form__footer">
+                    <button type="submit" class="btn btn--primary">Invia richiesta</button>
+                </footer>
+            </form>
         </section>
 
         <section class="landing-section landing-cta">

@@ -1571,9 +1571,96 @@ switch ($page) {
             header('Location: index.php?page=dashboard');
             exit;
         }
+        $landingFeedback = $_SESSION['landing_feedback'] ?? null;
+        unset($_SESSION['landing_feedback']);
+        $landingOldInput = $_SESSION['landing_old_input'] ?? null;
+        unset($_SESSION['landing_old_input']);
+
+        if ($method === 'POST' && (($_POST['action'] ?? '') === 'landing_contact')) {
+            $name = trim((string) ($_POST['contact_name'] ?? ''));
+            $email = trim((string) ($_POST['contact_email'] ?? ''));
+            $company = trim((string) ($_POST['contact_company'] ?? ''));
+            $requestType = trim((string) ($_POST['contact_request'] ?? ''));
+            $message = trim((string) ($_POST['contact_message'] ?? ''));
+
+            $errors = [];
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $errors[] = 'Inserisci un indirizzo email valido.';
+            }
+            if ($requestType === '') {
+                $errors[] = 'Seleziona il tipo di richiesta.';
+            }
+
+            if ($errors !== []) {
+                $_SESSION['landing_feedback'] = [
+                    'success' => false,
+                    'message' => 'Controlla i campi del modulo.',
+                    'errors' => $errors,
+                ];
+                $_SESSION['landing_old_input'] = [
+                    'contact_name' => $name,
+                    'contact_email' => $email,
+                    'contact_company' => $company,
+                    'contact_request' => $requestType,
+                    'contact_message' => $message,
+                ];
+                header('Location: index.php?page=landing#contatto');
+                exit;
+            }
+
+            if ($requestType === 'info_piani') {
+                $subject = 'Informazioni piani ' . $appName;
+                $lines = [];
+                $lines[] = 'Ciao' . ($name !== '' ? ' ' . $name : '') . ',';
+                $lines[] = '';
+                $lines[] = 'Ecco il riepilogo dei piani disponibili:';
+                $lines[] = '';
+                $lines[] = 'Piano Start (12 mesi, max 1 cassiere)';
+                $lines[] = '- Dashboard, Magazzino SIM, Prodotti, Lista prodotti, Clienti, Listini, Nuova vendita, Storico vendite, Guida completa, Impostazioni.';
+                $lines[] = '';
+                $lines[] = 'Piano Start Plus (12 mesi, max 1 cassiere)';
+                $lines[] = '- Tutto del Start + Report, Richieste supporto, Ordini store.';
+                $lines[] = '';
+                $lines[] = 'Piano Core (24 mesi, max 2 cassieri)';
+                $lines[] = '- Tutto del Start Plus + Contratti energia, Report avanzati (KPI), Supporto prioritario.';
+                $lines[] = '';
+                $lines[] = 'Piano Business (36 mesi, max 4 cassieri)';
+                $lines[] = '- Tutto del Core + Report personalizzati, SLA dedicato, onboarding/training, integrazioni avanzate.';
+                $lines[] = '';
+                if ($company !== '') {
+                    $lines[] = 'Azienda: ' . $company;
+                }
+                if ($message !== '') {
+                    $lines[] = 'Messaggio: ' . $message;
+                }
+
+                $sent = sendGuideSupportEmail(
+                    $email,
+                    $subject,
+                    implode("\n", $lines),
+                    $resendApiKey,
+                    $resendFrom,
+                    $resendFromName
+                );
+
+                $_SESSION['landing_feedback'] = $sent
+                    ? ['success' => true, 'message' => 'Ti abbiamo inviato una mail con tutte le informazioni sui piani.']
+                    : ['success' => false, 'message' => 'Invio email non riuscito.', 'error' => 'Riprova tra qualche minuto.'];
+            } else {
+                $_SESSION['landing_feedback'] = [
+                    'success' => true,
+                    'message' => 'Richiesta inviata correttamente. Ti ricontatteremo a breve.',
+                ];
+            }
+
+            header('Location: index.php?page=landing#contatto');
+            exit;
+        }
         render('landing', [
             'pageTitle' => 'Coresuite Express - Gestionale multi-tenant',
             'currentUser' => $currentUser,
+            'feedback' => is_array($landingFeedback) ? $landingFeedback : null,
+            'oldInput' => is_array($landingOldInput) ? $landingOldInput : null,
         ], false);
         break;
     case 'dashboard':
