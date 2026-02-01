@@ -256,13 +256,19 @@ if ($currentRoute === '' || $currentRoute === '/') {
         </div>
         <footer class="main__footer">
             <div class="footer__content">
-                <span><?= htmlspecialchars((string) $appName) ?></span>
-                <span>·</span>
-                <span>Sviluppato da AG SERVIZI</span>
-                <span>·</span>
-                <a href="index.php?page=terms">Termini e condizioni</a>
-                <span>·</span>
-                <a href="index.php?page=privacy">Privacy policy</a>
+                <div class="footer__brand">
+                    <span class="footer__app"><?= htmlspecialchars((string) $appName) ?></span>
+                    <span class="footer__version"><?= htmlspecialchars($appVersionLabel) ?></span>
+                </div>
+                <div class="footer__meta">
+                    <span class="footer__credit">Sviluppato da AG SERVIZI</span>
+                    <span class="footer__divider">•</span>
+                    <span class="footer__year">© <?= date('Y') ?></span>
+                </div>
+                <div class="footer__links">
+                    <a href="index.php?page=terms">Termini e condizioni</a>
+                    <a href="index.php?page=privacy">Privacy policy</a>
+                </div>
             </div>
         </footer>
     </main>
