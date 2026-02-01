@@ -105,7 +105,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                                 ? (int) $license['term_months'] . ' mesi'
                                 : '—';
                         ?>
-                        <tr>
+                        <tr id="license-<?= (int) $license['id'] ?>">
                             <td><?= htmlspecialchars((string) $license['code']) ?></td>
                             <td><?= $license['label'] ? htmlspecialchars((string) $license['label']) : '—' ?></td>
                             <td><?= (int) ($license['max_users'] ?? 1) ?></td>
@@ -237,6 +237,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                                 </span>
                             </td>
                             <td>
+                                <a class="btn btn--ghost btn--small" href="index.php?page=licenses#license-<?= (int) $assignment['license_id'] ?>">Dettaglio</a>
                                 <?php if (!$isRevoked): ?>
                                     <form method="post" class="table-actions">
                                         <input type="hidden" name="action" value="revoke_tenant_license">
