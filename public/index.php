@@ -437,6 +437,119 @@ function buildPlanModuleMap(): array
     ];
 }
 
+function normalizeDemoPlanKey(?string $value): string
+{
+    $normalized = strtolower(trim((string) $value));
+    return match ($normalized) {
+        'start plus', 'start_plus', 'start+', 'startplus' => 'start_plus',
+        'core' => 'core',
+        'business' => 'business',
+        default => 'start',
+    };
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function buildDemoLicensePayload(string $planKey, int $expiresAt): array
+{
+    $planKey = normalizeDemoPlanKey($planKey);
+    $planMeta = match ($planKey) {
+        'start_plus' => ['label' => 'Start Plus', 'max_users' => 1, 'term_months' => 12],
+        'core' => ['label' => 'Core', 'max_users' => 2, 'term_months' => 24],
+        'business' => ['label' => 'Business', 'max_users' => 4, 'term_months' => 36],
+        default => ['label' => 'Start', 'max_users' => 1, 'term_months' => 12],
+    };
+
+    return [
+        'id' => null,
+        'code' => 'demo-' . $planKey,
+        'label' => $planMeta['label'],
+        'max_users' => $planMeta['max_users'],
+        'term_months' => $planMeta['term_months'],
+        'is_active' => 1,
+        'expires_at' => date('Y-m-d H:i:s', max($expiresAt, time())),
+    ];
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function ensureDemoUser(PDO $pdo, string $email, int $tenantId = 1): ?array
+{
+    $normalizedEmail = trim((string) $email);
+    if ($normalizedEmail === '' || !filter_var($normalizedEmail, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare('SELECT id, username, role_id, fullname, tenant_id, email FROM users WHERE email = :email LIMIT 1');
+    $stmt->execute([':email' => $normalizedEmail]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user !== false) {
+        return $user;
+    }
+
+    $username = 'demo';
+    $stmt = $pdo->prepare('SELECT id, username, role_id, fullname, tenant_id, email FROM users WHERE username = :username LIMIT 1');
+    $stmt->execute([':username' => $username]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user !== false) {
+        if (empty($user['email'])) {
+            $update = $pdo->prepare('UPDATE users SET email = :email WHERE id = :id');
+            $update->execute([
+                ':email' => $normalizedEmail,
+                ':id' => (int) $user['id'],
+            ]);
+            $user['email'] = $normalizedEmail;
+        }
+        return $user;
+    }
+
+    $roleStmt = $pdo->prepare('SELECT id FROM roles WHERE name = :name LIMIT 1');
+    $roleStmt->execute([':name' => 'cassiere']);
+    $roleId = (int) $roleStmt->fetchColumn();
+    if ($roleId <= 0) {
+        return null;
+    }
+
+    $password = bin2hex(random_bytes(8));
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+    if ($hash === false) {
+        return null;
+    }
+
+    $fullname = 'Account Demo';
+    $insert = $pdo->prepare(
+        'INSERT INTO users (username, email, password_hash, tenant_id, role_id, fullname, mfa_enabled)
+         VALUES (:username, :email, :password_hash, :tenant_id, :role_id, :fullname, 0)'
+    );
+    $ok = $insert->execute([
+        ':username' => $username,
+        ':email' => $normalizedEmail,
+        ':password_hash' => $hash,
+        ':tenant_id' => $tenantId,
+        ':role_id' => $roleId,
+        ':fullname' => $fullname,
+    ]);
+    if (!$ok) {
+        return null;
+    }
+
+    $userId = (int) $pdo->lastInsertId();
+    if ($userId <= 0) {
+        return null;
+    }
+
+    return [
+        'id' => $userId,
+        'username' => $username,
+        'role_id' => $roleId,
+        'fullname' => $fullname,
+        'tenant_id' => $tenantId,
+        'email' => $normalizedEmail,
+    ];
+}
+
 function resolveOperatorLimitForLicense(?array $license): int
 {
     if (isLicenseExpired($license)) {
@@ -827,7 +940,25 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $currentUser = $authService->currentUser();
 TenantContext::setTenantId(isset($currentUser['tenant_id']) ? (int) $currentUser['tenant_id'] : 1);
 
+$demoActive = !empty($_SESSION['demo_active']);
+$demoExpiresAt = isset($_SESSION['demo_expires_at']) ? (int) $_SESSION['demo_expires_at'] : 0;
+if ($currentUser !== null && $demoActive && $demoExpiresAt > 0 && time() > $demoExpiresAt) {
+    $authService->logout();
+    header('Location: index.php?page=login&demo_expired=1');
+    exit;
+}
+
 $moduleAccess = resolveTenantModuleAccess($pdo, $currentUser, $authService);
+$demoPlanKey = $demoActive ? normalizeDemoPlanKey($_SESSION['demo_plan_key'] ?? 'start') : null;
+if ($currentUser !== null && $demoActive && $demoPlanKey !== null) {
+    $planModules = buildPlanModuleMap();
+    $demoModules = $planModules[$demoPlanKey] ?? $planModules['start'];
+    $moduleAccess = [
+        'plan_key' => $demoPlanKey,
+        'modules' => $demoModules,
+        'license' => buildDemoLicensePayload($demoPlanKey, $demoExpiresAt > 0 ? $demoExpiresAt : (time() + 3600)),
+    ];
+}
 $enabledModules = $moduleAccess['modules'];
 $GLOBALS['enabledModules'] = $enabledModules;
 $GLOBALS['tenantPlanKey'] = $moduleAccess['plan_key'];
@@ -968,8 +1099,44 @@ if ($page === 'logout') {
 }
 
 if ($page === 'login' && $method === 'POST') {
+    $action = isset($_POST['action']) ? (string) $_POST['action'] : '';
+    if ($action === 'demo_login') {
+        $demoPlanKey = normalizeDemoPlanKey((string) ($_POST['demo_plan'] ?? 'start'));
+        $demoEmail = 'demo@coresuite.test';
+        $demoUser = ensureDemoUser($pdo, $demoEmail, 1);
+
+        if ($demoUser !== null) {
+            $loginResult = $authService->loginByUserId((int) $demoUser['id'], false);
+            if (($loginResult['success'] ?? false) === true) {
+                $_SESSION['demo_active'] = true;
+                $_SESSION['demo_started_at'] = time();
+                $_SESSION['demo_expires_at'] = time() + 3600;
+                $_SESSION['demo_plan_key'] = $demoPlanKey;
+                header('Location: index.php?page=dashboard');
+                exit;
+            }
+        }
+
+        render('login', [
+            'errors' => ['Impossibile avviare la demo. Riprova tra qualche minuto.'],
+            'appName' => $GLOBALS['config']['app']['name'] ?? 'Gestionale Telefonia',
+            'oldInput' => [
+                'username' => '',
+                'remember_me' => false,
+                'demo_plan' => $demoPlanKey,
+            ],
+        ], false);
+        exit;
+    }
+
     $result = $authController->login($_POST);
     if ($result['success']) {
+        unset(
+            $_SESSION['demo_active'],
+            $_SESSION['demo_started_at'],
+            $_SESSION['demo_expires_at'],
+            $_SESSION['demo_plan_key']
+        );
         $pending = $_SESSION['login_redirect'] ?? null;
         unset($_SESSION['login_redirect']);
         $target = is_string($pending) && $pending !== ''
@@ -1339,7 +1506,7 @@ if ($currentUser !== null && !$authService->hasRole('admin')) {
     }
 }
 
-if ($currentUser !== null) {
+if ($currentUser !== null && !$demoActive) {
     $allowedWithoutMfa = ['security', 'logout', 'notifications_stream', 'notifications_mark_all_read'];
     $state = $authController->getSecurityState((int) $currentUser['id']);
     $hasMfa = is_array($state) && (($state['mfa_enabled'] ?? false) === true);
@@ -1382,6 +1549,8 @@ if ($currentUser !== null) {
             exit;
         }
     }
+} elseif ($currentUser !== null && $demoActive) {
+    unset($_SESSION['mfa_enforcement_prompted'], $_SESSION['receipt_enforcement_prompted']);
 }
 
 if ($page === 'login_mfa') {
@@ -1431,8 +1600,13 @@ if ($page === 'login') {
         exit;
     }
 
+    $loginErrors = [];
+    if (!empty($_GET['demo_expired'])) {
+        $loginErrors[] = 'La sessione demo è scaduta. Accedi di nuovo per riavviare la prova.';
+    }
+
     render('login', [
-        'errors' => [],
+        'errors' => $loginErrors,
         'appName' => $GLOBALS['config']['app']['name'] ?? 'Gestionale Telefonia',
         'oldInput' => ['username' => '', 'remember_me' => false],
     ], false);

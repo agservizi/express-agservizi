@@ -6,6 +6,7 @@ $appName = $appName ?? 'Gestionale Telefonia';
 $oldInput = $oldInput ?? ['username' => '', 'remember_me' => false];
 $oldUsername = htmlspecialchars((string) ($oldInput['username'] ?? ''), ENT_QUOTES, 'UTF-8');
 $rememberChecked = !empty($oldInput['remember_me']);
+$oldDemoPlan = htmlspecialchars((string) ($oldInput['demo_plan'] ?? 'start'), ENT_QUOTES, 'UTF-8');
 ?>
 <!doctype html>
 <html lang="it">
@@ -64,6 +65,22 @@ $rememberChecked = !empty($oldInput['remember_me']);
                     <span class="login-form__help">Problemi di accesso? Contatta l'amministratore.</span>
                 </div>
                 <button type="submit" class="btn btn--primary btn--full">Accedi</button>
+            </form>
+            <div class="login-divider">
+                <span>oppure prova la demo</span>
+            </div>
+            <form method="post" action="index.php?page=login" class="login-form">
+                <input type="hidden" name="action" value="demo_login">
+                <div class="form__group">
+                    <label for="demo_plan">Piano demo</label>
+                    <select id="demo_plan" name="demo_plan" required>
+                        <option value="start" <?= $oldDemoPlan === 'start' ? 'selected' : '' ?>>Start</option>
+                        <option value="start_plus" <?= $oldDemoPlan === 'start_plus' ? 'selected' : '' ?>>Start Plus</option>
+                        <option value="core" <?= $oldDemoPlan === 'core' ? 'selected' : '' ?>>Core</option>
+                        <option value="business" <?= $oldDemoPlan === 'business' ? 'selected' : '' ?>>Business</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn--secondary btn--full">Accedi in demo (1 ora)</button>
             </form>
             <p class="login-card__footer">Accesso protetto e tracciato per garantirti compliance e sicurezza.</p>
         </section>

@@ -719,6 +719,8 @@ body[data-sidebar-collapsed="true"] .topbar{padding-left:24px;padding-right:24px
 .checkbox--compact input{width:14px;height:14px;border-radius:4px;box-shadow:none;}
 .checkbox--compact input::before{width:8px;height:8px;}
 .login-form__help{font-size:13px;color:#64748b;}
+.login-divider{display:flex;align-items:center;gap:12px;color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:.08em;}
+.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 .btn--full{width:100%;justify-content:center;box-shadow:0 12px 24px rgba(37,99,235,.3);}
 .btn--full:hover{box-shadow:0 16px 32px rgba(29,78,216,.32);}
 .login-card__footer{font-size:13px;color:#64748b;text-align:center;line-height:1.4;}

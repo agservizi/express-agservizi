@@ -85,6 +85,46 @@ final class AuthService
         return ['success' => true];
     }
 
+    /**
+     * @return array{success:bool,error?:string}
+     */
+    public function loginByUserId(int $userId, bool $remember = false): array
+    {
+        if ($userId <= 0) {
+            return [
+                'success' => false,
+                'error' => 'Utente non valido.',
+            ];
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT id, username, role_id, fullname, tenant_id
+             FROM users WHERE id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $userId]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            return [
+                'success' => false,
+                'error' => 'Utente non trovato.',
+            ];
+        }
+
+        session_regenerate_id(true);
+        $sessionUser = [
+            'id' => (int) $user['id'],
+            'username' => (string) $user['username'],
+            'role_id' => (int) $user['role_id'],
+            'fullname' => $user['fullname'] ?? '',
+            'tenant_id' => isset($user['tenant_id']) ? (int) $user['tenant_id'] : 1,
+        ];
+
+        $this->finalizeLogin($sessionUser, $remember);
+
+        return ['success' => true];
+    }
+
     public function logout(): void
     {
         $this->removeRememberToken();
