@@ -333,7 +333,7 @@ function resolveTenantLicense(PDO $pdo, int $tenantId): ?array
 
     $stmt = $pdo->prepare(
         'SELECT l.id, l.code, l.label, l.max_users, l.term_months, l.is_active, l.expires_at,
-                tl.max_users_override, tl.assigned_at, tl.revoked_at
+            tl.max_users_override, tl.assigned_at, tl.revoked_at, tl.renewal_paid_at
          FROM tenant_licenses tl
          INNER JOIN licenses l ON l.id = tl.license_id
          WHERE tl.tenant_id = :tenant AND tl.revoked_at IS NULL
@@ -399,6 +399,20 @@ function isLicenseExpired(?array $license): bool
     }
 
     return $timestamp < strtotime('today');
+}
+
+function isLicensePaid(?array $license): bool
+{
+    if ($license === null) {
+        return false;
+    }
+
+    $paidAt = $license['renewal_paid_at'] ?? null;
+    if ($paidAt === null) {
+        return false;
+    }
+
+    return trim((string) $paidAt) !== '';
 }
 
 /**
@@ -1491,7 +1505,35 @@ if ($currentUser === null && !in_array($page, ['landing', 'login', 'login_mfa', 
     exit;
 }
 
-if ($currentUser !== null && !$authService->hasRole('admin')) {
+if ($currentUser !== null && !$authService->hasRole('admin') && !$demoActive) {
+    $tenantLicense = $moduleAccess['license'] ?? null;
+
+    if ($tenantLicense === null) {
+        pushFlashToast([
+            'type' => 'warning',
+            'title' => 'Licenza non attiva',
+            'message' => 'Per accedere è necessaria una licenza attiva con quota di adesione pagata.',
+            'duration' => 0,
+            'dismissible' => false,
+        ]);
+        $authController->logout();
+        header('Location: index.php?page=login');
+        exit;
+    }
+
+    if (!isLicensePaid($tenantLicense)) {
+        pushFlashToast([
+            'type' => 'warning',
+            'title' => 'Quota adesione non pagata',
+            'message' => 'Il pagamento della quota adesione è richiesto per accedere alla piattaforma.',
+            'duration' => 0,
+            'dismissible' => false,
+        ]);
+        $authController->logout();
+        header('Location: index.php?page=login');
+        exit;
+    }
+
     if (($moduleAccess['plan_key'] ?? '') === 'expired') {
         pushFlashToast([
             'type' => 'warning',
