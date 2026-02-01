@@ -104,13 +104,15 @@ body[data-sidebar-collapsed="true"] .main{margin-left:72px;}
 .footer__divider{color:#cbd5f5;}
 .footer__links{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .footer__links a{color:#2563eb;font-weight:600;font-size:12px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);padding:6px 10px;border-radius:999px;transition:all .2s ease;}
+html{scroll-behavior:smooth;}
 .landing-body{margin:0;font-family:'Inter','Segoe UI',Arial,sans-serif;background:#0b1020;color:#e2e8f0;}
-.landing-hero{position:relative;overflow:hidden;padding:48px 6vw 80px;background:radial-gradient(circle at top left,rgba(37,99,235,.18),transparent 45%),radial-gradient(circle at 30% 20%,rgba(14,165,233,.2),transparent 55%),#0b1020;}
+.landing-hero{position:relative;overflow:hidden;padding:48px 0 80px;background:radial-gradient(circle at top left,rgba(37,99,235,.18),transparent 45%),radial-gradient(circle at 30% 20%,rgba(14,165,233,.2),transparent 55%),#0b1020;}
 .landing-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;}
+.landing-nav{padding:0 6vw;}
 .landing-brand{display:flex;align-items:center;gap:12px;font-weight:700;color:#f8fafc;}
 .landing-brand__dot{width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#38bdf8);box-shadow:0 0 18px rgba(56,189,248,.5);}
 .landing-brand__name{letter-spacing:.01em;font-size:16px;}
-.landing-hero__content{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;margin-top:56px;align-items:center;}
+.landing-hero__content{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;margin-top:56px;align-items:center;padding:0 6vw;}
 .landing-kicker{color:#93c5fd;text-transform:uppercase;letter-spacing:.18em;font-size:12px;font-weight:600;margin:0 0 14px;}
 .landing-hero h1{font-size:48px;line-height:1.1;margin:0 0 18px;color:#f8fafc;}
 .landing-subtitle{font-size:17px;color:#cbd5f5;line-height:1.7;margin:0 0 28px;}
