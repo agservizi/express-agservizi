@@ -590,7 +590,7 @@ $ssoController = new SsoController($ssoService);
 $pdaImportController = new PdaImportController($pdaImportService);
 $energyContractController = new EnergyContractController($energyContractService);
 
-$page = $_GET['page'] ?? 'dashboard';
+$page = $_GET['page'] ?? 'landing';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $currentUser = $authService->currentUser();
 TenantContext::setTenantId(isset($currentUser['tenant_id']) ? (int) $currentUser['tenant_id'] : 1);
@@ -1077,7 +1077,7 @@ if ($page === 'global_search') {
     ]);
 }
 
-if ($currentUser === null && !in_array($page, ['login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
+if ($currentUser === null && !in_array($page, ['landing', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
     header('Location: index.php?page=login');
     exit;
 }
@@ -1292,6 +1292,16 @@ if ($page === 'notifications_stream') {
 }
 
 switch ($page) {
+    case 'landing':
+        if ($currentUser !== null) {
+            header('Location: index.php?page=dashboard');
+            exit;
+        }
+        render('landing', [
+            'pageTitle' => 'Coresuite Express - Gestionale multi-tenant',
+            'currentUser' => $currentUser,
+        ], false);
+        break;
     case 'dashboard':
         $period = $_GET['period'] ?? 'day';
         if (!in_array($period, ['day', 'month', 'year'], true)) {
