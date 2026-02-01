@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+session_start();
+
 require __DIR__ . '/../config/database.php';
 
 spl_autoload_register(static function (string $class): void {
@@ -15,10 +17,22 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+use App\Services\AuthService;
 use App\Services\SalesService;
 use App\Services\ReceiptSettingsService;
+use App\Services\TenantContext;
 
 $pdo = Database::getConnection();
+$authService = new AuthService($pdo);
+$currentUser = $authService->currentUser();
+if ($currentUser === null) {
+  http_response_code(401);
+  echo 'Accesso non autorizzato.';
+  exit;
+}
+
+TenantContext::setTenantId(isset($currentUser['tenant_id']) ? (int) $currentUser['tenant_id'] : 1);
+
 $salesService = new SalesService($pdo);
 $receiptSettingsService = new ReceiptSettingsService();
 
