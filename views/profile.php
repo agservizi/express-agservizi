@@ -7,6 +7,8 @@ declare(strict_types=1);
  * @var string $roleSummary
  * @var array<int, array<string, string>> $shortcuts
  * @var array{total_sales:int,total_revenue:float,last_sale_at:?string,status_breakdown:array<string,int>} $salesSummary
+ * @var string|null $tenantLicenseLabel
+ * @var string|null $tenantLicenseExpiresAt
  */
 $profile = $profile ?? [];
 $roleLabel = $roleLabel ?? 'Operatore';
@@ -18,6 +20,10 @@ $salesSummary = $salesSummary ?? [
     'last_sale_at' => null,
     'status_breakdown' => [],
 ];
+$tenantLicenseLabel = isset($tenantLicenseLabel) && is_string($tenantLicenseLabel) ? trim($tenantLicenseLabel) : '';
+$tenantLicenseExpiresAt = isset($tenantLicenseExpiresAt) && is_string($tenantLicenseExpiresAt)
+    ? trim($tenantLicenseExpiresAt)
+    : '';
 
 $fullname = (string) ($profile['fullname'] ?? '');
 $username = (string) ($profile['username'] ?? '');
@@ -86,6 +92,16 @@ $totalRevenueFormatted = number_format((float) $salesSummary['total_revenue'], 2
                     <div class="profile-meta__row">
                         <dt class="profile-meta__label">Nome utente</dt>
                         <dd class="profile-meta__value"><?= htmlspecialchars($username !== '' ? $username : 'n/d') ?></dd>
+                    </div>
+                    <div class="profile-meta__row">
+                        <dt class="profile-meta__label">Piano attivo</dt>
+                        <dd class="profile-meta__value"><?= htmlspecialchars($tenantLicenseLabel !== '' ? $tenantLicenseLabel : 'n/d') ?></dd>
+                    </div>
+                    <div class="profile-meta__row">
+                        <dt class="profile-meta__label">Scadenza licenza</dt>
+                        <dd class="profile-meta__value">
+                            <?= htmlspecialchars($tenantLicenseExpiresAt !== '' ? $formatDateTime($tenantLicenseExpiresAt) : 'n/d') ?>
+                        </dd>
                     </div>
                     <div class="profile-meta__row">
                         <dt class="profile-meta__label">Creato il</dt>

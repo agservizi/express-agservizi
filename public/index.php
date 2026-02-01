@@ -382,6 +382,25 @@ function resolveLicensePlanKey(?array $license): string
     return 'start';
 }
 
+function isLicenseExpired(?array $license): bool
+{
+    if ($license === null) {
+        return false;
+    }
+
+    $expiresAt = $license['expires_at'] ?? null;
+    if ($expiresAt === null || trim((string) $expiresAt) === '') {
+        return false;
+    }
+
+    $timestamp = strtotime((string) $expiresAt);
+    if ($timestamp === false) {
+        return false;
+    }
+
+    return $timestamp < strtotime('today');
+}
+
 /**
  * @return array<string, array<int, string>>
  */
@@ -448,6 +467,14 @@ function resolveTenantModuleAccess(PDO $pdo, ?array $currentUser, \App\Services\
 
     $tenantId = (int) ($currentUser['tenant_id'] ?? 1);
     $license = resolveTenantLicense($pdo, $tenantId);
+    if (isLicenseExpired($license)) {
+        return [
+            'plan_key' => 'expired',
+            'modules' => [],
+            'license' => $license,
+        ];
+    }
+
     $planKey = resolveLicensePlanKey($license);
     $modules = $planModules[$planKey] ?? $planModules['start'];
 
@@ -1251,6 +1278,21 @@ if ($page === 'global_search') {
 if ($currentUser === null && !in_array($page, ['landing', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
     header('Location: index.php?page=login');
     exit;
+}
+
+if ($currentUser !== null && !$authService->hasRole('admin')) {
+    if (($moduleAccess['plan_key'] ?? '') === 'expired') {
+        pushFlashToast([
+            'type' => 'warning',
+            'title' => 'Licenza scaduta',
+            'message' => 'La licenza è scaduta. Contatta l’amministratore per il rinnovo.',
+            'duration' => 0,
+            'dismissible' => false,
+        ]);
+        $authController->logout();
+        header('Location: index.php?page=login');
+        exit;
+    }
 }
 
 if ($currentUser !== null) {
@@ -4189,6 +4231,33 @@ function render(string $view, array $params = [], bool $layout = true): void
 
     if ($layout && !array_key_exists('enabledModules', $params)) {
         $params['enabledModules'] = $GLOBALS['enabledModules'] ?? null;
+    }
+
+    if ($layout && !array_key_exists('tenantLicenseLabel', $params)) {
+        $license = $GLOBALS['tenantLicense'] ?? null;
+        $planKey = $GLOBALS['tenantPlanKey'] ?? null;
+        $labelValue = null;
+        if (is_array($license)) {
+            $labelValue = isset($license['label']) && trim((string) $license['label']) !== ''
+                ? trim((string) $license['label'])
+                : null;
+            if ($labelValue === null && isset($license['code']) && trim((string) $license['code']) !== '') {
+                $labelValue = trim((string) $license['code']);
+            }
+        }
+        if ($labelValue === null && is_string($planKey) && $planKey !== '') {
+            $labelValue = $planKey;
+        }
+        $params['tenantLicenseLabel'] = $labelValue;
+    }
+
+    if ($layout && !array_key_exists('tenantLicenseExpiresAt', $params)) {
+        $license = $GLOBALS['tenantLicense'] ?? null;
+        $expiresAt = null;
+        if (is_array($license) && isset($license['expires_at']) && $license['expires_at'] !== null) {
+            $expiresAt = (string) $license['expires_at'];
+        }
+        $params['tenantLicenseExpiresAt'] = $expiresAt;
     }
 
     extract($params, EXTR_SKIP);
