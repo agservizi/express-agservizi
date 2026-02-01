@@ -4702,6 +4702,9 @@ function render(string $view, array $params = [], bool $layout = true): void
         if ($labelValue === null && is_string($planKey) && $planKey !== '') {
             $labelValue = $planKey;
         }
+        if (!empty($params['isAdmin'])) {
+            $labelValue = 'Illimitata';
+        }
         $params['tenantLicenseLabel'] = $labelValue;
     }
 
@@ -4710,6 +4713,9 @@ function render(string $view, array $params = [], bool $layout = true): void
         $expiresAt = null;
         if (is_array($license) && isset($license['expires_at']) && $license['expires_at'] !== null) {
             $expiresAt = (string) $license['expires_at'];
+        }
+        if (!empty($params['isAdmin'])) {
+            $expiresAt = '';
         }
         $params['tenantLicenseExpiresAt'] = $expiresAt;
     }

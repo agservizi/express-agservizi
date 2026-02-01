@@ -26,6 +26,7 @@ $tenantLicenseExpiresAt = isset($tenantLicenseExpiresAt) && is_string($tenantLic
     ? trim($tenantLicenseExpiresAt)
     : '';
 $passwordFeedback = isset($passwordFeedback) && is_array($passwordFeedback) ? $passwordFeedback : null;
+$isAdmin = isset($isAdmin) ? (bool) $isAdmin : false;
 
 $fullname = (string) ($profile['fullname'] ?? '');
 $username = (string) ($profile['username'] ?? '');
@@ -97,12 +98,14 @@ $totalRevenueFormatted = number_format((float) $salesSummary['total_revenue'], 2
                     </div>
                     <div class="profile-meta__row">
                         <dt class="profile-meta__label">Piano attivo</dt>
-                        <dd class="profile-meta__value"><?= htmlspecialchars($tenantLicenseLabel !== '' ? $tenantLicenseLabel : 'n/d') ?></dd>
+                        <dd class="profile-meta__value">
+                            <?= htmlspecialchars($isAdmin ? 'Illimitata' : ($tenantLicenseLabel !== '' ? $tenantLicenseLabel : 'n/d')) ?>
+                        </dd>
                     </div>
                     <div class="profile-meta__row">
                         <dt class="profile-meta__label">Scadenza licenza</dt>
                         <dd class="profile-meta__value">
-                            <?= htmlspecialchars($tenantLicenseExpiresAt !== '' ? $formatDateTime($tenantLicenseExpiresAt) : 'n/d') ?>
+                            <?= htmlspecialchars($isAdmin ? 'Illimitata' : ($tenantLicenseExpiresAt !== '' ? $formatDateTime($tenantLicenseExpiresAt) : 'n/d')) ?>
                         </dd>
                     </div>
                     <div class="profile-meta__row">
