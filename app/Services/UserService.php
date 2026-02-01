@@ -20,8 +20,25 @@ final class UserService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function listOperators(): array
+    public function listOperators(?int $tenantId = null): array
     {
+        if ($tenantId !== null) {
+            $stmt = $this->pdo->prepare(
+                'SELECT u.id, u.username, u.email, u.fullname, u.created_at, u.updated_at,
+                        u.role_id, r.name AS role_name, u.mfa_enabled, u.mfa_enabled_at,
+                        u.tenant_id, t.name AS tenant_name
+                 FROM users u
+                 INNER JOIN roles r ON r.id = u.role_id
+                 LEFT JOIN tenants t ON t.id = u.tenant_id
+                 WHERE u.tenant_id = :tenant_id
+                 ORDER BY u.fullname ASC, u.username ASC'
+            );
+            $stmt->execute([':tenant_id' => $tenantId]);
+            $rows = $stmt->fetchAll();
+
+            return is_array($rows) ? $rows : [];
+        }
+
         $stmt = $this->pdo->query(
             'SELECT u.id, u.username, u.email, u.fullname, u.created_at, u.updated_at,
                     u.role_id, r.name AS role_name, u.mfa_enabled, u.mfa_enabled_at,
@@ -67,6 +84,18 @@ final class UserService
     public function getRoles(): array
     {
         $stmt = $this->pdo->query('SELECT id, name FROM roles ORDER BY name ASC');
+        $rows = $stmt ? $stmt->fetchAll() : [];
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getRolesForTenant(): array
+    {
+        $stmt = $this->pdo->prepare('SELECT id, name FROM roles WHERE LOWER(name) <> :admin ORDER BY name ASC');
+        $stmt->execute([':admin' => 'admin']);
         $rows = $stmt ? $stmt->fetchAll() : [];
 
         return is_array($rows) ? $rows : [];

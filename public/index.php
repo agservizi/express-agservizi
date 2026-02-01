@@ -1977,12 +1977,14 @@ switch ($page) {
         $ssoSecretPreview = $_SESSION['settings_sso_secret'] ?? null;
         unset($_SESSION['settings_sso_secret']);
         $ssoEnabled = $ssoService->isEnabled();
+        $tenantId = isset($currentUser['tenant_id']) ? (int) $currentUser['tenant_id'] : 1;
         $isAdmin = $authService->hasRole('admin');
+        $canManageTenantSettings = $isAdmin || $tenantId > 1;
         $pdaSettings = $pdaSettingsService->getSettings();
         $pdaOpen = isset($_GET['pda_open']) || $pdaSettingsFeedback !== null;
         $receiptSettings = $receiptSettingsService->getSettings();
         $receiptOpen = isset($_GET['receipt_open']) || $receiptSettingsFeedback !== null;
-        $energyProviders = $energyProviderService->listProviders();
+        $energyProviders = $canManageTenantSettings ? $energyProviderService->listProviders() : [];
         $energyOpen = isset($_GET['energy_open']) || $energySettingsFeedback !== null;
         $energyOffersImportStatus = loadEnergyOffersImportStatus();
         $licensesOpen = isset($_GET['licenses_open']) || $licenseSettingsFeedback !== null || $licenseGeneratedCode !== null;
@@ -2008,7 +2010,7 @@ switch ($page) {
         $operatorEditId = 0;
         $providersOpenOverride = null;
 
-        if ($isAdmin) {
+        if ($canManageTenantSettings) {
             if (isset($_SESSION['settings_operator_form']) && is_array($_SESSION['settings_operator_form'])) {
                 $storedOperatorForm = $_SESSION['settings_operator_form'];
                 unset($_SESSION['settings_operator_form']);
@@ -2062,11 +2064,11 @@ switch ($page) {
             $isLicenseAction = false;
 
             if ($action === 'update_threshold') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono aggiornare le soglie.',
+                        'error' => 'Solo i responsabili del tenant possono aggiornare le soglie.',
                     ];
                 } else {
                     $providerId = (int) ($_POST['provider_id'] ?? 0);
@@ -2074,20 +2076,25 @@ switch ($page) {
                     $result = $stockMonitorService->updateThreshold($providerId, $threshold);
                 }
             } elseif ($action === 'create_operator') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono creare operatori.',
+                        'error' => 'Solo i responsabili del tenant possono creare operatori.',
                     ];
                 } else {
-                    $result = $userService->createOperator($_POST);
-                    if (($result['success'] ?? false)) {
+                    $payload = $_POST;
+                    if (!$isAdmin) {
+                        $payload['operator_tenant_id'] = $tenantId;
+                        unset($payload['operator_license_id']);
+                    }
+                    $result = $userService->createOperator($payload);
+                    if (($result['success'] ?? false) && $isAdmin) {
                         $licenseId = isset($_POST['operator_license_id']) ? (int) $_POST['operator_license_id'] : 0;
-                        $tenantId = isset($_POST['operator_tenant_id']) ? (int) $_POST['operator_tenant_id'] : 0;
-                        if ($licenseId > 0 && $tenantId > 0) {
+                        $targetTenantId = isset($_POST['operator_tenant_id']) ? (int) $_POST['operator_tenant_id'] : 0;
+                        if ($licenseId > 0 && $targetTenantId > 0) {
                             $assignment = $tenantService->assignLicense([
-                                'tenant_id' => $tenantId,
+                                'tenant_id' => $targetTenantId,
                                 'license_id' => $licenseId,
                             ]);
                             if (!($assignment['success'] ?? false)) {
@@ -2104,22 +2111,43 @@ switch ($page) {
                     $redirectParams['operators_open'] = 1;
                 }
             } elseif ($action === 'update_operator') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono aggiornare operatori.',
+                        'error' => 'Solo i responsabili del tenant possono aggiornare operatori.',
                     ];
                 } else {
                     $operatorId = isset($_POST['operator_id']) ? (int) $_POST['operator_id'] : 0;
+                    if (!$isAdmin && $operatorId > 0) {
+                        $operatorRow = $userService->findUser($operatorId);
+                        $operatorTenantId = isset($operatorRow['tenant_id']) ? (int) $operatorRow['tenant_id'] : 0;
+                        if ($operatorRow === null || $operatorTenantId !== $tenantId) {
+                            $result = [
+                                'success' => false,
+                                'message' => 'Operazione non autorizzata.',
+                                'error' => 'Puoi modificare solo operatori del tuo tenant.',
+                            ];
+                            $redirectParams['operators_open'] = 1;
+                            $_SESSION['settings_feedback'] = $result;
+                            header('Location: index.php?' . http_build_query(['page' => 'settings', 'operators_open' => 1]));
+                            exit;
+                        }
+                    }
+                    $payload = $_POST;
+                    if (!$isAdmin) {
+                        $payload['operator_edit_tenant_id'] = $tenantId;
+                    }
                     $formData = [
                         'fullname' => trim((string) ($_POST['operator_edit_fullname'] ?? '')),
                         'username' => trim((string) ($_POST['operator_edit_username'] ?? '')),
                         'role_id' => isset($_POST['operator_edit_role']) ? (int) $_POST['operator_edit_role'] : 0,
                         'email' => trim((string) ($_POST['operator_edit_email'] ?? '')),
-                        'tenant_id' => isset($_POST['operator_edit_tenant_id']) ? (int) $_POST['operator_edit_tenant_id'] : 0,
+                        'tenant_id' => $isAdmin
+                            ? (int) ($_POST['operator_edit_tenant_id'] ?? 0)
+                            : $tenantId,
                     ];
-                    $result = $userService->updateOperator($operatorId, $_POST);
+                    $result = $userService->updateOperator($operatorId, $payload);
                     if (!($result['success'] ?? false)) {
                         $_SESSION['settings_operator_form'] = [
                             'id' => $operatorId,
@@ -2134,36 +2162,51 @@ switch ($page) {
                 }
                 $redirectParams['operators_open'] = 1;
             } elseif ($action === 'delete_operator') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono eliminare operatori.',
+                        'error' => 'Solo i responsabili del tenant possono eliminare operatori.',
                     ];
                 } else {
                     $operatorId = isset($_POST['operator_id']) ? (int) $_POST['operator_id'] : 0;
                     $actingUserId = isset($currentUser['id']) ? (int) $currentUser['id'] : 0;
+                    if (!$isAdmin && $operatorId > 0) {
+                        $operatorRow = $userService->findUser($operatorId);
+                        $operatorTenantId = isset($operatorRow['tenant_id']) ? (int) $operatorRow['tenant_id'] : 0;
+                        if ($operatorRow === null || $operatorTenantId !== $tenantId) {
+                            $result = [
+                                'success' => false,
+                                'message' => 'Operazione non autorizzata.',
+                                'error' => 'Puoi eliminare solo operatori del tuo tenant.',
+                            ];
+                            $redirectParams['operators_open'] = 1;
+                            $_SESSION['settings_feedback'] = $result;
+                            header('Location: index.php?' . http_build_query(['page' => 'settings', 'operators_open' => 1]));
+                            exit;
+                        }
+                    }
                     $result = $userService->deleteOperator($operatorId, $actingUserId);
                     unset($_SESSION['settings_operator_form']);
                 }
                 $redirectParams['operators_open'] = 1;
             } elseif ($action === 'create_provider') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono creare gestori.',
+                        'error' => 'Solo i responsabili del tenant possono creare gestori.',
                     ];
                 } else {
                     $result = $providerService->createProvider($_POST, (int) ($currentUser['id'] ?? 0));
                 }
                 $redirectParams['providers_open'] = 1;
             } elseif ($action === 'update_provider') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono aggiornare i gestori.',
+                        'error' => 'Solo i responsabili del tenant possono aggiornare i gestori.',
                     ];
                 } else {
                     $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
@@ -2171,11 +2214,11 @@ switch ($page) {
                 }
                 $redirectParams['providers_open'] = 1;
             } elseif ($action === 'delete_provider') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono eliminare gestori.',
+                        'error' => 'Solo i responsabili del tenant possono eliminare gestori.',
                     ];
                 } else {
                     $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
@@ -2184,11 +2227,11 @@ switch ($page) {
                 $redirectParams['providers_open'] = 1;
             } elseif ($action === 'create_energy_provider') {
                 $isEnergyAction = true;
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono creare gestori energia.',
+                        'error' => 'Solo i responsabili del tenant possono creare gestori energia.',
                     ];
                 } else {
                     $result = $energyProviderService->createProvider($_POST, (int) ($currentUser['id'] ?? 0));
@@ -2197,11 +2240,11 @@ switch ($page) {
                 $redirectParams['energy_open'] = 1;
             } elseif ($action === 'update_energy_provider') {
                 $isEnergyAction = true;
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono aggiornare gestori energia.',
+                        'error' => 'Solo i responsabili del tenant possono aggiornare gestori energia.',
                     ];
                 } else {
                     $providerId = isset($_POST['energy_provider_id']) ? (int) $_POST['energy_provider_id'] : 0;
@@ -2211,11 +2254,11 @@ switch ($page) {
                 $redirectParams['energy_open'] = 1;
             } elseif ($action === 'delete_energy_provider') {
                 $isEnergyAction = true;
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono eliminare gestori energia.',
+                        'error' => 'Solo i responsabili del tenant possono eliminare gestori energia.',
                     ];
                 } else {
                     $providerId = isset($_POST['energy_provider_id']) ? (int) $_POST['energy_provider_id'] : 0;
@@ -2318,11 +2361,11 @@ switch ($page) {
                 $redirectParams['pda_open'] = 1;
             } elseif ($action === 'save_receipt_settings') {
                 $isReceiptAction = true;
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'errors' => ['Solo gli amministratori possono configurare lo scontrino.'],
+                        'errors' => ['Solo i responsabili del tenant possono configurare lo scontrino.'],
                     ];
                 } else {
                     $result = $receiptSettingsService->saveSettings($_POST);
@@ -2330,11 +2373,11 @@ switch ($page) {
                 $_SESSION['receipt_settings_feedback'] = $result;
                 $redirectParams['receipt_open'] = 1;
             } elseif ($action === 'update_product_tax') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono aggiornare le impostazioni fiscali.',
+                        'error' => 'Solo i responsabili del tenant possono aggiornare le impostazioni fiscali.',
                     ];
                 } else {
                     $productId = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
@@ -2346,21 +2389,21 @@ switch ($page) {
                 }
                 $redirectParams['fiscal_open'] = 1;
             } elseif ($action === 'create_discount_campaign') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono creare campagne.',
+                        'error' => 'Solo i responsabili del tenant possono creare campagne.',
                     ];
                 } else {
                     $result = $discountCampaignService->create($_POST);
                 }
             } elseif ($action === 'toggle_discount_campaign') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono aggiornare campagne.',
+                        'error' => 'Solo i responsabili del tenant possono aggiornare campagne.',
                     ];
                 } else {
                     $campaignId = (int) ($_POST['campaign_id'] ?? 0);
@@ -2368,14 +2411,29 @@ switch ($page) {
                     $result = $discountCampaignService->setStatus($campaignId, $target);
                 }
             } elseif ($action === 'force_disable_mfa') {
-                if (!$isAdmin) {
+                if (!$canManageTenantSettings) {
                     $result = [
                         'success' => false,
                         'message' => 'Operazione non autorizzata.',
-                        'error' => 'Solo gli amministratori possono intervenire sull’MFA degli operatori.',
+                        'error' => 'Solo i responsabili del tenant possono intervenire sull’MFA degli operatori.',
                     ];
                 } else {
                     $operatorId = isset($_POST['operator_id']) ? (int) $_POST['operator_id'] : 0;
+                    if (!$isAdmin && $operatorId > 0) {
+                        $operatorRow = $userService->findUser($operatorId);
+                        $operatorTenantId = isset($operatorRow['tenant_id']) ? (int) $operatorRow['tenant_id'] : 0;
+                        if ($operatorRow === null || $operatorTenantId !== $tenantId) {
+                            $result = [
+                                'success' => false,
+                                'message' => 'Operazione non autorizzata.',
+                                'error' => 'Puoi intervenire solo su operatori del tuo tenant.',
+                            ];
+                            $redirectParams['operators_open'] = 1;
+                            $_SESSION['settings_feedback'] = $result;
+                            header('Location: index.php?' . http_build_query(['page' => 'settings', 'operators_open' => 1]));
+                            exit;
+                        }
+                    }
                     $result = $authController->disableMfa($operatorId, null, true);
                     $result['message'] = ($result['success'] ?? false)
                         ? 'MFA disattivata per l’operatore selezionato.'
@@ -2510,8 +2568,14 @@ switch ($page) {
             exit;
         }
 
-        if ($isAdmin && $operatorEditId > 0) {
+        if ($canManageTenantSettings && $operatorEditId > 0) {
             $operatorEdit = $userService->findUser($operatorEditId);
+            if (!$isAdmin && $operatorEdit !== null) {
+                $operatorTenantId = isset($operatorEdit['tenant_id']) ? (int) $operatorEdit['tenant_id'] : 0;
+                if ($operatorTenantId !== $tenantId) {
+                    $operatorEdit = null;
+                }
+            }
             if ($operatorEdit === null) {
                 if ($feedback === null) {
                     $feedback = [
@@ -2528,7 +2592,7 @@ switch ($page) {
 
     $auditPage = isset($_GET['audit_page']) ? max((int) $_GET['audit_page'], 1) : 1;
         $auditPerPage = isset($_GET['audit_per_page']) ? max(5, min((int) $_GET['audit_per_page'], 25)) : 10;
-        $auditLogsResult = paginateAuditLogs($pdo, $auditPage, $auditPerPage);
+    $auditLogsResult = paginateAuditLogs($pdo, $auditPage, $auditPerPage, $isAdmin ? null : $tenantId);
         $buildAuditPageUrl = static function (int $pageNo) use ($auditLogsResult): string {
             $target = max(1, $pageNo);
             $perPage = (int) ($auditLogsResult['pagination']['per_page'] ?? 10);
@@ -2550,11 +2614,15 @@ switch ($page) {
             'feedback' => $feedback,
             'currentUser' => $currentUser,
             'pageTitle' => 'Impostazioni',
-            'roles' => $isAdmin ? $userService->getRoles() : [],
-            'operators' => $isAdmin ? $userService->listOperators() : [],
+            'roles' => $canManageTenantSettings
+                ? ($isAdmin ? $userService->getRoles() : $userService->getRolesForTenant())
+                : [],
+            'operators' => $canManageTenantSettings
+                ? ($isAdmin ? $userService->listOperators() : $userService->listOperators($tenantId))
+                : [],
             'tenants' => $tenantsList,
             'licenses' => $licenses,
-            'providers' => $isAdmin ? $providerService->listProviders() : [],
+            'providers' => $canManageTenantSettings ? $providerService->listProviders() : [],
             'energyProviders' => $energyProviders,
             'energyOffersImportStatus' => $energyOffersImportStatus,
             'energyOpen' => $energyOpen,
@@ -2568,10 +2636,12 @@ switch ($page) {
             'operatorEditForm' => $operatorEditForm,
             'operatorsOpen' => $operatorsOpenOverride,
             'providersOpen' => $providersOpenOverride,
-            'fiscalProducts' => $productService->listForFiscalSettings(),
+            'fiscalProducts' => $canManageTenantSettings ? $productService->listForFiscalSettings() : [],
             'fiscalOpen' => $fiscalOpen,
-            'discountCampaigns' => $discountCampaignService->listAll(),
+            'discountCampaigns' => $canManageTenantSettings ? $discountCampaignService->listAll() : [],
             'isAdmin' => $isAdmin,
+            'canManageTenantSettings' => $canManageTenantSettings,
+            'currentTenantId' => $tenantId,
             'auditLogs' => $auditLogsResult['rows'],
             'auditPagination' => $auditLogsResult['pagination'],
             'buildAuditPageUrl' => $buildAuditPageUrl,
@@ -4881,13 +4951,19 @@ function buildCampaignPerformance(PDO $pdo): array
     ];
 }
 
-function paginateAuditLogs(PDO $pdo, int $page, int $perPage = 10): array
+function paginateAuditLogs(PDO $pdo, int $page, int $perPage = 10, ?int $tenantId = null): array
 {
     $page = max(1, $page);
     $perPage = max(5, min($perPage, 25));
 
-    $countStmt = $pdo->query('SELECT COUNT(*) FROM audit_log');
-    $total = (int) ($countStmt !== false ? ($countStmt->fetchColumn() ?: 0) : 0);
+    if ($tenantId !== null) {
+        $countStmt = $pdo->prepare('SELECT COUNT(*) FROM audit_log WHERE tenant_id = :tenant_id');
+        $countStmt->execute([':tenant_id' => $tenantId]);
+        $total = (int) ($countStmt->fetchColumn() ?: 0);
+    } else {
+        $countStmt = $pdo->query('SELECT COUNT(*) FROM audit_log');
+        $total = (int) ($countStmt !== false ? ($countStmt->fetchColumn() ?: 0) : 0);
+    }
     $pages = $total > 0 ? (int) ceil($total / $perPage) : 1;
     if ($page > $pages) {
         $page = $pages;
@@ -4896,14 +4972,18 @@ function paginateAuditLogs(PDO $pdo, int $page, int $perPage = 10): array
     $rows = [];
     if ($total > 0) {
         $offset = ($page - 1) * $perPage;
-        $stmt = $pdo->prepare(
-            'SELECT al.id, al.action, al.description, al.created_at, u.fullname, u.username
-             FROM audit_log al
-             LEFT JOIN users u ON u.id = al.user_id
-             ORDER BY al.created_at DESC
-             LIMIT :limit OFFSET :offset'
-        );
+        $sql = 'SELECT al.id, al.action, al.description, al.created_at, u.fullname, u.username
+                FROM audit_log al
+                LEFT JOIN users u ON u.id = al.user_id';
+        if ($tenantId !== null) {
+            $sql .= ' WHERE al.tenant_id = :tenant_id';
+        }
+        $sql .= ' ORDER BY al.created_at DESC LIMIT :limit OFFSET :offset';
+        $stmt = $pdo->prepare($sql);
         if ($stmt !== false) {
+            if ($tenantId !== null) {
+                $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+            }
             $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();

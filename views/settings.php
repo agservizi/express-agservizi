@@ -43,6 +43,8 @@ declare(strict_types=1);
  * @var bool $licensesOpen
  * @var array<int, array<string, mixed>> $licenseActivations
  * @var int $licenseFocusId
+ * @var bool $canManageTenantSettings
+ * @var int $currentTenantId
  */
 $pageTitle = $pageTitle ?? 'Impostazioni';
 $roles = $roles ?? [];
@@ -51,6 +53,8 @@ $providers = $providers ?? [];
 $discountCampaigns = $discountCampaigns ?? [];
 $fiscalProducts = $fiscalProducts ?? [];
 $isAdmin = $isAdmin ?? false;
+$canManageTenantSettings = $canManageTenantSettings ?? $isAdmin;
+$currentTenantId = isset($currentTenantId) ? (int) $currentTenantId : (int) ($currentUser['tenant_id'] ?? 1);
 $operatorEdit = $operatorEdit ?? null;
 $operatorEditForm = isset($operatorEditForm) && is_array($operatorEditForm) ? $operatorEditForm : null;
 $auditLogs = $auditLogs ?? [];
@@ -70,10 +74,10 @@ $providersOpenProp = $providersOpen ?? null;
 $inventoryOpen = $feedback !== null && isset($feedback['message']) && stripos((string) $feedback['message'], 'soglia') !== false;
 $operatorsOpen = is_bool($operatorsOpenProp)
     ? $operatorsOpenProp
-    : ($isAdmin && $feedback !== null && ($feedback['success'] ?? false) === false && ! $inventoryOpen);
+    : ($canManageTenantSettings && $feedback !== null && ($feedback['success'] ?? false) === false && ! $inventoryOpen);
 $providersOpen = is_bool($providersOpenProp)
     ? $providersOpenProp
-    : ($isAdmin && $feedback !== null && stripos((string) ($feedback['message'] ?? ''), 'gestore') !== false);
+    : ($canManageTenantSettings && $feedback !== null && stripos((string) ($feedback['message'] ?? ''), 'gestore') !== false);
 $ssoClients = isset($ssoClients) && is_array($ssoClients) ? $ssoClients : [];
 $ssoFeedback = isset($ssoFeedback) && is_array($ssoFeedback) ? $ssoFeedback : null;
 $ssoSecretPreview = isset($ssoSecretPreview) && is_array($ssoSecretPreview) ? $ssoSecretPreview : null;
@@ -171,6 +175,9 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 <span class="settings-accordion__icon" aria-hidden="true"></span>
             </button>
             <div class="settings-accordion__content" data-accordion-content <?= $inventoryOpen ? '' : 'hidden' ?>>
+                <?php if (!$canManageTenantSettings): ?>
+                    <p class="muted">Solo i responsabili del tenant possono modificare le soglie.</p>
+                <?php endif; ?>
                 <p class="muted">Definisci il livello minimo di SIM disponibili per ciascun operatore. Al raggiungimento della soglia viene generato un alert visibile in dashboard e via email.</p>
                 <div class="table-wrapper table-wrapper--embedded">
                     <table class="table table--compact">
@@ -241,8 +248,8 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 <span class="settings-accordion__icon" aria-hidden="true"></span>
             </button>
             <div class="settings-accordion__content" data-accordion-content <?= $fiscalOpen ? '' : 'hidden' ?>>
-                <?php if (!$isAdmin): ?>
-                    <p class="muted">Solo gli amministratori possono gestire le impostazioni fiscali dei prodotti.</p>
+                <?php if (!$canManageTenantSettings): ?>
+                    <p class="muted">Solo i responsabili del tenant possono gestire le impostazioni fiscali dei prodotti.</p>
                 <?php else: ?>
                     <p class="muted">Imposta aliquota e codice IVA per ciascun prodotto: i valori vengono riportati automaticamente nello scontrino.</p>
                     <?php if (empty($fiscalProducts)): ?>
@@ -358,8 +365,8 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 <span class="settings-accordion__icon" aria-hidden="true"></span>
             </button>
             <div class="settings-accordion__content" data-accordion-content <?= $campaignsOpen ? '' : 'hidden' ?>>
-                <?php if (!$isAdmin): ?>
-                    <p class="muted">Solo gli amministratori possono gestire le campagne sconto.</p>
+                <?php if (!$canManageTenantSettings): ?>
+                    <p class="muted">Solo i responsabili del tenant possono gestire le campagne sconto.</p>
                 <?php else: ?>
                     <div class="settings-operators">
                         <section class="settings-operators__panel">
@@ -533,7 +540,7 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
             </article>
         <?php endif; ?>
 
-        <?php if ($isAdmin): ?>
+        <?php if ($canManageTenantSettings): ?>
             <article class="settings-accordion__item" data-accordion data-open="<?= $receiptOpen ? 'true' : 'false' ?>">
                 <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $receiptOpen ? 'true' : 'false' ?>">
                     <span class="settings-accordion__title">Configurazione scontrino</span>
@@ -795,8 +802,8 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 <span class="settings-accordion__icon" aria-hidden="true"></span>
             </button>
             <div class="settings-accordion__content" data-accordion-content <?= $providersOpen ? '' : 'hidden' ?>>
-                <?php if (!$isAdmin): ?>
-                    <p class="muted">Solo gli amministratori possono creare o modificare i gestori.</p>
+                <?php if (!$canManageTenantSettings): ?>
+                    <p class="muted">Solo i responsabili del tenant possono creare o modificare i gestori.</p>
                 <?php else: ?>
                     <div class="settings-operators">
                         <section class="settings-operators__panel">
@@ -900,8 +907,8 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                         <?php endif; ?>
                     </div>
                 <?php endif; ?>
-                <?php if (!$isAdmin): ?>
-                    <p class="muted">Solo gli amministratori possono creare o modificare i gestori energia.</p>
+                <?php if (!$canManageTenantSettings): ?>
+                    <p class="muted">Solo i responsabili del tenant possono creare o modificare i gestori energia.</p>
                 <?php else: ?>
                     <div class="settings-operators">
                         <section class="settings-operators__panel">
@@ -940,27 +947,29 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
 
                         <section class="settings-operators__panel">
                             <h4>Gestori energia configurati</h4>
-                            <div class="settings-operators__actions" style="margin:10px 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-                                <form method="post" class="inline-form" onsubmit="return confirm('Importare ora le offerte ARERA?');">
-                                    <input type="hidden" name="action" value="import_energy_offers">
-                                    <button type="submit" class="btn btn--secondary btn--small">Importa offerte ARERA</button>
-                                </form>
-                                <?php if (!empty($energyOffersImportStatus['last_run']) || !empty($energyOffersImportStatus['last_started'])): ?>
-                                    <?php
-                                        $lastRun = !empty($energyOffersImportStatus['last_run'])
-                                            ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_run'])
-                                            : null;
-                                        $lastStarted = !empty($energyOffersImportStatus['last_started'])
-                                            ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_started'])
-                                            : null;
-                                        $statusLabel = $energyOffersImportStatus['last_status'] ?? '';
-                                        $statusText = $statusLabel === 'success'
-                                            ? 'Completato'
-                                            : ($statusLabel === 'error' ? 'Errore' : 'In corso');
-                                    ?>
-                                    <span class="muted">Ultimo import: <?= htmlspecialchars($lastRun ?? $lastStarted ?? 'n/d') ?> · Stato: <?= htmlspecialchars($statusText) ?></span>
-                                <?php endif; ?>
-                            </div>
+                            <?php if ($isAdmin): ?>
+                                <div class="settings-operators__actions" style="margin:10px 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                                    <form method="post" class="inline-form" onsubmit="return confirm('Importare ora le offerte ARERA?');">
+                                        <input type="hidden" name="action" value="import_energy_offers">
+                                        <button type="submit" class="btn btn--secondary btn--small">Importa offerte ARERA</button>
+                                    </form>
+                                    <?php if (!empty($energyOffersImportStatus['last_run']) || !empty($energyOffersImportStatus['last_started'])): ?>
+                                        <?php
+                                            $lastRun = !empty($energyOffersImportStatus['last_run'])
+                                                ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_run'])
+                                                : null;
+                                            $lastStarted = !empty($energyOffersImportStatus['last_started'])
+                                                ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_started'])
+                                                : null;
+                                            $statusLabel = $energyOffersImportStatus['last_status'] ?? '';
+                                            $statusText = $statusLabel === 'success'
+                                                ? 'Completato'
+                                                : ($statusLabel === 'error' ? 'Errore' : 'In corso');
+                                        ?>
+                                        <span class="muted">Ultimo import: <?= htmlspecialchars($lastRun ?? $lastStarted ?? 'n/d') ?> · Stato: <?= htmlspecialchars($statusText) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
                             <?php if (empty($energyProviders)): ?>
                                 <p class="muted">Nessun gestore energia configurato.</p>
                             <?php else: ?>
@@ -1032,8 +1041,8 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 <span class="settings-accordion__icon" aria-hidden="true"></span>
             </button>
             <div class="settings-accordion__content" data-accordion-content <?= $operatorsOpen ? '' : 'hidden' ?>>
-                <?php if (!$isAdmin): ?>
-                    <p class="muted">Solo gli amministratori possono creare o modificare operatori.</p>
+                <?php if (!$canManageTenantSettings): ?>
+                    <p class="muted">Solo i responsabili del tenant possono creare o modificare operatori.</p>
                 <?php else: ?>
                     <div class="settings-operators">
                         <section class="settings-operators__panel">
@@ -1062,17 +1071,21 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="settings-form__field">
-                                        <label for="operator_tenant_id">Tenant</label>
-                                        <select id="operator_tenant_id" name="operator_tenant_id" required>
-                                            <option value="">Seleziona...</option>
-                                            <?php foreach ($tenants as $tenant): ?>
-                                                <option value="<?= (int) $tenant['id'] ?>">
-                                                    <?= htmlspecialchars((string) $tenant['name']) ?> (<?= htmlspecialchars((string) $tenant['slug']) ?>)
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
+                                    <?php if ($isAdmin): ?>
+                                        <div class="settings-form__field">
+                                            <label for="operator_tenant_id">Tenant</label>
+                                            <select id="operator_tenant_id" name="operator_tenant_id" required>
+                                                <option value="">Seleziona...</option>
+                                                <?php foreach ($tenants as $tenant): ?>
+                                                    <option value="<?= (int) $tenant['id'] ?>">
+                                                        <?= htmlspecialchars((string) $tenant['name']) ?> (<?= htmlspecialchars((string) $tenant['slug']) ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    <?php else: ?>
+                                        <input type="hidden" name="operator_tenant_id" value="<?= $currentTenantId ?>">
+                                    <?php endif; ?>
                                     <div class="settings-form__field">
                                         <label for="operator_password">Password</label>
                                         <input type="password" id="operator_password" name="operator_password" minlength="8" required>
@@ -1081,17 +1094,19 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                         <label for="operator_password_confirmation">Conferma password</label>
                                         <input type="password" id="operator_password_confirmation" name="operator_password_confirmation" minlength="8" required>
                                     </div>
-                                    <div class="settings-form__field">
-                                        <label for="operator_license_id">Licenza da assegnare</label>
-                                        <select id="operator_license_id" name="operator_license_id">
-                                            <option value="">Nessuna</option>
-                                            <?php foreach ($licenses as $license): ?>
-                                                <option value="<?= (int) $license['id'] ?>">
-                                                    <?= htmlspecialchars((string) $license['code']) ?><?= $license['label'] ? ' - ' . htmlspecialchars((string) $license['label']) : '' ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
+                                    <?php if ($isAdmin): ?>
+                                        <div class="settings-form__field">
+                                            <label for="operator_license_id">Licenza da assegnare</label>
+                                            <select id="operator_license_id" name="operator_license_id">
+                                                <option value="">Nessuna</option>
+                                                <?php foreach ($licenses as $license): ?>
+                                                    <option value="<?= (int) $license['id'] ?>">
+                                                        <?= htmlspecialchars((string) $license['code']) ?><?= $license['label'] ? ' - ' . htmlspecialchars((string) $license['label']) : '' ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    <?php endif; ?>
                                     <div class="settings-form__field">
                                         <label class="checkbox">
                                             <input type="checkbox" name="operator_send_credentials" value="1" checked>
@@ -1116,7 +1131,9 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                                 <th>Nome</th>
                                                 <th>Nome utente</th>
                                                 <th>Email</th>
-                                                <th>Tenant</th>
+                                                <?php if ($isAdmin): ?>
+                                                    <th>Tenant</th>
+                                                <?php endif; ?>
                                                 <th>Ruolo</th>
                                                 <th>MFA</th>
                                                 <th>Creato il</th>
@@ -1145,7 +1162,9 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                                     <td><?= htmlspecialchars((string) ($operator['fullname'] ?? '')) ?></td>
                                                     <td><?= htmlspecialchars((string) $operator['username']) ?></td>
                                                     <td><?= !empty($operator['email']) ? htmlspecialchars((string) $operator['email']) : '—' ?></td>
-                                                    <td><?= !empty($operator['tenant_name']) ? htmlspecialchars((string) $operator['tenant_name']) : '—' ?></td>
+                                                    <?php if ($isAdmin): ?>
+                                                        <td><?= !empty($operator['tenant_name']) ? htmlspecialchars((string) $operator['tenant_name']) : '—' ?></td>
+                                                    <?php endif; ?>
                                                     <td><?= htmlspecialchars((string) $operator['role_name']) ?></td>
                                                     <td>
                                                         <?php if ($mfaEnabled): ?>
@@ -1226,18 +1245,22 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                                                     <?php endforeach; ?>
                                                 </select>
                                             </div>
-                                            <div class="settings-form__field">
-                                                <label for="operator_edit_tenant_id">Tenant</label>
-                                                <select id="operator_edit_tenant_id" name="operator_edit_tenant_id" required>
-                                                    <option value="">Seleziona...</option>
-                                                    <?php foreach ($tenants as $tenant): ?>
-                                                        <?php $tenantId = (int) ($tenant['id'] ?? 0); ?>
-                                                        <option value="<?= $tenantId ?>" <?= $tenantId === $editTenantId ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars((string) $tenant['name']) ?> (<?= htmlspecialchars((string) $tenant['slug']) ?>)
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
+                                            <?php if ($isAdmin): ?>
+                                                <div class="settings-form__field">
+                                                    <label for="operator_edit_tenant_id">Tenant</label>
+                                                    <select id="operator_edit_tenant_id" name="operator_edit_tenant_id" required>
+                                                        <option value="">Seleziona...</option>
+                                                        <?php foreach ($tenants as $tenant): ?>
+                                                            <?php $tenantId = (int) ($tenant['id'] ?? 0); ?>
+                                                            <option value="<?= $tenantId ?>" <?= $tenantId === $editTenantId ? 'selected' : '' ?>>
+                                                                <?= htmlspecialchars((string) $tenant['name']) ?> (<?= htmlspecialchars((string) $tenant['slug']) ?>)
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                            <?php else: ?>
+                                                <input type="hidden" name="operator_edit_tenant_id" value="<?= $currentTenantId ?>">
+                                            <?php endif; ?>
                                             <div class="settings-form__field">
                                                 <label for="operator_edit_password">Nuova password <span class="muted">(opzionale)</span></label>
                                                 <input type="password" id="operator_edit_password" name="operator_edit_password" minlength="8" placeholder="Lascia vuoto per non cambiare">
