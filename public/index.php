@@ -1623,16 +1623,16 @@ switch ($page) {
                 $lines[] = '';
                 $lines[] = 'Ecco il riepilogo dei piani disponibili:';
                 $lines[] = '';
-                $lines[] = 'Piano Start (12 mesi, max 1 cassiere)';
+                $lines[] = 'Piano Start (12 mesi, max 1 cassiere) - € 550';
                 $lines[] = '- Dashboard, Magazzino SIM, Prodotti, Lista prodotti, Clienti, Listini, Nuova vendita, Storico vendite, Guida completa, Impostazioni.';
                 $lines[] = '';
-                $lines[] = 'Piano Start Plus (12 mesi, max 1 cassiere)';
+                $lines[] = 'Piano Start Plus (12 mesi, max 1 cassiere) - € 650';
                 $lines[] = '- Tutto del Start + Report, Richieste supporto, Ordini store.';
                 $lines[] = '';
-                $lines[] = 'Piano Core (24 mesi, max 2 cassieri)';
+                $lines[] = 'Piano Core (24 mesi, max 2 cassieri) - € 850';
                 $lines[] = '- Tutto del Start Plus + Contratti energia, Report avanzati (KPI), Supporto prioritario.';
                 $lines[] = '';
-                $lines[] = 'Piano Business (36 mesi, max 4 cassieri)';
+                $lines[] = 'Piano Business (36 mesi, max 4 cassieri) - € 1200';
                 $lines[] = '- Tutto del Core + Report personalizzati, SLA dedicato, onboarding/training, integrazioni avanzate.';
                 $lines[] = '';
                 if ($company !== '') {
@@ -1643,60 +1643,67 @@ switch ($page) {
                 }
 
                 $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-                $brandColor = '#1f2937';
-                $accentColor = '#2563eb';
+                $brandColor = '#0f172a';
+                $accentColor = '#6366f1';
                 $displayName = $name !== '' ? $name : 'te';
                 $htmlMessage = '<!doctype html>';
                 $htmlMessage .= '<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
                 $htmlMessage .= '<title>' . $escape($appName) . '</title>';
-                $htmlMessage .= '</head><body style="margin:0;padding:0;background:#f4f6fb;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827;">';
-                $htmlMessage .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:32px 12px;">';
+                $htmlMessage .= '</head><body style="margin:0;padding:0;background:#0b1120;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e5e7eb;">';
+                $htmlMessage .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#0b1120 0%,#111827 40%,#1f2937 100%);min-height:100vh;padding:48px 16px;">';
                 $htmlMessage .= '<tr><td align="center">';
-                $htmlMessage .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 18px 45px rgba(15,23,42,0.08);">';
-                $htmlMessage .= '<tr><td style="padding:24px 28px;background:' . $brandColor . ';color:#ffffff;">';
-                $htmlMessage .= '<h1 style="margin:0;font-size:20px;font-weight:600;">' . $escape($appName) . '</h1>';
-                $htmlMessage .= '<p style="margin:6px 0 0;font-size:14px;opacity:0.85;">Richiesta informazioni piani</p>';
+                $htmlMessage .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:720px;background:#0f172a;border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,0.45);">';
+                $htmlMessage .= '<tr><td style="padding:32px 32px;background:linear-gradient(120deg,' . $brandColor . ' 0%,#1e293b 60%,#312e81 100%);color:#ffffff;">';
+                $htmlMessage .= '<p style="margin:0 0 10px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.7;">Coresuite Express</p>';
+                $htmlMessage .= '<h1 style="margin:0;font-size:24px;font-weight:700;">' . $escape($appName) . '</h1>';
+                $htmlMessage .= '<p style="margin:8px 0 0;font-size:15px;opacity:0.85;">Richiesta informazioni piani</p>';
                 $htmlMessage .= '</td></tr>';
-                $htmlMessage .= '<tr><td style="padding:28px;">';
-                $htmlMessage .= '<p style="margin:0 0 12px;font-size:16px;">Ciao <strong>' . $escape($displayName) . '</strong>,</p>';
-                $htmlMessage .= '<p style="margin:0 0 20px;color:#4b5563;">Ecco il riepilogo aggiornato dei piani disponibili.</p>';
-                $htmlMessage .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:16px;">';
-                $htmlMessage .= '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#111827;">Piano Start</p>';
-                $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">12 mesi · max 1 cassiere</p>';
-                $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">Dashboard, Magazzino SIM, Prodotti, Lista prodotti, Clienti, Listini, Nuova vendita, Storico vendite, Guida completa, Impostazioni.</p>';
-                $htmlMessage .= '</div>';
-                $htmlMessage .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:16px;">';
-                $htmlMessage .= '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#111827;">Piano Start Plus</p>';
-                $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">12 mesi · max 1 cassiere</p>';
-                $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">Tutto del Start + Report, Richieste supporto, Ordini store.</p>';
-                $htmlMessage .= '</div>';
-                $htmlMessage .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:16px;">';
-                $htmlMessage .= '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#111827;">Piano Core</p>';
-                $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">24 mesi · max 2 cassieri</p>';
-                $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">Tutto del Start Plus + Contratti energia, Report avanzati (KPI), Supporto prioritario.</p>';
-                $htmlMessage .= '</div>';
-                $htmlMessage .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:18px;">';
-                $htmlMessage .= '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#111827;">Piano Business</p>';
-                $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">36 mesi · max 4 cassieri</p>';
-                $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">Tutto del Core + Report personalizzati, SLA dedicato, onboarding/training, integrazioni avanzate.</p>';
-                $htmlMessage .= '</div>';
+                $htmlMessage .= '<tr><td style="padding:32px;">';
+                $htmlMessage .= '<p style="margin:0 0 14px;font-size:18px;color:#f8fafc;">Ciao <strong>' . $escape($displayName) . '</strong>,</p>';
+                $htmlMessage .= '<p style="margin:0 0 24px;color:#cbd5f5;">Ecco il riepilogo aggiornato dei piani disponibili con i relativi costi.</p>';
+                $htmlMessage .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0 14px;">';
+                $htmlMessage .= '<tr><td style="background:#111827;border:1px solid #1f2937;border-radius:16px;padding:18px 20px;">';
+                $htmlMessage .= '<p style="margin:0 0 6px;font-size:16px;font-weight:600;color:#f8fafc;">Piano Start</p>';
+                $htmlMessage .= '<p style="margin:0 0 10px;font-size:13px;color:#94a3b8;">12 mesi · max 1 cassiere</p>';
+                $htmlMessage .= '<p style="margin:0 0 12px;font-size:14px;color:#e2e8f0;">Dashboard, Magazzino SIM, Prodotti, Lista prodotti, Clienti, Listini, Nuova vendita, Storico vendite, Guida completa, Impostazioni.</p>';
+                $htmlMessage .= '<span style="display:inline-block;background:#0f172a;border:1px solid #334155;border-radius:999px;padding:6px 12px;font-size:13px;color:#e2e8f0;">€ 550</span>';
+                $htmlMessage .= '</td></tr>';
+                $htmlMessage .= '<tr><td style="background:#111827;border:1px solid #1f2937;border-radius:16px;padding:18px 20px;">';
+                $htmlMessage .= '<p style="margin:0 0 6px;font-size:16px;font-weight:600;color:#f8fafc;">Piano Start Plus</p>';
+                $htmlMessage .= '<p style="margin:0 0 10px;font-size:13px;color:#94a3b8;">12 mesi · max 1 cassiere</p>';
+                $htmlMessage .= '<p style="margin:0 0 12px;font-size:14px;color:#e2e8f0;">Tutto del Start + Report, Richieste supporto, Ordini store.</p>';
+                $htmlMessage .= '<span style="display:inline-block;background:#0f172a;border:1px solid #334155;border-radius:999px;padding:6px 12px;font-size:13px;color:#e2e8f0;">€ 650</span>';
+                $htmlMessage .= '</td></tr>';
+                $htmlMessage .= '<tr><td style="background:#111827;border:1px solid #1f2937;border-radius:16px;padding:18px 20px;">';
+                $htmlMessage .= '<p style="margin:0 0 6px;font-size:16px;font-weight:600;color:#f8fafc;">Piano Core</p>';
+                $htmlMessage .= '<p style="margin:0 0 10px;font-size:13px;color:#94a3b8;">24 mesi · max 2 cassieri</p>';
+                $htmlMessage .= '<p style="margin:0 0 12px;font-size:14px;color:#e2e8f0;">Tutto del Start Plus + Contratti energia, Report avanzati (KPI), Supporto prioritario.</p>';
+                $htmlMessage .= '<span style="display:inline-block;background:#0f172a;border:1px solid #334155;border-radius:999px;padding:6px 12px;font-size:13px;color:#e2e8f0;">€ 850</span>';
+                $htmlMessage .= '</td></tr>';
+                $htmlMessage .= '<tr><td style="background:#111827;border:1px solid #1f2937;border-radius:16px;padding:18px 20px;">';
+                $htmlMessage .= '<p style="margin:0 0 6px;font-size:16px;font-weight:600;color:#f8fafc;">Piano Business</p>';
+                $htmlMessage .= '<p style="margin:0 0 10px;font-size:13px;color:#94a3b8;">36 mesi · max 4 cassieri</p>';
+                $htmlMessage .= '<p style="margin:0 0 12px;font-size:14px;color:#e2e8f0;">Tutto del Core + Report personalizzati, SLA dedicato, onboarding/training, integrazioni avanzate.</p>';
+                $htmlMessage .= '<span style="display:inline-block;background:#0f172a;border:1px solid #334155;border-radius:999px;padding:6px 12px;font-size:13px;color:#e2e8f0;">€ 1200</span>';
+                $htmlMessage .= '</td></tr>';
+                $htmlMessage .= '</table>';
 
                 if ($company !== '' || $message !== '') {
-                    $htmlMessage .= '<div style="border:1px dashed #d1d5db;border-radius:12px;padding:14px 16px;margin-bottom:18px;">';
+                    $htmlMessage .= '<div style="border:1px dashed #334155;border-radius:16px;padding:16px 18px;margin:24px 0 20px;background:#0b1120;">';
                     if ($company !== '') {
-                        $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">Azienda</p>';
-                        $htmlMessage .= '<p style="margin:0 0 12px;font-size:15px;color:#111827;font-weight:600;">' . $escape($company) . '</p>';
+                        $htmlMessage .= '<p style="margin:0 0 8px;font-size:12px;color:#94a3b8;">Azienda</p>';
+                        $htmlMessage .= '<p style="margin:0 0 12px;font-size:15px;color:#f8fafc;font-weight:600;">' . $escape($company) . '</p>';
                     }
                     if ($message !== '') {
-                        $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">Messaggio</p>';
-                        $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">' . nl2br($escape($message)) . '</p>';
+                        $htmlMessage .= '<p style="margin:0 0 8px;font-size:12px;color:#94a3b8;">Messaggio</p>';
+                        $htmlMessage .= '<p style="margin:0;font-size:14px;color:#e2e8f0;">' . nl2br($escape($message)) . '</p>';
                     }
                     $htmlMessage .= '</div>';
                 }
 
-                $htmlMessage .= '<a href="mailto:' . $escape($resendFrom ?? 'support@coresuite.test') . '" style="display:inline-block;background:' . $accentColor . ';color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">Richiedi una demo</a>';
+                $htmlMessage .= '<a href="mailto:' . $escape($resendFrom ?? 'support@coresuite.test') . '" style="display:inline-block;background:' . $accentColor . ';color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600;box-shadow:0 10px 30px rgba(99,102,241,0.35);">Richiedi una demo</a>';
                 $htmlMessage .= '</td></tr>';
-                $htmlMessage .= '<tr><td style="padding:20px 28px;border-top:1px solid #e5e7eb;background:#fafafa;color:#9ca3af;font-size:12px;">';
+                $htmlMessage .= '<tr><td style="padding:22px 28px;border-top:1px solid #1f2937;background:#0b1120;color:#94a3b8;font-size:12px;">';
                 $htmlMessage .= 'Se non hai richiesto queste informazioni, ignora questa email.';
                 $htmlMessage .= '</td></tr>';
                 $htmlMessage .= '</table>';
