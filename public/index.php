@@ -1819,6 +1819,16 @@ switch ($page) {
                     $lines[] = 'Messaggio: ' . $message;
                 }
 
+                $appLoginUrl = 'index.php?page=login';
+                if (!empty($_SERVER['HTTP_HOST'])) {
+                    $httpsValue = $_SERVER['HTTPS'] ?? null;
+                    $scheme = (is_string($httpsValue) && strtolower((string) $httpsValue) !== 'off' && $httpsValue !== '') ? 'https' : 'http';
+                    $appLoginUrl = $scheme . '://' . $_SERVER['HTTP_HOST'] . '/public/index.php?page=login';
+                }
+                $lines[] = '';
+                $lines[] = 'Accedi alla demo (durata 1 ora) e seleziona il piano da testare:';
+                $lines[] = $appLoginUrl;
+
                 $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
                 $brandColor = '#0f172a';
                 $accentColor = '#6366f1';
@@ -1882,7 +1892,7 @@ switch ($page) {
                     $htmlMessage .= '</div>';
                 }
 
-                $htmlMessage .= '<a href="mailto:' . $escape($resendFrom ?? 'support@coresuite.test') . '" style="display:inline-block;background:' . $accentColor . ';color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600;box-shadow:0 10px 30px rgba(99,102,241,0.35);">Richiedi una demo</a>';
+                $htmlMessage .= '<a href="' . $escape($appLoginUrl) . '" style="display:inline-block;background:' . $accentColor . ';color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600;box-shadow:0 10px 30px rgba(99,102,241,0.35);">Accedi alla demo</a>';
                 $htmlMessage .= '</td></tr>';
                 $htmlMessage .= '<tr><td style="padding:22px 28px;border-top:1px solid #1f2937;background:#0b1120;color:#94a3b8;font-size:12px;">';
                 $htmlMessage .= 'Se non hai richiesto queste informazioni, ignora questa email.';
