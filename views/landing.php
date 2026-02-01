@@ -14,14 +14,17 @@ $loginUrl = 'index.php?page=login';
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body class="landing-body">
-    <header class="landing-hero">
-        <nav class="landing-nav">
+    <div class="landing-topbar">
+        <div class="landing-topbar__inner">
             <div class="landing-brand">
                 <span class="landing-brand__dot"></span>
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
-            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
-        </nav>
+            <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
+        </div>
+    </div>
+
+    <header class="landing-hero">
 
         <div class="landing-hero__content">
             <div class="landing-hero__text">
