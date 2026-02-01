@@ -203,7 +203,7 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
             <strong><?= htmlspecialchars($appName) ?></strong>
             <span>· Gestionale multi-tenant per telecomunicazioni e retail.</span>
         </div>
-        <a href="<?= htmlspecialchars($loginUrl) ?>">Login</a>
+        <span>Sviluppato e distribuito da AG SERVIZI P.Iva 08442881218</span>
     </footer>
 </body>
 </html>
