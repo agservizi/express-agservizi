@@ -20,7 +20,7 @@ $loginUrl = 'index.php?page=login';
                 <span class="landing-brand__dot"></span>
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
-            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
+            <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
         </nav>
 
         <div class="landing-hero__content">
@@ -33,7 +33,6 @@ $loginUrl = 'index.php?page=login';
                     È pensata per essere venduta facilmente ai clienti: onboarding rapido, flussi guidati e dati sempre sotto controllo.
                 </p>
                 <div class="landing-hero__actions">
-                    <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi al gestionale</a>
                     <a class="landing-btn landing-btn--secondary" href="#funzionalita">Scopri le funzionalità</a>
                 </div>
                 <div class="landing-metrics">
