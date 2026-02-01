@@ -210,6 +210,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                         <th>Codice</th>
                         <th>Etichetta</th>
                         <th>Max utenti</th>
+                        <th>Durata</th>
                         <th>Scadenza</th>
                         <th>Stato</th>
                         <th>Azioni</th>
@@ -217,13 +218,19 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                 </thead>
                 <tbody>
                     <?php if ($licenses === []): ?>
-                        <tr><td colspan="6">Nessuna licenza creata.</td></tr>
+                        <tr><td colspan="7">Nessuna licenza creata.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($licenses as $license): ?>
+                        <?php
+                            $termMonths = isset($license['term_months']) && (int) $license['term_months'] > 0
+                                ? (int) $license['term_months'] . ' mesi'
+                                : '—';
+                        ?>
                         <tr>
                             <td><?= htmlspecialchars((string) $license['code']) ?></td>
                             <td><?= $license['label'] ? htmlspecialchars((string) $license['label']) : '—' ?></td>
                             <td><?= (int) ($license['max_users'] ?? 1) ?></td>
+                            <td><?= htmlspecialchars($termMonths) ?></td>
                             <td><?= htmlspecialchars($formatDate($license['expires_at'] ?? null, 'd/m/Y')) ?></td>
                             <td>
                                 <span class="badge badge--<?= (int) $license['is_active'] === 1 ? 'success' : 'muted' ?>">
@@ -329,6 +336,9 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                             <td>
                                 <?= htmlspecialchars((string) $assignment['license_code']) ?><br>
                                 <small><?= htmlspecialchars((string) ($assignment['license_label'] ?? '')) ?></small>
+                                <?php if (!empty($assignment['license_term_months'])): ?>
+                                    <br><small><?= (int) $assignment['license_term_months'] ?> mesi</small>
+                                <?php endif; ?>
                             </td>
                             <td><?= htmlspecialchars($maxUsersLabel) ?></td>
                             <td><?= $assignment['notes'] ? htmlspecialchars((string) $assignment['notes']) : '—' ?></td>

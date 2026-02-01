@@ -68,15 +68,12 @@ $currentUserId = isset($currentUser['id']) ? (int) $currentUser['id'] : 0;
 $operatorsOpenProp = $operatorsOpen ?? null;
 $providersOpenProp = $providersOpen ?? null;
 $inventoryOpen = $feedback !== null && isset($feedback['message']) && stripos((string) $feedback['message'], 'soglia') !== false;
-$alertsOpen = !empty($stockAlerts);
 $operatorsOpen = is_bool($operatorsOpenProp)
     ? $operatorsOpenProp
     : ($isAdmin && $feedback !== null && ($feedback['success'] ?? false) === false && ! $inventoryOpen);
 $providersOpen = is_bool($providersOpenProp)
     ? $providersOpenProp
     : ($isAdmin && $feedback !== null && stripos((string) ($feedback['message'] ?? ''), 'gestore') !== false);
-$fiscalOpen = isset($fiscalOpen) ? (bool) $fiscalOpen : false;
-$ssoEnabled = isset($ssoEnabled) ? (bool) $ssoEnabled : false;
 $ssoClients = isset($ssoClients) && is_array($ssoClients) ? $ssoClients : [];
 $ssoFeedback = isset($ssoFeedback) && is_array($ssoFeedback) ? $ssoFeedback : null;
 $ssoSecretPreview = isset($ssoSecretPreview) && is_array($ssoSecretPreview) ? $ssoSecretPreview : null;

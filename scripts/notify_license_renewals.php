@@ -21,11 +21,17 @@ use App\Services\TenantContext;
 
 $pdo = Database::getConnection();
 $config = $GLOBALS['config'] ?? [];
+$appConfig = $config['app'] ?? [];
 $alertsConfig = $config['alerts'] ?? [];
 $resendApiKey = $alertsConfig['resend_api_key'] ?? null;
 $resendFrom = $alertsConfig['resend_from'] ?? 'alerts@coresuite.test';
 $resendFromName = $alertsConfig['resend_from_name'] ?? null;
 $logFile = __DIR__ . '/../storage/logs/license_renewals.log';
+
+$portalUrl = $appConfig['portal_url'] ?? null;
+if (!is_string($portalUrl) || trim($portalUrl) === '') {
+    $portalUrl = null;
+}
 
 $notificationsConfig = $config['notifications'] ?? [];
 $dispatcher = new NotificationDispatcher(
@@ -146,11 +152,17 @@ foreach ($rows as $row) {
     $textBody = "Ciao {$tenantName},\n\n";
     $textBody .= "La tua licenza {$displayLabel} scade il {$expiresAt}.\n";
     $textBody .= "Hai 30 giorni per rinnovare la licenza pagando la quota di adesione.\n\n";
+    if ($portalUrl !== null) {
+        $textBody .= "Accedi qui per rinnovare: {$portalUrl}\n\n";
+    }
     $textBody .= "Per info sul rinnovo, contatta l'amministrazione.\n";
 
     $htmlBody = '<p>Ciao <strong>' . htmlspecialchars($tenantName) . '</strong>,</p>';
     $htmlBody .= '<p>La tua licenza <strong>' . htmlspecialchars($displayLabel) . '</strong> scade il <strong>' . htmlspecialchars($expiresAt) . '</strong>.</p>';
     $htmlBody .= '<p>Hai 30 giorni per rinnovare la licenza pagando la quota di adesione.</p>';
+    if ($portalUrl !== null) {
+        $htmlBody .= '<p><a href="' . htmlspecialchars($portalUrl) . '">Accedi per rinnovare</a>.</p>';
+    }
     $htmlBody .= '<p>Per info sul rinnovo, contatta l&#39;amministrazione.</p>';
 
     $emailSent = false;
@@ -170,6 +182,7 @@ foreach ($rows as $row) {
         [
             'level' => 'warning',
             'channel' => 'system',
+            'link' => $portalUrl,
         ]
     );
 
