@@ -132,7 +132,8 @@ if ($currentRoute === '' || $currentRoute === '/') {
             <a href="index.php?page=guide" class="sidebar__link" data-tooltip="Guida">📘 <span>Guida completa</span></a>
             <a href="index.php?page=settings" class="sidebar__link" data-tooltip="Impostazioni">⚙️ <span>Impostazioni</span></a>
             <?php if ($isAdmin): ?>
-                <a href="index.php?page=licenses" class="sidebar__link" data-tooltip="Licenze e tenant">🧩 <span>Licenze &amp; Tenant</span></a>
+                <a href="index.php?page=tenants" class="sidebar__link" data-tooltip="Tenant">🏢 <span>Tenant</span></a>
+                <a href="index.php?page=licenses" class="sidebar__link" data-tooltip="Licenze">🧩 <span>Licenze</span></a>
             <?php endif; ?>
         </nav>
     <div class="sidebar__footer">

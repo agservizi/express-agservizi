@@ -1831,6 +1831,49 @@ switch ($page) {
         ]);
         break;
 
+    case 'tenants':
+        if (!$authService->hasRole('admin')) {
+            header('Location: index.php?page=dashboard');
+            exit;
+        }
+
+        $tenantFeedback = $_SESSION['tenants_feedback'] ?? null;
+        unset($_SESSION['tenants_feedback']);
+
+        if ($method === 'POST') {
+            $action = $_POST['action'] ?? '';
+
+            if ($action === 'create_tenant') {
+                $result = $tenantService->createTenant($_POST);
+            } elseif ($action === 'update_tenant') {
+                $tenantId = (int) ($_POST['tenant_id'] ?? 0);
+                $result = $tenantService->updateTenant($tenantId, $_POST);
+            } elseif ($action === 'toggle_tenant') {
+                $tenantId = (int) ($_POST['tenant_id'] ?? 0);
+                $enabled = (int) ($_POST['enabled'] ?? 0) === 1;
+                $result = $tenantService->toggleTenant($tenantId, $enabled);
+            } else {
+                $result = [
+                    'success' => false,
+                    'message' => 'Operazione non riconosciuta.',
+                ];
+            }
+
+            $_SESSION['tenants_feedback'] = $result;
+            header('Location: index.php?page=tenants');
+            exit;
+        }
+
+        $tenants = $tenantService->listTenants();
+
+        render('tenants', [
+            'currentUser' => $currentUser,
+            'pageTitle' => 'Tenant',
+            'feedback' => $tenantFeedback,
+            'tenants' => $tenants,
+        ]);
+        break;
+
     case 'licenses':
         if (!$authService->hasRole('admin')) {
             header('Location: index.php?page=dashboard');
@@ -1845,16 +1888,7 @@ switch ($page) {
         if ($method === 'POST') {
             $action = $_POST['action'] ?? '';
 
-            if ($action === 'create_tenant') {
-                $result = $tenantService->createTenant($_POST);
-            } elseif ($action === 'update_tenant') {
-                $tenantId = (int) ($_POST['tenant_id'] ?? 0);
-                $result = $tenantService->updateTenant($tenantId, $_POST);
-            } elseif ($action === 'toggle_tenant') {
-                $tenantId = (int) ($_POST['tenant_id'] ?? 0);
-                $enabled = (int) ($_POST['enabled'] ?? 0) === 1;
-                $result = $tenantService->toggleTenant($tenantId, $enabled);
-            } elseif ($action === 'assign_license') {
+            if ($action === 'assign_license') {
                 $result = $tenantService->assignLicense($_POST);
             } elseif ($action === 'revoke_tenant_license') {
                 $assignmentId = (int) ($_POST['assignment_id'] ?? 0);
@@ -1895,7 +1929,7 @@ switch ($page) {
 
         render('licenses', [
             'currentUser' => $currentUser,
-            'pageTitle' => 'Licenze & Tenant',
+            'pageTitle' => 'Licenze',
             'feedback' => $licenseFeedback,
             'tenants' => $tenants,
             'licenses' => $licenses,
