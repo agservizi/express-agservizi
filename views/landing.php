@@ -20,7 +20,7 @@ $loginUrl = 'index.php?page=login';
                 <span class="landing-brand__dot"></span>
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
-            <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
+            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
         </div>
     </div>
 
