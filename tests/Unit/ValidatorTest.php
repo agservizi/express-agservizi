@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Helpers\Validator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ValidatorTest extends TestCase
 {
-    /**
-     * @dataProvider iccidProvider
-     */
+    #[DataProvider('iccidProvider')]
     public function testIsValidIccid(bool $expected, string $candidate): void
     {
         self::assertSame($expected, Validator::isValidICCID($candidate));

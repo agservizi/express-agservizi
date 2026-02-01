@@ -3,14 +3,24 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Services\TenantContext;
+
 final class PdaSettingsService
 {
-    private const SETTINGS_PATH = __DIR__ . '/../../storage/config/pda_settings.json';
     private const DEFAULT_OCR = [
         'enabled' => true,
         'min_chars' => 200,
         'lang' => 'ita',
     ];
+
+    private string $baseDir;
+    private string $legacyPath;
+
+    public function __construct()
+    {
+        $this->baseDir = dirname(__DIR__, 2) . '/storage/config/tenants';
+        $this->legacyPath = __DIR__ . '/../../storage/config/pda_settings.json';
+    }
 
     /**
      * @return array<string, mixed>
@@ -118,17 +128,42 @@ final class PdaSettingsService
      */
     private function readSettings(): array
     {
-        if (!is_file(self::SETTINGS_PATH)) {
-            return [];
+        $path = $this->resolvePath();
+        $usedLegacy = false;
+        if (!is_file($path)) {
+            if ($this->shouldFallbackToLegacy()) {
+                $path = $this->legacyPath;
+                $usedLegacy = true;
+            } else {
+                return [];
+            }
         }
 
-        $contents = file_get_contents(self::SETTINGS_PATH);
+        $contents = file_get_contents($path);
         if ($contents === false || trim($contents) === '') {
             return [];
         }
 
         $decoded = json_decode($contents, true);
-        return is_array($decoded) ? $decoded : [];
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        if ($usedLegacy && TenantContext::id() === 1) {
+            $tenantPath = $this->resolvePath(1);
+            if (!is_file($tenantPath)) {
+                $dir = dirname($tenantPath);
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0775, true);
+                }
+                $json = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                if ($json !== false) {
+                    file_put_contents($tenantPath, $json);
+                }
+            }
+        }
+
+        return $decoded;
     }
 
     /**
@@ -136,7 +171,8 @@ final class PdaSettingsService
      */
     private function writeSettings(array $settings): void
     {
-        $dir = dirname(self::SETTINGS_PATH);
+        $path = $this->resolvePath();
+        $dir = dirname($path);
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
         }
@@ -146,7 +182,19 @@ final class PdaSettingsService
             throw new \RuntimeException('Impossibile salvare le impostazioni PDA.');
         }
 
-        file_put_contents(self::SETTINGS_PATH, $encoded);
+        file_put_contents($path, $encoded);
+    }
+
+    private function resolvePath(?int $tenantId = null): string
+    {
+        $resolvedTenantId = $tenantId ?? TenantContext::id();
+        return $this->baseDir . '/tenant_' . $resolvedTenantId . '/pda_settings.json';
+    }
+
+    private function shouldFallbackToLegacy(?int $tenantId = null): bool
+    {
+        $resolvedTenantId = $tenantId ?? TenantContext::id();
+        return $resolvedTenantId === 1 && is_file($this->legacyPath);
     }
 
     /**

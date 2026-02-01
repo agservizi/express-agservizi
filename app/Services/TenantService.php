@@ -75,6 +75,11 @@ final class TenantService
             ':phone' => $phone !== '' ? $phone : null,
         ]);
 
+        $tenantId = (int) $this->pdo->lastInsertId();
+        if ($tenantId > 0) {
+            (new ReceiptSettingsService())->initializeForTenant($tenantId, $name);
+        }
+
         return [
             'success' => true,
             'message' => 'Tenant creato correttamente.',

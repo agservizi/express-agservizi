@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Services\TenantContext;
+
 final class ReceiptSettingsService
 {
-    private string $path;
+    private ?string $customPath;
+    private string $baseDir;
+    private string $legacyPath;
 
     /**
      * @var array<string, mixed>
@@ -15,7 +19,9 @@ final class ReceiptSettingsService
 
     public function __construct(?string $path = null)
     {
-        $this->path = $path ?? dirname(__DIR__, 2) . '/storage/config/receipt_settings.json';
+        $this->customPath = $path !== null ? $path : null;
+        $this->baseDir = dirname(__DIR__, 2) . '/storage/config/tenants';
+        $this->legacyPath = dirname(__DIR__, 2) . '/storage/config/receipt_settings.json';
         $this->defaults = [
             'header_lines' => [
                 'Negozio Esempio S.r.l.',
@@ -53,18 +59,7 @@ final class ReceiptSettingsService
      */
     public function getSettings(): array
     {
-        $data = [];
-        if (is_file($this->path)) {
-            $raw = file_get_contents($this->path);
-            if ($raw !== false && $raw !== '') {
-                $decoded = json_decode($raw, true);
-                if (is_array($decoded)) {
-                    $data = $decoded;
-                }
-            }
-        }
-
-        return $this->mergeDefaults($data);
+        return $this->mergeDefaults($this->readSettings());
     }
 
     /**
@@ -123,7 +118,8 @@ final class ReceiptSettingsService
             'configured_at' => date('Y-m-d H:i:s'),
         ];
 
-        $dir = dirname($this->path);
+        $path = $this->resolvePath();
+        $dir = dirname($path);
         if (!is_dir($dir)) {
             if (!mkdir($dir, 0775, true) && !is_dir($dir)) {
                 return [
@@ -143,7 +139,7 @@ final class ReceiptSettingsService
             ];
         }
 
-        if (file_put_contents($this->path, $json) === false) {
+        if (file_put_contents($path, $json) === false) {
             return [
                 'success' => false,
                 'message' => 'Configurazione scontrino non salvata.',
@@ -223,11 +219,16 @@ final class ReceiptSettingsService
 
     public function isConfigured(): bool
     {
-        if (!is_file($this->path)) {
-            return false;
+        $path = $this->resolvePath();
+        if (!is_file($path)) {
+            if ($this->customPath === null && $this->shouldFallbackToLegacy()) {
+                $path = $this->legacyPath;
+            } else {
+                return false;
+            }
         }
 
-        $raw = file_get_contents($this->path);
+        $raw = file_get_contents($path);
         if ($raw === false || trim($raw) === '') {
             return false;
         }
@@ -246,5 +247,113 @@ final class ReceiptSettingsService
             || isset($decoded['document_number_template'])
             || isset($decoded['labels'])
             || isset($decoded['status_labels']);
+    }
+
+    public function initializeForTenant(int $tenantId, ?string $tenantName = null): void
+    {
+        if ($tenantId <= 0) {
+            return;
+        }
+
+        $path = $this->resolvePath($tenantId);
+        if (is_file($path)) {
+            return;
+        }
+
+        $settings = $this->buildDefaultSettings($tenantName);
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0775, true);
+        }
+
+        $json = json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            return;
+        }
+
+        file_put_contents($path, $json);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function readSettings(?int $tenantId = null): array
+    {
+        $path = $this->resolvePath($tenantId);
+        $usedLegacy = false;
+        if (!is_file($path)) {
+            if ($this->customPath === null && $this->shouldFallbackToLegacy($tenantId)) {
+                $path = $this->legacyPath;
+                $usedLegacy = true;
+            } else {
+                return [];
+            }
+        }
+
+        $raw = file_get_contents($path);
+        if ($raw === false || $raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        if ($usedLegacy && $this->customPath === null) {
+            $resolvedTenantId = $tenantId ?? TenantContext::id();
+            if ($resolvedTenantId === 1) {
+                $tenantPath = $this->resolvePath($resolvedTenantId);
+                if (!is_file($tenantPath)) {
+                    $dir = dirname($tenantPath);
+                    if (!is_dir($dir)) {
+                        mkdir($dir, 0775, true);
+                    }
+                    $json = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    if ($json !== false) {
+                        file_put_contents($tenantPath, $json);
+                    }
+                }
+            }
+        }
+
+        return $decoded;
+    }
+
+    private function resolvePath(?int $tenantId = null): string
+    {
+        if ($this->customPath !== null) {
+            return $this->customPath;
+        }
+
+        $resolvedTenantId = $tenantId ?? TenantContext::id();
+        return $this->baseDir . '/tenant_' . $resolvedTenantId . '/receipt_settings.json';
+    }
+
+    private function shouldFallbackToLegacy(?int $tenantId = null): bool
+    {
+        $resolvedTenantId = $tenantId ?? TenantContext::id();
+        return $resolvedTenantId === 1 && is_file($this->legacyPath);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildDefaultSettings(?string $tenantName = null): array
+    {
+        $header = $tenantName !== null && trim($tenantName) !== ''
+            ? [trim($tenantName)]
+            : (array) ($this->defaults['header_lines'] ?? []);
+
+        return [
+            'header_lines' => $header,
+            'document_title' => (string) ($this->defaults['document_title'] ?? 'DOCUMENTO GESTIONALE'),
+            'document_number_template' => (string) ($this->defaults['document_number_template'] ?? '{{document_title}} #{{sale_id}}'),
+            'thanks_text' => (string) ($this->defaults['thanks_text'] ?? 'Grazie per il tuo acquisto!'),
+            'footer_text' => (string) ($this->defaults['footer_text'] ?? ''),
+            'labels' => (array) ($this->defaults['labels'] ?? []),
+            'status_labels' => (array) ($this->defaults['status_labels'] ?? []),
+            'configured_at' => date('Y-m-d H:i:s'),
+        ];
     }
 }

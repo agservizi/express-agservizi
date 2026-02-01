@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Helpers\InputFilter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class InputFilterTest extends TestCase
@@ -50,10 +51,7 @@ final class InputFilterTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider booleanValuesProvider
-     * @param mixed $input
-     */
+    #[DataProvider('booleanValuesProvider')]
     public function testBoolNormalization($input, bool $expected): void
     {
         self::assertSame($expected, InputFilter::bool($input));
