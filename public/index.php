@@ -437,6 +437,42 @@ function buildPlanModuleMap(): array
     ];
 }
 
+function resolveOperatorLimitForLicense(?array $license): int
+{
+    if (isLicenseExpired($license)) {
+        return 0;
+    }
+
+    $planKey = resolveLicensePlanKey($license);
+    return match ($planKey) {
+        'start_plus' => 2,
+        'core' => 2,
+        'business' => 4,
+        default => 1,
+    };
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function resolveLicenseById(PDO $pdo, int $licenseId): ?array
+{
+    if ($licenseId <= 0) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare(
+        'SELECT id, code, label, max_users, term_months, is_active, expires_at
+         FROM licenses
+         WHERE id = :id
+         LIMIT 1'
+    );
+    $stmt->execute([':id' => $licenseId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row !== false ? $row : null;
+}
+
 /**
  * @return array{plan_key:string,modules:array<int,string>,license:array<string,mixed>|null}
  */
@@ -2332,11 +2368,55 @@ switch ($page) {
                     ];
                 } else {
                     $payload = $_POST;
-                    if (!$isAdmin) {
+                    $targetTenantId = $tenantId;
+                    $licenseForLimit = null;
+
+                    if ($isAdmin) {
+                        $targetTenantId = isset($_POST['operator_tenant_id']) ? (int) $_POST['operator_tenant_id'] : 0;
+                        $licenseId = isset($_POST['operator_license_id']) ? (int) $_POST['operator_license_id'] : 0;
+                        if ($licenseId > 0) {
+                            $licenseForLimit = resolveLicenseById($pdo, $licenseId);
+                        }
+                    } else {
                         $payload['operator_tenant_id'] = $tenantId;
                         unset($payload['operator_license_id']);
                     }
-                    $result = $userService->createOperator($payload);
+
+                    if ($targetTenantId <= 0) {
+                        $result = [
+                            'success' => false,
+                            'message' => 'Impossibile creare l’operatore.',
+                            'error' => 'Tenant non valido.',
+                        ];
+                    } else {
+                        if ($licenseForLimit === null) {
+                            $licenseForLimit = resolveTenantLicense($pdo, $targetTenantId);
+                        }
+
+                        if (is_array($licenseForLimit) && (int) ($licenseForLimit['is_active'] ?? 0) !== 1) {
+                            $licenseForLimit = null;
+                        }
+
+                        $maxOperators = resolveOperatorLimitForLicense($licenseForLimit);
+                        $currentOperators = $userService->listOperators($targetTenantId);
+                        $currentCount = is_array($currentOperators) ? count($currentOperators) : 0;
+
+                        if ($maxOperators <= 0) {
+                            $result = [
+                                'success' => false,
+                                'message' => 'Impossibile creare l’operatore.',
+                                'error' => 'Licenza non attiva o scaduta per questo tenant.',
+                            ];
+                        } elseif ($currentCount >= $maxOperators) {
+                            $result = [
+                                'success' => false,
+                                'message' => 'Limite operatori raggiunto.',
+                                'error' => 'Il piano attivo consente massimo ' . $maxOperators . ' operatori.',
+                            ];
+                        } else {
+                            $result = $userService->createOperator($payload);
+                        }
+                    }
                     if (($result['success'] ?? false) && $isAdmin) {
                         $licenseId = isset($_POST['operator_license_id']) ? (int) $_POST['operator_license_id'] : 0;
                         $targetTenantId = isset($_POST['operator_tenant_id']) ? (int) $_POST['operator_tenant_id'] : 0;
