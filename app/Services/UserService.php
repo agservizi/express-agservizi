@@ -79,6 +79,83 @@ final class UserService
     }
 
     /**
+     * @param array<string, mixed> $input
+     * @return array{success:bool,message:string,error?:string}
+     */
+    public function updateOwnPassword(int $userId, array $input): array
+    {
+        if ($userId <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile aggiornare la password.',
+                'error' => 'Utente non valido.',
+            ];
+        }
+
+        $currentPassword = (string) ($input['current_password'] ?? '');
+        $newPassword = (string) ($input['new_password'] ?? '');
+        $confirmPassword = (string) ($input['new_password_confirmation'] ?? '');
+
+        $errors = [];
+        if ($currentPassword === '') {
+            $errors[] = 'Inserisci la password attuale.';
+        }
+        if ($newPassword === '' || strlen($newPassword) < 8) {
+            $errors[] = 'La nuova password deve contenere almeno 8 caratteri.';
+        }
+        if ($newPassword !== $confirmPassword) {
+            $errors[] = 'Le nuove password non coincidono.';
+        }
+
+        if ($errors !== []) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile aggiornare la password.',
+                'error' => implode(' ', $errors),
+            ];
+        }
+
+        $stmt = $this->pdo->prepare('SELECT password_hash FROM users WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false || empty($row['password_hash'])) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile aggiornare la password.',
+                'error' => 'Utente non trovato.',
+            ];
+        }
+
+        if (!password_verify($currentPassword, (string) $row['password_hash'])) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile aggiornare la password.',
+                'error' => 'La password attuale non è corretta.',
+            ];
+        }
+
+        $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+        if ($hash === false) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile aggiornare la password.',
+                'error' => 'Errore durante la generazione della password.',
+            ];
+        }
+
+        $update = $this->pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
+        $update->execute([
+            ':hash' => $hash,
+            ':id' => $userId,
+        ]);
+
+        return [
+            'success' => true,
+            'message' => 'Password aggiornata correttamente.',
+        ];
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function getRoles(): array

@@ -2045,6 +2045,13 @@ switch ($page) {
             exit;
         }
 
+        if ($method === 'POST' && (($_POST['action'] ?? '') === 'update_password')) {
+            $result = $userService->updateOwnPassword((int) ($currentUser['id'] ?? 0), $_POST);
+            $_SESSION['profile_password_feedback'] = $result;
+            header('Location: index.php?page=profile');
+            exit;
+        }
+
         $profileUser = $userService->findUser((int) ($currentUser['id'] ?? 0));
         if ($profileUser === null) {
             pushFlashToast([
@@ -2063,6 +2070,8 @@ switch ($page) {
         $shortcuts = resolveProfileShortcuts($roleKey);
         $salesSummary = buildUserProfileSalesSummary($pdo, (int) $profileUser['id']);
         $roleSummary = resolveRoleSummary($roleKey);
+        $passwordFeedback = $_SESSION['profile_password_feedback'] ?? null;
+        unset($_SESSION['profile_password_feedback']);
 
         render('profile', [
             'currentUser' => $currentUser,
@@ -2072,6 +2081,7 @@ switch ($page) {
             'roleSummary' => $roleSummary,
             'shortcuts' => $shortcuts,
             'salesSummary' => $salesSummary,
+            'passwordFeedback' => is_array($passwordFeedback) ? $passwordFeedback : null,
         ]);
         break;
 

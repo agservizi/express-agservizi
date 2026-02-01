@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @var array{total_sales:int,total_revenue:float,last_sale_at:?string,status_breakdown:array<string,int>} $salesSummary
  * @var string|null $tenantLicenseLabel
  * @var string|null $tenantLicenseExpiresAt
+ * @var array{success:bool,message:string,error?:string}|null $passwordFeedback
  */
 $profile = $profile ?? [];
 $roleLabel = $roleLabel ?? 'Operatore';
@@ -24,6 +25,7 @@ $tenantLicenseLabel = isset($tenantLicenseLabel) && is_string($tenantLicenseLabe
 $tenantLicenseExpiresAt = isset($tenantLicenseExpiresAt) && is_string($tenantLicenseExpiresAt)
     ? trim($tenantLicenseExpiresAt)
     : '';
+$passwordFeedback = isset($passwordFeedback) && is_array($passwordFeedback) ? $passwordFeedback : null;
 
 $fullname = (string) ($profile['fullname'] ?? '');
 $username = (string) ($profile['username'] ?? '');
@@ -141,6 +143,40 @@ $totalRevenueFormatted = number_format((float) $salesSummary['total_revenue'], 2
                         <?php endforeach; ?>
                     </ul>
                 <?php endif; ?>
+            </article>
+        </div>
+    </section>
+
+    <section class="page__section">
+        <div class="profile-summary">
+            <article class="card profile-card">
+                <h3 class="profile-card__section">Sicurezza account</h3>
+                <?php if ($passwordFeedback !== null): ?>
+                    <div class="alert <?= ($passwordFeedback['success'] ?? false) ? 'alert--success' : 'alert--error' ?>">
+                        <p><?= htmlspecialchars((string) ($passwordFeedback['message'] ?? 'Operazione completata.')) ?></p>
+                        <?php if (!empty($passwordFeedback['error'])): ?>
+                            <p class="muted">Dettaglio: <?= htmlspecialchars((string) $passwordFeedback['error']) ?></p>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+                <form method="post" class="form">
+                    <input type="hidden" name="action" value="update_password">
+                    <div class="form__grid">
+                        <div class="form__group">
+                            <label for="profile_current_password">Password attuale</label>
+                            <input type="password" id="profile_current_password" name="current_password" required autocomplete="current-password">
+                        </div>
+                        <div class="form__group">
+                            <label for="profile_new_password">Nuova password</label>
+                            <input type="password" id="profile_new_password" name="new_password" required minlength="8" autocomplete="new-password">
+                        </div>
+                        <div class="form__group">
+                            <label for="profile_new_password_confirmation">Conferma nuova password</label>
+                            <input type="password" id="profile_new_password_confirmation" name="new_password_confirmation" required minlength="8" autocomplete="new-password">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn--primary">Aggiorna password</button>
+                </form>
             </article>
         </div>
     </section>
