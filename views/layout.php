@@ -106,6 +106,19 @@ $moduleEnabled = static function (string $module) use ($enabledModules): bool {
     }
     return in_array($module, $enabledModules, true);
 };
+
+$currentPage = isset($_GET['page']) ? trim((string) $_GET['page']) : '';
+if ($currentPage === '') {
+    $currentPage = 'dashboard';
+}
+$pageAliases = [
+    'product_request' => 'product_requests',
+    'support_request' => 'support_requests',
+];
+$currentPage = $pageAliases[$currentPage] ?? $currentPage;
+$isActiveSidebar = static function (string $page) use ($currentPage): string {
+    return $currentPage === $page ? ' is-active' : '';
+};
 ?>
 <!doctype html>
 <html lang="it">
@@ -127,50 +140,50 @@ $moduleEnabled = static function (string $module) use ($enabledModules): bool {
         </div>
         <nav class="sidebar__nav">
             <?php if ($moduleEnabled('dashboard')): ?>
-                <a href="index.php?page=dashboard" class="sidebar__link" data-tooltip="Dashboard">🏠 <span>Dashboard</span></a>
+                <a href="index.php?page=dashboard" class="sidebar__link<?= $isActiveSidebar('dashboard') ?>" data-tooltip="Dashboard">🏠 <span>Dashboard</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('sim_stock')): ?>
-                <a href="index.php?page=sim_stock" class="sidebar__link" data-tooltip="Magazzino SIM">📥 <span>Magazzino SIM</span></a>
+                <a href="index.php?page=sim_stock" class="sidebar__link<?= $isActiveSidebar('sim_stock') ?>" data-tooltip="Magazzino SIM">📥 <span>Magazzino SIM</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('products')): ?>
-                <a href="index.php?page=products" class="sidebar__link" data-tooltip="Prodotti">🛒 <span>Prodotti</span></a>
+                <a href="index.php?page=products" class="sidebar__link<?= $isActiveSidebar('products') ?>" data-tooltip="Prodotti">🛒 <span>Prodotti</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('products_list')): ?>
-                <a href="index.php?page=products_list" class="sidebar__link" data-tooltip="Lista Prodotti">📋 <span>Lista prodotti</span></a>
+                <a href="index.php?page=products_list" class="sidebar__link<?= $isActiveSidebar('products_list') ?>" data-tooltip="Lista Prodotti">📋 <span>Lista prodotti</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('customers')): ?>
-                <a href="index.php?page=customers" class="sidebar__link" data-tooltip="Clienti">👥 <span>Clienti</span></a>
+                <a href="index.php?page=customers" class="sidebar__link<?= $isActiveSidebar('customers') ?>" data-tooltip="Clienti">👥 <span>Clienti</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('offers')): ?>
-                <a href="index.php?page=offers" class="sidebar__link" data-tooltip="Listini">🗂️ <span>Listini</span></a>
+                <a href="index.php?page=offers" class="sidebar__link<?= $isActiveSidebar('offers') ?>" data-tooltip="Listini">🗂️ <span>Listini</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('sales_create')): ?>
-                <a href="index.php?page=sales_create" class="sidebar__link" data-tooltip="Nuova vendita">🧾 <span>Nuova vendita</span></a>
+                <a href="index.php?page=sales_create" class="sidebar__link<?= $isActiveSidebar('sales_create') ?>" data-tooltip="Nuova vendita">🧾 <span>Nuova vendita</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('sales_list')): ?>
-                <a href="index.php?page=sales_list" class="sidebar__link" data-tooltip="Storico vendite">📊 <span>Storico vendite</span></a>
+                <a href="index.php?page=sales_list" class="sidebar__link<?= $isActiveSidebar('sales_list') ?>" data-tooltip="Storico vendite">📊 <span>Storico vendite</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('energy_contracts')): ?>
-                <a href="index.php?page=energy_contracts" class="sidebar__link" data-tooltip="Contratti energia">⚡ <span>Contratti energia</span></a>
+                <a href="index.php?page=energy_contracts" class="sidebar__link<?= $isActiveSidebar('energy_contracts') ?>" data-tooltip="Contratti energia">⚡ <span>Contratti energia</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('product_requests')): ?>
-                <a href="index.php?page=product_requests" class="sidebar__link" data-tooltip="Ordini store">📦 <span>Ordini store</span></a>
+                <a href="index.php?page=product_requests" class="sidebar__link<?= $isActiveSidebar('product_requests') ?>" data-tooltip="Ordini store">📦 <span>Ordini store</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('support_requests')): ?>
-                <a href="index.php?page=support_requests" class="sidebar__link" data-tooltip="Supporto clienti">💬 <span>Richieste supporto</span></a>
+                <a href="index.php?page=support_requests" class="sidebar__link<?= $isActiveSidebar('support_requests') ?>" data-tooltip="Supporto clienti">💬 <span>Richieste supporto</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('reports')): ?>
-                <a href="index.php?page=reports" class="sidebar__link" data-tooltip="Report vendite">📈 <span>Report</span></a>
+                <a href="index.php?page=reports" class="sidebar__link<?= $isActiveSidebar('reports') ?>" data-tooltip="Report vendite">📈 <span>Report</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('guide')): ?>
-                <a href="index.php?page=guide" class="sidebar__link" data-tooltip="Guida">📘 <span>Guida completa</span></a>
+                <a href="index.php?page=guide" class="sidebar__link<?= $isActiveSidebar('guide') ?>" data-tooltip="Guida">📘 <span>Guida completa</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('settings')): ?>
-                <a href="index.php?page=settings" class="sidebar__link" data-tooltip="Impostazioni">⚙️ <span>Impostazioni</span></a>
+                <a href="index.php?page=settings" class="sidebar__link<?= $isActiveSidebar('settings') ?>" data-tooltip="Impostazioni">⚙️ <span>Impostazioni</span></a>
             <?php endif; ?>
             <?php if ($isAdmin): ?>
-                <a href="index.php?page=tenants" class="sidebar__link" data-tooltip="Tenant">🏢 <span>Tenant</span></a>
-                <a href="index.php?page=licenses" class="sidebar__link" data-tooltip="Licenze">🧩 <span>Licenze</span></a>
+                <a href="index.php?page=tenants" class="sidebar__link<?= $isActiveSidebar('tenants') ?>" data-tooltip="Tenant">🏢 <span>Tenant</span></a>
+                <a href="index.php?page=licenses" class="sidebar__link<?= $isActiveSidebar('licenses') ?>" data-tooltip="Licenze">🧩 <span>Licenze</span></a>
             <?php endif; ?>
         </nav>
     <div class="sidebar__footer">
