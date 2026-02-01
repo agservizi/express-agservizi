@@ -4,12 +4,12 @@ declare(strict_types=1);
 $pageTitle = $pageTitle ?? 'Termini e condizioni';
 ?>
 <section class="page">
-    <div class="card">
-        <header class="page__header">
-            <h2>Termini e condizioni</h2>
-            <p>Le presenti condizioni regolano l’uso del software e dei servizi forniti da AG SERVIZI.</p>
-        </header>
+    <header class="page__header">
+        <h2>Termini e condizioni</h2>
+        <p>Le presenti condizioni regolano l’uso del software e dei servizi forniti da AG SERVIZI.</p>
+    </header>
 
+    <div class="card">
         <section class="page__section">
             <h3>1. Titolare e contatti</h3>
             <p>
