@@ -14,6 +14,7 @@ $migrations = [
     __DIR__ . '/../migrations/20260129_add_energy_sim_requests.sql',
     __DIR__ . '/../migrations/20260129_alter_energy_offers_supply_type.sql',
     __DIR__ . '/../migrations/20260201_add_licenses.sql',
+    __DIR__ . '/../migrations/20260201_update_privacy_policy_contacts.sql',
     __DIR__ . '/../migrations/20260202_add_tenants.sql',
     __DIR__ . '/../migrations/20260203_add_user_email.sql',
     __DIR__ . '/../migrations/20260204_add_tenant_scopes.sql',
