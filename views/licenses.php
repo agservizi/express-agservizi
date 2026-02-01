@@ -49,6 +49,12 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
 
     <section class="page__section">
         <header class="section__header">
+            <h3>Tenant</h3>
+        </header>
+    </section>
+
+    <section class="page__section">
+        <header class="section__header">
             <h3>Crea tenant</h3>
         </header>
         <form method="post" class="form">
@@ -167,6 +173,12 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                 </tbody>
             </table>
         </div>
+    </section>
+
+    <section class="page__section">
+        <header class="section__header">
+            <h3>Licenze</h3>
+        </header>
     </section>
 
     <section class="page__section">
