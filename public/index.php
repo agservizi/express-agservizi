@@ -332,7 +332,7 @@ function resolveTenantLicense(PDO $pdo, int $tenantId): ?array
     }
 
     $stmt = $pdo->prepare(
-        'SELECT l.id, l.code, l.label, l.max_users, l.term_months, l.is_active,
+        'SELECT l.id, l.code, l.label, l.max_users, l.term_months, l.is_active, l.expires_at,
                 tl.max_users_override, tl.assigned_at, tl.revoked_at
          FROM tenant_licenses tl
          INNER JOIN licenses l ON l.id = tl.license_id
