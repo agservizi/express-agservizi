@@ -362,7 +362,7 @@ $previewHasErrors = $previewErrors !== [];
                 <section class="page__section">
                     <header class="section__header">
                         <h3>Articoli</h3>
-                        <button type="button" class="btn btn--secondary" data-action="add-item">Aggiungi riga</button>
+                        <button type="button" class="btn btn--secondary" data-action="add-item">Aggiungi articolo</button>
                     </header>
 
                     <div class="form__group">
