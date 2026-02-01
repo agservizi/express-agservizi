@@ -106,6 +106,13 @@ $licensesOpen = isset($licensesOpen) ? (bool) $licensesOpen : false;
 $licensesOpen = $licensesOpen || $licenseFeedback !== null || $licenseGeneratedCode !== null;
 $licenseActivations = isset($licenseActivations) && is_array($licenseActivations) ? $licenseActivations : [];
 $licenseFocusId = isset($licenseFocusId) ? (int) $licenseFocusId : 0;
+$enabledModules = isset($enabledModules) && is_array($enabledModules) ? $enabledModules : null;
+$moduleEnabled = static function (string $module) use ($enabledModules): bool {
+    if ($enabledModules === null) {
+        return true;
+    }
+    return in_array($module, $enabledModules, true);
+};
 $receiptHeaderLines = $receiptSettings['header_lines'] ?? [];
 if (!is_array($receiptHeaderLines)) {
     $receiptHeaderLines = [];
@@ -169,6 +176,7 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
     <?php endif; ?>
 
     <div class="settings-accordion" data-accordion-group>
+        <?php if ($moduleEnabled('sim_stock')): ?>
         <article class="settings-accordion__item" data-accordion data-open="<?= $inventoryOpen ? 'true' : 'false' ?>">
             <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $inventoryOpen ? 'true' : 'false' ?>">
                 <span class="settings-accordion__title">Magazzino e soglie</span>
@@ -241,7 +249,9 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 </div>
             </div>
         </article>
+        <?php endif; ?>
 
+        <?php if ($moduleEnabled('products')): ?>
         <article class="settings-accordion__item" data-accordion data-open="<?= $fiscalOpen ? 'true' : 'false' ?>">
             <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $fiscalOpen ? 'true' : 'false' ?>">
                 <span class="settings-accordion__title">Impostazioni fiscali</span>
@@ -333,7 +343,9 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 <?php endif; ?>
             </div>
         </article>
+        <?php endif; ?>
 
+        <?php if ($moduleEnabled('sim_stock')): ?>
         <article class="settings-accordion__item" data-accordion data-open="<?= $alertsOpen ? 'true' : 'false' ?>">
             <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $alertsOpen ? 'true' : 'false' ?>">
                 <span class="settings-accordion__title">Alert in corso</span>
@@ -358,7 +370,9 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 <?php endif; ?>
             </div>
         </article>
+        <?php endif; ?>
 
+        <?php if ($moduleEnabled('offers')): ?>
         <article class="settings-accordion__item" data-accordion data-open="<?= $campaignsOpen ? 'true' : 'false' ?>">
             <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $campaignsOpen ? 'true' : 'false' ?>">
                 <span class="settings-accordion__title">Campagne sconto</span>
@@ -478,6 +492,7 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                 <?php endif; ?>
             </div>
         </article>
+        <?php endif; ?>
 
         <?php if ($isAdmin): ?>
             <article class="settings-accordion__item" data-accordion data-open="<?= $pdaOpen ? 'true' : 'false' ?>">
@@ -796,244 +811,248 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
             </div>
         </article>
 
-        <article class="settings-accordion__item" data-accordion data-open="<?= ($providersOpen ? 'true' : 'false') ?>">
-            <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $providersOpen ? 'true' : 'false' ?>">
-                <span class="settings-accordion__title">Gestione gestori</span>
-                <span class="settings-accordion__icon" aria-hidden="true"></span>
-            </button>
-            <div class="settings-accordion__content" data-accordion-content <?= $providersOpen ? '' : 'hidden' ?>>
-                <?php if (!$canManageTenantSettings): ?>
-                    <p class="muted">Solo i responsabili del tenant possono creare o modificare i gestori.</p>
-                <?php else: ?>
-                    <div class="settings-operators">
-                        <section class="settings-operators__panel">
-                            <h4>Crea un nuovo gestore</h4>
-                            <form method="post" class="form settings-form">
-                                <input type="hidden" name="action" value="create_provider">
-                                <div class="settings-form__grid">
-                                    <div class="settings-form__field">
-                                        <label for="provider_name">Nome gestore</label>
-                                        <input type="text" id="provider_name" name="provider_name" required>
+        <?php if ($moduleEnabled('sim_stock')): ?>
+            <article class="settings-accordion__item" data-accordion data-open="<?= ($providersOpen ? 'true' : 'false') ?>">
+                <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $providersOpen ? 'true' : 'false' ?>">
+                    <span class="settings-accordion__title">Gestori</span>
+                    <span class="settings-accordion__icon" aria-hidden="true"></span>
+                </button>
+                <div class="settings-accordion__content" data-accordion-content <?= $providersOpen ? '' : 'hidden' ?>>
+                    <?php if (!$canManageTenantSettings): ?>
+                        <p class="muted">Solo i responsabili del tenant possono creare o modificare i gestori.</p>
+                    <?php else: ?>
+                        <div class="settings-operators">
+                            <section class="settings-operators__panel">
+                                <h4>Crea un nuovo gestore</h4>
+                                <form method="post" class="form settings-form">
+                                    <input type="hidden" name="action" value="create_provider">
+                                    <div class="settings-form__grid">
+                                        <div class="settings-form__field">
+                                            <label for="provider_name">Nome gestore</label>
+                                            <input type="text" id="provider_name" name="provider_name" required>
+                                        </div>
+                                        <div class="settings-form__field">
+                                            <label for="provider_threshold">Soglia minima</label>
+                                            <input type="number" id="provider_threshold" name="provider_threshold" min="0" step="1" value="0">
+                                        </div>
+                                        <div class="settings-form__field">
+                                            <label for="provider_notes">Note</label>
+                                            <input type="text" id="provider_notes" name="provider_notes" placeholder="(opzionale)">
+                                        </div>
                                     </div>
-                                    <div class="settings-form__field">
-                                        <label for="provider_threshold">Soglia minima</label>
-                                        <input type="number" id="provider_threshold" name="reorder_threshold" min="0" value="0" required>
-                                    </div>
-                                    <div class="settings-form__field">
-                                        <label for="provider_notes">Note</label>
-                                        <input type="text" id="provider_notes" name="provider_notes" placeholder="(opzionale)">
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn--primary">Crea gestore</button>
-                            </form>
-                        </section>
+                                    <button type="submit" class="btn btn--primary">Crea gestore</button>
+                                </form>
+                            </section>
 
-                        <section class="settings-operators__panel">
-                            <h4>Gestori configurati</h4>
-                            <?php if (empty($providers)): ?>
-                                <p class="muted">Nessun gestore configurato.</p>
-                            <?php else: ?>
-                                <div class="table-wrapper table-wrapper--embedded">
-                                    <table class="table table--compact">
-                                        <thead>
-                                            <tr>
-                                                <th>Nome</th>
-                                                <th>Soglia</th>
-                                                <th>Note</th>
-                                                <th>Creato il</th>
-                                                <th class="table__col--actions">Azioni</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($providers as $provider): ?>
-                                                <?php
-                                                    $providerId = (int) ($provider['id'] ?? 0);
-                                                    $createdAt = !empty($provider['created_at'])
-                                                        ? date('d/m/Y H:i', strtotime((string) $provider['created_at']))
-                                                        : 'n/d';
-                                                ?>
+                            <section class="settings-operators__panel">
+                                <h4>Gestori configurati</h4>
+                                <?php if (empty($providers)): ?>
+                                    <p class="muted">Nessun gestore configurato.</p>
+                                <?php else: ?>
+                                    <div class="table-wrapper table-wrapper--embedded">
+                                        <table class="table table--compact">
+                                            <thead>
                                                 <tr>
-                                                    <td>
-                                                        <input type="text" name="provider_name" form="provider-update-<?= $providerId ?>" value="<?= htmlspecialchars((string) $provider['name']) ?>" required>
-                                                    </td>
-                                                    <td>
-                                                        <input type="number" min="0" name="reorder_threshold" form="provider-update-<?= $providerId ?>" value="<?= (int) ($provider['reorder_threshold'] ?? 0) ?>" required>
-                                                    </td>
-                                                    <td>
-                                                        <input type="text" name="provider_notes" form="provider-update-<?= $providerId ?>" value="<?= htmlspecialchars((string) ($provider['notes'] ?? '')) ?>" placeholder="(opzionale)">
-                                                    </td>
-                                                    <td><?= htmlspecialchars($createdAt) ?></td>
-                                                    <td class="table__col--actions">
-                                                        <div class="table-actions">
-                                                            <form id="provider-update-<?= $providerId ?>" method="post" class="inline-form">
-                                                                <input type="hidden" name="action" value="update_provider">
-                                                                <input type="hidden" name="provider_id" value="<?= $providerId ?>">
-                                                                <button type="submit" class="btn btn--secondary btn--small">Salva</button>
-                                                            </form>
-                                                            <form method="post" onsubmit="return confirm('Eliminare definitivamente questo gestore?');">
-                                                                <input type="hidden" name="action" value="delete_provider">
-                                                                <input type="hidden" name="provider_id" value="<?= $providerId ?>">
-                                                                <button type="submit" class="btn btn--danger btn--small">Elimina</button>
-                                                            </form>
-                                                        </div>
-                                                    </td>
+                                                    <th>Nome</th>
+                                                    <th>Soglia minima</th>
+                                                    <th>Note</th>
+                                                    <th>Creato il</th>
+                                                    <th class="table__col--actions">Azioni</th>
                                                 </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            <?php endif; ?>
-                        </section>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </article>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($providers as $provider): ?>
+                                                    <?php
+                                                        $providerId = (int) ($provider['id'] ?? 0);
+                                                        $createdAt = !empty($provider['created_at'])
+                                                            ? date('d/m/Y H:i', strtotime((string) $provider['created_at']))
+                                                            : 'n/d';
+                                                    ?>
+                                                    <tr>
+                                                        <td>
+                                                            <input type="text" name="provider_name" form="provider-update-<?= $providerId ?>" value="<?= htmlspecialchars((string) $provider['name']) ?>" required>
+                                                        </td>
+                                                        <td>
+                                                            <input type="number" min="0" name="reorder_threshold" form="provider-update-<?= $providerId ?>" value="<?= (int) ($provider['reorder_threshold'] ?? 0) ?>" required>
+                                                        </td>
+                                                        <td>
+                                                            <input type="text" name="provider_notes" form="provider-update-<?= $providerId ?>" value="<?= htmlspecialchars((string) ($provider['notes'] ?? '')) ?>" placeholder="(opzionale)">
+                                                        </td>
+                                                        <td><?= htmlspecialchars($createdAt) ?></td>
+                                                        <td class="table__col--actions">
+                                                            <div class="table-actions">
+                                                                <form id="provider-update-<?= $providerId ?>" method="post" class="inline-form">
+                                                                    <input type="hidden" name="action" value="update_provider">
+                                                                    <input type="hidden" name="provider_id" value="<?= $providerId ?>">
+                                                                    <button type="submit" class="btn btn--secondary btn--small">Salva</button>
+                                                                </form>
+                                                                <form method="post" onsubmit="return confirm('Eliminare definitivamente questo gestore?');">
+                                                                    <input type="hidden" name="action" value="delete_provider">
+                                                                    <input type="hidden" name="provider_id" value="<?= $providerId ?>">
+                                                                    <button type="submit" class="btn btn--danger btn--small">Elimina</button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                            </section>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </article>
+        <?php endif; ?>
 
-        <article class="settings-accordion__item" data-accordion data-open="<?= ($energyOpen ? 'true' : 'false') ?>">
-            <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $energyOpen ? 'true' : 'false' ?>">
-                <span class="settings-accordion__title">Gestori luce &amp; gas</span>
-                <span class="settings-accordion__icon" aria-hidden="true"></span>
-            </button>
-            <div class="settings-accordion__content" data-accordion-content <?= $energyOpen ? '' : 'hidden' ?>>
-                <?php if ($energyFeedback !== null): ?>
-                    <div class="alert <?= ($energyFeedback['success'] ?? false) ? 'alert--success' : 'alert--error' ?>">
-                        <p><?= htmlspecialchars($energyFeedback['message']) ?></p>
-                        <?php if (!empty($energyFeedback['errors']) && is_array($energyFeedback['errors'])): ?>
-                            <ul class="alert__list">
-                                <?php foreach ($energyFeedback['errors'] as $error): ?>
-                                    <li><?= htmlspecialchars((string) $error) ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-                    </div>
-                <?php endif; ?>
-                <?php if (!$canManageTenantSettings): ?>
-                    <p class="muted">Solo i responsabili del tenant possono creare o modificare i gestori energia.</p>
-                <?php else: ?>
-                    <div class="settings-operators">
-                        <section class="settings-operators__panel">
-                            <h4>Crea un nuovo gestore energia</h4>
-                            <form method="post" class="form settings-form">
-                                <input type="hidden" name="action" value="create_energy_provider">
-                                <div class="settings-form__grid">
-                                    <div class="settings-form__field">
-                                        <label for="energy_provider_name">Nome gestore</label>
-                                        <input type="text" id="energy_provider_name" name="energy_provider_name" required>
-                                    </div>
-                                    <div class="settings-form__field">
-                                        <label for="energy_provider_type">Tipologia</label>
-                                        <select id="energy_provider_type" name="energy_provider_type" required>
-                                            <option value="luce">Luce</option>
-                                            <option value="gas">Gas</option>
-                                            <option value="luce_gas" selected>Luce + Gas</option>
-                                        </select>
-                                    </div>
-                                    <div class="settings-form__field">
-                                        <label for="energy_token_luce">Gettone luce (€)</label>
-                                        <input type="number" id="energy_token_luce" name="energy_token_luce" min="0" step="0.01" value="0">
-                                    </div>
-                                    <div class="settings-form__field">
-                                        <label for="energy_token_gas">Gettone gas (€)</label>
-                                        <input type="number" id="energy_token_gas" name="energy_token_gas" min="0" step="0.01" value="0">
-                                    </div>
-                                    <div class="settings-form__field">
-                                        <label for="energy_provider_notes">Note</label>
-                                        <input type="text" id="energy_provider_notes" name="energy_provider_notes" placeholder="(opzionale)">
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn--primary">Crea gestore energia</button>
-                            </form>
-                        </section>
-
-                        <section class="settings-operators__panel">
-                            <h4>Gestori energia configurati</h4>
-                            <?php if ($isAdmin): ?>
-                                <div class="settings-operators__actions" style="margin:10px 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-                                    <form method="post" class="inline-form" onsubmit="return confirm('Importare ora le offerte ARERA?');">
-                                        <input type="hidden" name="action" value="import_energy_offers">
-                                        <button type="submit" class="btn btn--secondary btn--small">Importa offerte ARERA</button>
-                                    </form>
-                                    <?php if (!empty($energyOffersImportStatus['last_run']) || !empty($energyOffersImportStatus['last_started'])): ?>
-                                        <?php
-                                            $lastRun = !empty($energyOffersImportStatus['last_run'])
-                                                ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_run'])
-                                                : null;
-                                            $lastStarted = !empty($energyOffersImportStatus['last_started'])
-                                                ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_started'])
-                                                : null;
-                                            $statusLabel = $energyOffersImportStatus['last_status'] ?? '';
-                                            $statusText = $statusLabel === 'success'
-                                                ? 'Completato'
-                                                : ($statusLabel === 'error' ? 'Errore' : 'In corso');
-                                        ?>
-                                        <span class="muted">Ultimo import: <?= htmlspecialchars($lastRun ?? $lastStarted ?? 'n/d') ?> · Stato: <?= htmlspecialchars($statusText) ?></span>
-                                    <?php endif; ?>
-                                </div>
+        <?php if ($moduleEnabled('energy_contracts')): ?>
+            <article class="settings-accordion__item" data-accordion data-open="<?= ($energyOpen ? 'true' : 'false') ?>">
+                <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $energyOpen ? 'true' : 'false' ?>">
+                    <span class="settings-accordion__title">Gestori luce &amp; gas</span>
+                    <span class="settings-accordion__icon" aria-hidden="true"></span>
+                </button>
+                <div class="settings-accordion__content" data-accordion-content <?= $energyOpen ? '' : 'hidden' ?>>
+                    <?php if ($energyFeedback !== null): ?>
+                        <div class="alert <?= ($energyFeedback['success'] ?? false) ? 'alert--success' : 'alert--error' ?>">
+                            <p><?= htmlspecialchars($energyFeedback['message']) ?></p>
+                            <?php if (!empty($energyFeedback['errors']) && is_array($energyFeedback['errors'])): ?>
+                                <ul class="alert__list">
+                                    <?php foreach ($energyFeedback['errors'] as $error): ?>
+                                        <li><?= htmlspecialchars((string) $error) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
                             <?php endif; ?>
-                            <?php if (empty($energyProviders)): ?>
-                                <p class="muted">Nessun gestore energia configurato.</p>
-                            <?php else: ?>
-                                <div class="table-wrapper table-wrapper--embedded">
-                                    <table class="table table--compact">
-                                        <thead>
-                                            <tr>
-                                                <th>Nome</th>
-                                                <th>Tipologia</th>
-                                                <th>Gettone luce</th>
-                                                <th>Gettone gas</th>
-                                                <th>Note</th>
-                                                <th class="table__col--actions">Azioni</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($energyProviders as $energyProvider): ?>
-                                                <?php $energyProviderId = (int) ($energyProvider['id'] ?? 0); ?>
+                        </div>
+                    <?php endif; ?>
+                    <?php if (!$canManageTenantSettings): ?>
+                        <p class="muted">Solo i responsabili del tenant possono creare o modificare i gestori energia.</p>
+                    <?php else: ?>
+                        <div class="settings-operators">
+                            <section class="settings-operators__panel">
+                                <h4>Crea un nuovo gestore energia</h4>
+                                <form method="post" class="form settings-form">
+                                    <input type="hidden" name="action" value="create_energy_provider">
+                                    <div class="settings-form__grid">
+                                        <div class="settings-form__field">
+                                            <label for="energy_provider_name">Nome gestore</label>
+                                            <input type="text" id="energy_provider_name" name="energy_provider_name" required>
+                                        </div>
+                                        <div class="settings-form__field">
+                                            <label for="energy_provider_type">Tipologia</label>
+                                            <select id="energy_provider_type" name="energy_provider_type" required>
+                                                <option value="luce">Luce</option>
+                                                <option value="gas">Gas</option>
+                                                <option value="luce_gas" selected>Luce + Gas</option>
+                                            </select>
+                                        </div>
+                                        <div class="settings-form__field">
+                                            <label for="energy_token_luce">Gettone luce (€)</label>
+                                            <input type="number" id="energy_token_luce" name="energy_token_luce" min="0" step="0.01" value="0">
+                                        </div>
+                                        <div class="settings-form__field">
+                                            <label for="energy_token_gas">Gettone gas (€)</label>
+                                            <input type="number" id="energy_token_gas" name="energy_token_gas" min="0" step="0.01" value="0">
+                                        </div>
+                                        <div class="settings-form__field">
+                                            <label for="energy_provider_notes">Note</label>
+                                            <input type="text" id="energy_provider_notes" name="energy_provider_notes" placeholder="(opzionale)">
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn--primary">Crea gestore energia</button>
+                                </form>
+                            </section>
+
+                            <section class="settings-operators__panel">
+                                <h4>Gestori energia configurati</h4>
+                                <?php if ($isAdmin): ?>
+                                    <div class="settings-operators__actions" style="margin:10px 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                                        <form method="post" class="inline-form" onsubmit="return confirm('Importare ora le offerte ARERA?');">
+                                            <input type="hidden" name="action" value="import_energy_offers">
+                                            <button type="submit" class="btn btn--secondary btn--small">Importa offerte ARERA</button>
+                                        </form>
+                                        <?php if (!empty($energyOffersImportStatus['last_run']) || !empty($energyOffersImportStatus['last_started'])): ?>
+                                            <?php
+                                                $lastRun = !empty($energyOffersImportStatus['last_run'])
+                                                    ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_run'])
+                                                    : null;
+                                                $lastStarted = !empty($energyOffersImportStatus['last_started'])
+                                                    ? date('d/m/Y H:i', (int) $energyOffersImportStatus['last_started'])
+                                                    : null;
+                                                $statusLabel = $energyOffersImportStatus['last_status'] ?? '';
+                                                $statusText = $statusLabel === 'success'
+                                                    ? 'Completato'
+                                                    : ($statusLabel === 'error' ? 'Errore' : 'In corso');
+                                            ?>
+                                            <span class="muted">Ultimo import: <?= htmlspecialchars($lastRun ?? $lastStarted ?? 'n/d') ?> · Stato: <?= htmlspecialchars($statusText) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (empty($energyProviders)): ?>
+                                    <p class="muted">Nessun gestore energia configurato.</p>
+                                <?php else: ?>
+                                    <div class="table-wrapper table-wrapper--embedded">
+                                        <table class="table table--compact">
+                                            <thead>
                                                 <tr>
-                                                    <td>
-                                                        <input type="text" name="energy_provider_name" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= htmlspecialchars((string) ($energyProvider['name'] ?? '')) ?>" required>
-                                                    </td>
-                                                    <td>
-                                                        <select name="energy_provider_type" form="energy-provider-update-<?= $energyProviderId ?>">
-                                                            <?php $currentType = (string) ($energyProvider['service_type'] ?? 'luce_gas'); ?>
-                                                            <option value="luce" <?= $currentType === 'luce' ? 'selected' : '' ?>>Luce</option>
-                                                            <option value="gas" <?= $currentType === 'gas' ? 'selected' : '' ?>>Gas</option>
-                                                            <option value="luce_gas" <?= $currentType === 'luce_gas' ? 'selected' : '' ?>>Luce + Gas</option>
-                                                        </select>
-                                                    </td>
-                                                    <td>
-                                                        <input type="number" min="0" step="0.01" name="energy_token_luce" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= number_format((float) ($energyProvider['token_luce'] ?? 0), 2, '.', '') ?>">
-                                                    </td>
-                                                    <td>
-                                                        <input type="number" min="0" step="0.01" name="energy_token_gas" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= number_format((float) ($energyProvider['token_gas'] ?? 0), 2, '.', '') ?>">
-                                                    </td>
-                                                    <td>
-                                                        <input type="text" name="energy_provider_notes" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= htmlspecialchars((string) ($energyProvider['notes'] ?? '')) ?>" placeholder="(opzionale)">
-                                                    </td>
-                                                    <td class="table__col--actions">
-                                                        <div class="table-actions">
-                                                            <form id="energy-provider-update-<?= $energyProviderId ?>" method="post" class="inline-form">
-                                                                <input type="hidden" name="action" value="update_energy_provider">
-                                                                <input type="hidden" name="energy_provider_id" value="<?= $energyProviderId ?>">
-                                                                <button type="submit" class="btn btn--secondary btn--small">Salva</button>
-                                                            </form>
-                                                            <form method="post" onsubmit="return confirm('Eliminare definitivamente questo gestore energia?');">
-                                                                <input type="hidden" name="action" value="delete_energy_provider">
-                                                                <input type="hidden" name="energy_provider_id" value="<?= $energyProviderId ?>">
-                                                                <button type="submit" class="btn btn--danger btn--small">Elimina</button>
-                                                            </form>
-                                                        </div>
-                                                    </td>
+                                                    <th>Nome</th>
+                                                    <th>Tipologia</th>
+                                                    <th>Gettone luce</th>
+                                                    <th>Gettone gas</th>
+                                                    <th>Note</th>
+                                                    <th class="table__col--actions">Azioni</th>
                                                 </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            <?php endif; ?>
-                        </section>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </article>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($energyProviders as $energyProvider): ?>
+                                                    <?php $energyProviderId = (int) ($energyProvider['id'] ?? 0); ?>
+                                                    <tr>
+                                                        <td>
+                                                            <input type="text" name="energy_provider_name" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= htmlspecialchars((string) ($energyProvider['name'] ?? '')) ?>" required>
+                                                        </td>
+                                                        <td>
+                                                            <select name="energy_provider_type" form="energy-provider-update-<?= $energyProviderId ?>">
+                                                                <?php $currentType = (string) ($energyProvider['service_type'] ?? 'luce_gas'); ?>
+                                                                <option value="luce" <?= $currentType === 'luce' ? 'selected' : '' ?>>Luce</option>
+                                                                <option value="gas" <?= $currentType === 'gas' ? 'selected' : '' ?>>Gas</option>
+                                                                <option value="luce_gas" <?= $currentType === 'luce_gas' ? 'selected' : '' ?>>Luce + Gas</option>
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <input type="number" min="0" step="0.01" name="energy_token_luce" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= number_format((float) ($energyProvider['token_luce'] ?? 0), 2, '.', '') ?>">
+                                                        </td>
+                                                        <td>
+                                                            <input type="number" min="0" step="0.01" name="energy_token_gas" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= number_format((float) ($energyProvider['token_gas'] ?? 0), 2, '.', '') ?>">
+                                                        </td>
+                                                        <td>
+                                                            <input type="text" name="energy_provider_notes" form="energy-provider-update-<?= $energyProviderId ?>" value="<?= htmlspecialchars((string) ($energyProvider['notes'] ?? '')) ?>" placeholder="(opzionale)">
+                                                        </td>
+                                                        <td class="table__col--actions">
+                                                            <div class="table-actions">
+                                                                <form id="energy-provider-update-<?= $energyProviderId ?>" method="post" class="inline-form">
+                                                                    <input type="hidden" name="action" value="update_energy_provider">
+                                                                    <input type="hidden" name="energy_provider_id" value="<?= $energyProviderId ?>">
+                                                                    <button type="submit" class="btn btn--secondary btn--small">Salva</button>
+                                                                </form>
+                                                                <form method="post" onsubmit="return confirm('Eliminare definitivamente questo gestore energia?');">
+                                                                    <input type="hidden" name="action" value="delete_energy_provider">
+                                                                    <input type="hidden" name="energy_provider_id" value="<?= $energyProviderId ?>">
+                                                                    <button type="submit" class="btn btn--danger btn--small">Elimina</button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                            </section>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </article>
+        <?php endif; ?>
 
         <article class="settings-accordion__item" data-accordion data-open="<?= ($operatorsOpen ? 'true' : 'false') ?>">
             <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $operatorsOpen ? 'true' : 'false' ?>">
