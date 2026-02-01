@@ -146,6 +146,13 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                                         <?= (int) $tenant['is_active'] === 1 ? 'Disattiva' : 'Attiva' ?>
                                     </button>
                                 </form>
+                                <form method="post" class="table-actions">
+                                    <input type="hidden" name="action" value="resend_tenant_credentials">
+                                    <input type="hidden" name="tenant_id" value="<?= (int) $tenant['id'] ?>">
+                                    <button type="submit" class="btn btn--primary">
+                                        Invia credenziali
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                     <?php endforeach; ?>

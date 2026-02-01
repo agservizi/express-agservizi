@@ -452,6 +452,83 @@ final class UserService
         return $tenant !== false ? $tenant : null;
     }
 
+    /**
+     * @return array{success:bool,message:string,error?:string,email_sent?:bool}
+     */
+    public function resendTenantCredentials(int $tenantId): array
+    {
+        if ($tenantId <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Tenant non valido.',
+            ];
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT u.id, u.username, u.fullname, u.email, r.name AS role_name
+             FROM users u
+             INNER JOIN roles r ON r.id = u.role_id
+             WHERE u.tenant_id = :tenant_id AND LOWER(r.name) <> "admin"
+             ORDER BY u.created_at ASC
+             LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId]);
+        $operator = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($operator === false) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Nessun operatore associato al tenant.',
+            ];
+        }
+
+        $email = trim((string) ($operator['email'] ?? ''));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Email operatore non valida o mancante.',
+            ];
+        }
+
+        $password = $this->generateTempPassword();
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        if ($hash === false) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Errore durante la generazione della password.',
+            ];
+        }
+
+        $update = $this->pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
+        $update->execute([
+            ':hash' => $hash,
+            ':id' => (int) ($operator['id'] ?? 0),
+        ]);
+
+        $sent = $this->sendResetCredentialsEmail(
+            $email,
+            (string) ($operator['username'] ?? ''),
+            $password,
+            (string) ($operator['fullname'] ?? '')
+        );
+
+        if (!$sent) {
+            $this->logTenantCredentialEmailFailure($tenantId, $email);
+        }
+
+        return [
+            'success' => $sent,
+            'message' => $sent
+                ? 'Credenziali inviate correttamente.'
+                : 'Password aggiornata, ma invio email non riuscito.',
+            'email_sent' => $sent,
+        ];
+    }
+
     private function sendCredentialsEmail(string $recipient, string $username, string $password, string $fullname): bool
     {
         $recipient = trim($recipient);
@@ -522,6 +599,99 @@ final class UserService
         }
 
         return $sent;
+    }
+
+    private function sendResetCredentialsEmail(string $recipient, string $username, string $password, string $fullname): bool
+    {
+        $recipient = trim($recipient);
+        if ($recipient === '' || !filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        $appName = $this->appName !== null && $this->appName !== '' ? $this->appName : 'Coresuite Express';
+        $loginUrl = $this->buildLoginUrl();
+        $displayName = $fullname !== '' ? $fullname : $username;
+
+        $subject = '[' . $appName . '] Reset credenziali di accesso';
+        $textBody = "Ciao {$displayName},\n\n";
+        $textBody .= "La tua password è stata reimpostata.\n\n";
+        $textBody .= "Username: {$username}\n";
+        $textBody .= "Password temporanea: {$password}\n\n";
+        $textBody .= "Accedi qui: {$loginUrl}\n\n";
+        $textBody .= "Ti consigliamo di cambiare la password al primo accesso.\n";
+
+        $brandColor = '#1f2937';
+        $accentColor = '#2563eb';
+        $htmlBody = '<!doctype html>';
+        $htmlBody .= '<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+        $htmlBody .= '<title>' . htmlspecialchars($appName) . '</title>';
+        $htmlBody .= '</head><body style="margin:0;padding:0;background:#f4f6fb;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827;">';
+        $htmlBody .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:32px 12px;">';
+        $htmlBody .= '<tr><td align="center">';
+        $htmlBody .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 18px 45px rgba(15,23,42,0.08);">';
+        $htmlBody .= '<tr><td style="padding:24px 28px;background:' . $brandColor . ';color:#ffffff;">';
+        $htmlBody .= '<h1 style="margin:0;font-size:20px;font-weight:600;">' . htmlspecialchars($appName) . '</h1>';
+        $htmlBody .= '<p style="margin:6px 0 0;font-size:14px;opacity:0.85;">Reset credenziali</p>';
+        $htmlBody .= '</td></tr>';
+        $htmlBody .= '<tr><td style="padding:28px;">';
+        $htmlBody .= '<p style="margin:0 0 12px;font-size:16px;">Ciao <strong>' . htmlspecialchars($displayName) . '</strong>,</p>';
+        $htmlBody .= '<p style="margin:0 0 20px;color:#4b5563;">La tua password è stata reimpostata. Trovi qui le credenziali aggiornate:</p>';
+        $htmlBody .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:22px;">';
+        $htmlBody .= '<p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Username</p>';
+        $htmlBody .= '<p style="margin:0 0 14px;font-size:16px;font-weight:600;color:#111827;">' . htmlspecialchars($username) . '</p>';
+        $htmlBody .= '<p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Password temporanea</p>';
+        $htmlBody .= '<p style="margin:0;font-size:16px;font-weight:600;color:#111827;">' . htmlspecialchars($password) . '</p>';
+        $htmlBody .= '</div>';
+        $htmlBody .= '<a href="' . htmlspecialchars($loginUrl) . '" style="display:inline-block;background:' . $accentColor . ';color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">Accedi al gestionale</a>';
+        $htmlBody .= '<p style="margin:20px 0 0;color:#6b7280;font-size:13px;">Ti consigliamo di cambiare la password al primo accesso.</p>';
+        $htmlBody .= '</td></tr>';
+        $htmlBody .= '<tr><td style="padding:20px 28px;border-top:1px solid #e5e7eb;background:#fafafa;color:#9ca3af;font-size:12px;">';
+        $htmlBody .= 'Se non riconosci questa email, contatta subito l\'amministratore.';
+        $htmlBody .= '</td></tr>';
+        $htmlBody .= '</table>';
+        $htmlBody .= '</td></tr></table>';
+        $htmlBody .= '</body></html>';
+
+        $sent = false;
+        if ($this->resendApiKey !== null && $this->sendEmailViaResend($recipient, $subject, $textBody, $htmlBody)) {
+            $sent = true;
+        }
+
+        if (!$sent) {
+            $fromEmail = $this->getFromEmail();
+            $fromName = $this->getFromDisplayName();
+            $formattedFrom = $this->formatEmailAddress($fromEmail, $fromName);
+            $headers = [
+                'From: ' . $formattedFrom,
+                'Reply-To: ' . $fromEmail,
+                'MIME-Version: 1.0',
+                'Content-Type: text/plain; charset=UTF-8',
+            ];
+            $sent = @mail($recipient, $subject, $textBody, implode("\r\n", $headers));
+        }
+
+        return $sent;
+    }
+
+    private function generateTempPassword(int $length = 12): string
+    {
+        $bytes = random_bytes((int) ceil($length / 2));
+        return substr(bin2hex($bytes), 0, $length);
+    }
+
+    private function logTenantCredentialEmailFailure(int $tenantId, string $email): void
+    {
+        $dir = dirname(__DIR__, 2) . '/storage/logs';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        $line = sprintf(
+            "[%s] Tenant %d - invio credenziali fallito a %s\n",
+            date('Y-m-d H:i:s'),
+            $tenantId,
+            $email
+        );
+        @file_put_contents($dir . '/tenant_emails.log', $line, FILE_APPEND);
     }
 
     private function buildLoginUrl(): string

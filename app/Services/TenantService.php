@@ -7,8 +7,13 @@ use PDO;
 
 final class TenantService
 {
-    public function __construct(private PDO $pdo)
-    {
+    public function __construct(
+        private PDO $pdo,
+        private ?string $resendApiKey = null,
+        private ?string $resendFrom = null,
+        private ?string $resendFromName = null,
+        private ?string $appName = null
+    ) {
     }
 
     /**
@@ -80,10 +85,105 @@ final class TenantService
             (new ReceiptSettingsService())->initializeForTenant($tenantId, $name);
         }
 
+        $emailSent = false;
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $emailSent = $this->sendTenantWelcomeEmail($email, $name, $slug, $phone !== '' ? $phone : null);
+        }
+
         return [
             'success' => true,
-            'message' => 'Tenant creato correttamente.',
+            'message' => $emailSent
+                ? 'Tenant creato correttamente. Email inviata al contatto.'
+                : 'Tenant creato correttamente.' . ($email !== '' ? ' Email non inviata.' : ''),
+            'email_sent' => $emailSent,
         ];
+    }
+
+    private function sendTenantWelcomeEmail(string $recipient, string $tenantName, string $tenantSlug, ?string $phone): bool
+    {
+        $appName = $this->appName ?: 'Gestionale';
+        $subject = 'Tenant creato - ' . $appName;
+
+        $lines = [
+            'Il tenant è stato creato correttamente.',
+            'Nome tenant: ' . $tenantName,
+            'Slug tenant: ' . $tenantSlug,
+        ];
+        if ($phone !== null && $phone !== '') {
+            $lines[] = 'Telefono: ' . $phone;
+        }
+        $lines[] = '';
+        $lines[] = 'Per accedere, utilizza le credenziali fornite dall’amministratore.';
+
+        $textBody = implode("\n", $lines);
+        $htmlBody = '<p>' . implode('</p><p>', array_map('htmlspecialchars', $lines)) . '</p>';
+
+        if ($this->resendApiKey !== null && $this->sendEmailViaResend($recipient, $subject, $textBody, $htmlBody)) {
+            return true;
+        }
+
+        $headers = [];
+        $fromEmail = trim((string) ($this->resendFrom ?? ''));
+        if ($fromEmail !== '') {
+            $fromName = trim((string) ($this->resendFromName ?? ''));
+            $from = $fromName !== '' ? $fromName . ' <' . $fromEmail . '>' : $fromEmail;
+            $headers[] = 'From: ' . $from;
+        }
+
+        if ($htmlBody !== null) {
+            $headers[] = 'MIME-Version: 1.0';
+            $headers[] = 'Content-Type: text/html; charset=UTF-8';
+        }
+
+        return @mail($recipient, $subject, $htmlBody ?? $textBody, implode("\r\n", $headers));
+    }
+
+    private function sendEmailViaResend(string $recipient, string $subject, string $textBody, ?string $htmlBody = null): bool
+    {
+        if (!function_exists('curl_init') || $this->resendApiKey === null) {
+            return false;
+        }
+
+        $fromEmail = trim((string) ($this->resendFrom ?? ''));
+        if ($fromEmail === '') {
+            $fromEmail = 'support@coresuite.test';
+        }
+        $fromName = trim((string) ($this->resendFromName ?? ''));
+        $from = $fromName !== '' ? $fromName . ' <' . $fromEmail . '>' : $fromEmail;
+
+        $payload = json_encode([
+            'from' => $from,
+            'to' => [$recipient],
+            'subject' => $subject,
+            'text' => $textBody,
+            'html' => $htmlBody,
+        ]);
+
+        if ($payload === false) {
+            return false;
+        }
+
+        $ch = curl_init('https://api.resend.com/emails');
+        if ($ch === false) {
+            return false;
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->resendApiKey,
+                'Content-Type: application/json',
+            ],
+            CURLOPT_TIMEOUT => 10,
+        ]);
+
+        $response = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return $response !== false && $status >= 200 && $status < 300;
     }
 
     /**

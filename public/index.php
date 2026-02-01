@@ -561,7 +561,7 @@ $energyProviderService = new EnergyProviderService($pdo);
 $energyContractService = new EnergyContractService($pdo);
 $energyOfferService = new EnergyOfferService($pdo);
 $licenseService = new LicenseService($pdo);
-$tenantService = new TenantService($pdo);
+$tenantService = new TenantService($pdo, $resendApiKey, $resendFrom, $resendFromName, $appName);
 $supportRequestService = new SupportRequestService($pdo);
 $userService = new UserService($pdo, $resendApiKey, $resendFrom, $resendFromName, $appName);
 $stockMonitorService = new StockMonitorService($pdo, $alertEmail, $logPath, $resendApiKey, $resendFrom, $systemNotificationService);
@@ -1854,6 +1854,9 @@ switch ($page) {
                 $tenantId = (int) ($_POST['tenant_id'] ?? 0);
                 $enabled = (int) ($_POST['enabled'] ?? 0) === 1;
                 $result = $tenantService->toggleTenant($tenantId, $enabled);
+            } elseif ($action === 'resend_tenant_credentials') {
+                $tenantId = (int) ($_POST['tenant_id'] ?? 0);
+                $result = $userService->resendTenantCredentials($tenantId);
             } else {
                 $result = [
                     'success' => false,
