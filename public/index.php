@@ -2226,6 +2226,8 @@ switch ($page) {
         $licenses = $licenseService->listLicenses();
         $assignments = $tenantService->listTenantLicenses();
 
+        $selectedLicenseId = isset($_GET['license_id']) ? (int) $_GET['license_id'] : 0;
+
         render('licenses', [
             'currentUser' => $currentUser,
             'pageTitle' => 'Licenze',
@@ -2234,6 +2236,7 @@ switch ($page) {
             'licenses' => $licenses,
             'assignments' => $assignments,
             'licenseGeneratedCode' => $licenseGeneratedCode,
+            'selectedLicenseId' => $selectedLicenseId,
         ]);
         break;
 

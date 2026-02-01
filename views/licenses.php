@@ -7,6 +7,7 @@ declare(strict_types=1);
  * @var array<int, array<string, mixed>> $assignments
  * @var array{success:bool,message:string,error?:string}|null $feedback
  * @var array{code:string,label?:string}|null $licenseGeneratedCode
+ * @var int $selectedLicenseId
  */
 $pageTitle = $pageTitle ?? 'Licenze';
 $tenants = isset($tenants) && is_array($tenants) ? $tenants : [];
@@ -14,6 +15,17 @@ $licenses = isset($licenses) && is_array($licenses) ? $licenses : [];
 $assignments = isset($assignments) && is_array($assignments) ? $assignments : [];
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
 $licenseGeneratedCode = isset($licenseGeneratedCode) && is_array($licenseGeneratedCode) ? $licenseGeneratedCode : null;
+$selectedLicenseId = isset($selectedLicenseId) ? (int) $selectedLicenseId : 0;
+
+$selectedLicense = null;
+if ($selectedLicenseId > 0) {
+    foreach ($licenses as $license) {
+        if ((int) ($license['id'] ?? 0) === $selectedLicenseId) {
+            $selectedLicense = $license;
+            break;
+        }
+    }
+}
 
 $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): string {
     if ($value === null || $value === '') {
@@ -47,6 +59,35 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
         </div>
     <?php endif; ?>
 
+
+    <?php if ($selectedLicense): ?>
+        <?php
+            $selectedTerm = isset($selectedLicense['term_months']) && (int) $selectedLicense['term_months'] > 0
+                ? (int) $selectedLicense['term_months'] . ' mesi'
+                : '—';
+        ?>
+        <section class="page__section" id="license-detail">
+            <header class="section__header">
+                <h3>Dettaglio licenza</h3>
+            </header>
+            <div class="card">
+                <div class="card__header">
+                    <h3><?= htmlspecialchars((string) ($selectedLicense['code'] ?? '')) ?></h3>
+                    <span class="badge badge--<?= (int) ($selectedLicense['is_active'] ?? 0) === 1 ? 'success' : 'muted' ?>">
+                        <?= (int) ($selectedLicense['is_active'] ?? 0) === 1 ? 'Attiva' : 'Disattiva' ?>
+                    </span>
+                </div>
+                <p class="card__meta">
+                    <?= !empty($selectedLicense['label']) ? htmlspecialchars((string) $selectedLicense['label']) : '—' ?>
+                </p>
+                <ul class="card__list">
+                    <li>Max utenti: <?= (int) ($selectedLicense['max_users'] ?? 1) ?></li>
+                    <li>Durata: <?= htmlspecialchars($selectedTerm) ?></li>
+                    <li>Scadenza: <?= htmlspecialchars($formatDate($selectedLicense['expires_at'] ?? null, 'd/m/Y')) ?></li>
+                </ul>
+            </div>
+        </section>
+    <?php endif; ?>
 
     <section class="page__section">
         <header class="section__header">
@@ -105,7 +146,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                                 ? (int) $license['term_months'] . ' mesi'
                                 : '—';
                         ?>
-                        <tr id="license-<?= (int) $license['id'] ?>">
+                        <tr id="license-<?= (int) $license['id'] ?>" class="<?= $selectedLicenseId === (int) $license['id'] ? 'highlight' : '' ?>">
                             <td><?= htmlspecialchars((string) $license['code']) ?></td>
                             <td><?= $license['label'] ? htmlspecialchars((string) $license['label']) : '—' ?></td>
                             <td><?= (int) ($license['max_users'] ?? 1) ?></td>
@@ -237,7 +278,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                                 </span>
                             </td>
                             <td>
-                                <a class="btn btn--ghost btn--small" href="index.php?page=licenses#license-<?= (int) $assignment['license_id'] ?>">Dettaglio</a>
+                                <a class="btn btn--ghost btn--small" href="index.php?page=licenses&license_id=<?= (int) $assignment['license_id'] ?>#license-<?= (int) $assignment['license_id'] ?>">Dettaglio</a>
                                 <?php if (!$isRevoked): ?>
                                     <form method="post" class="table-actions">
                                         <input type="hidden" name="action" value="revoke_tenant_license">
