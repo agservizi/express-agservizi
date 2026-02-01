@@ -8,6 +8,7 @@ $userDisplayName = null;
 $userInitial = null;
 $userRoleLabel = 'Operatore';
 $appVersionLabel = 'v. 1.0';
+$appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $initialToasts = $initialToasts ?? [];
 if (!is_array($initialToasts)) {
     $initialToasts = [];
@@ -253,6 +254,17 @@ if ($currentRoute === '' || $currentRoute === '/') {
         <div class="main__content">
             <?= $content ?>
         </div>
+        <footer class="main__footer">
+            <div class="footer__content">
+                <span><?= htmlspecialchars((string) $appName) ?></span>
+                <span>·</span>
+                <span>Sviluppato da AG SERVIZI</span>
+                <span>·</span>
+                <a href="index.php?page=terms">Termini e condizioni</a>
+                <span>·</span>
+                <a href="index.php?page=privacy">Privacy policy</a>
+            </div>
+        </footer>
     </main>
 </div>
 <?php

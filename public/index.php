@@ -497,6 +497,7 @@ use App\Services\EnergyProviderService;
 use App\Services\EnergyContractService;
 use App\Services\EnergyOfferService;
 use App\Services\SystemNotificationService;
+use App\Services\PrivacyPolicyService;
 use App\Services\SsoService;
 use App\Services\PdaImportService;
 use App\Services\ReceiptSettingsService;
@@ -552,6 +553,7 @@ $productService = new ProductService($pdo);
 $productRequestService = new ProductRequestService($pdo);
 $salesService = new SalesService($pdo);
 $discountCampaignService = new DiscountCampaignService($pdo);
+$privacyPolicyService = new PrivacyPolicyService($pdo);
 $pdaImportService = new PdaImportService($pdo, $customerService);
 $pdaSettingsService = new PdaSettingsService();
 $receiptSettingsService = new ReceiptSettingsService();
@@ -1935,6 +1937,22 @@ switch ($page) {
             'licenses' => $licenses,
             'assignments' => $assignments,
             'licenseGeneratedCode' => $licenseGeneratedCode,
+        ]);
+        break;
+
+    case 'terms':
+        render('terms', [
+            'currentUser' => $currentUser,
+            'pageTitle' => 'Termini e condizioni',
+        ]);
+        break;
+
+    case 'privacy':
+        $policy = $privacyPolicyService->getActivePolicy();
+        render('privacy', [
+            'currentUser' => $currentUser,
+            'pageTitle' => 'Privacy policy',
+            'policy' => $policy,
         ]);
         break;
 
