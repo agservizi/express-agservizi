@@ -4047,6 +4047,7 @@ function buildUserProfileSalesSummary(PDO $pdo, int $userId): array
 
 function getDashboardMetrics(PDO $pdo, string $period = 'day'): array
 {
+    $tenantId = \App\Services\TenantContext::id();
     $bounds = resolvePeriodBounds($period, false);
     $previousBounds = resolvePeriodBounds($period, true);
 
@@ -4058,8 +4059,13 @@ function getDashboardMetrics(PDO $pdo, string $period = 'day'): array
         ],
     ];
 
-    $metrics['iccid_total'] = (int) ($pdo->query('SELECT COUNT(*) FROM iccid_stock')->fetchColumn() ?: 0);
-    $metrics['iccid_available'] = (int) ($pdo->query("SELECT COUNT(*) FROM iccid_stock WHERE status = 'InStock'")->fetchColumn() ?: 0);
+    $iccidTotalStmt = $pdo->prepare('SELECT COUNT(*) FROM iccid_stock WHERE tenant_id = :tenant_id');
+    $iccidTotalStmt->execute([':tenant_id' => $tenantId]);
+    $metrics['iccid_total'] = (int) ($iccidTotalStmt->fetchColumn() ?: 0);
+
+    $iccidAvailableStmt = $pdo->prepare("SELECT COUNT(*) FROM iccid_stock WHERE tenant_id = :tenant_id AND status = 'InStock'");
+    $iccidAvailableStmt->execute([':tenant_id' => $tenantId]);
+    $metrics['iccid_available'] = (int) ($iccidAvailableStmt->fetchColumn() ?: 0);
 
     $currentSales = aggregateSalesForPeriod($pdo, $bounds);
     $previousSales = aggregateSalesForPeriod($pdo, $previousBounds);
@@ -4144,6 +4150,7 @@ function resolvePeriodBounds(string $period, bool $previous = false): array
  */
 function aggregateSalesForPeriod(PDO $pdo, array $bounds): array
 {
+    $tenantId = \App\Services\TenantContext::id();
     $stmt = $pdo->prepare(
         'SELECT
             SUM(CASE WHEN status = "Completed" THEN 1 ELSE 0 END) AS sales_count,
@@ -4152,10 +4159,11 @@ function aggregateSalesForPeriod(PDO $pdo, array $bounds): array
             COALESCE(SUM(CASE WHEN status = "Completed" THEN total_paid ELSE 0 END), 0) AS paid_total,
             COALESCE(SUM(CASE WHEN status = "Completed" THEN balance_due ELSE 0 END), 0) AS balance_due_total
          FROM sales
-         WHERE created_at BETWEEN :start AND :end'
+         WHERE tenant_id = :tenant_id AND created_at BETWEEN :start AND :end'
     );
 
     $stmt?->execute([
+        ':tenant_id' => $tenantId,
         ':start' => $bounds['start']->format('Y-m-d H:i:s'),
         ':end' => $bounds['end']->format('Y-m-d H:i:s'),
     ]);
@@ -4214,14 +4222,17 @@ function calculateDelta(float $current, float $previous): array
  */
 function fetchSupportSummary(PDO $pdo): array
 {
+    $tenantId = \App\Services\TenantContext::id();
     $statuses = ['Open', 'InProgress', 'Completed', 'Cancelled'];
     $summary = array_fill_keys($statuses, 0);
 
-    $stmt = $pdo->query(
+    $stmt = $pdo->prepare(
         'SELECT status, COUNT(*) AS total
          FROM customer_support_requests
+         WHERE tenant_id = :tenant_id
          GROUP BY status'
     );
+    $stmt->execute([':tenant_id' => $tenantId]);
 
     if ($stmt !== false) {
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -4232,11 +4243,13 @@ function fetchSupportSummary(PDO $pdo): array
         }
     }
 
-    $openBreachesStmt = $pdo->query(
-        "SELECT COUNT(*) FROM customer_support_requests
-         WHERE status IN ('Open','InProgress')
-           AND created_at < DATE_SUB(NOW(), INTERVAL 48 HOUR)"
-    );
+        $openBreachesStmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM customer_support_requests
+                 WHERE tenant_id = :tenant_id
+                     AND status IN ('Open','InProgress')
+                     AND created_at < DATE_SUB(NOW(), INTERVAL 48 HOUR)"
+        );
+        $openBreachesStmt->execute([':tenant_id' => $tenantId]);
 
     $openBreaches = (int) ($openBreachesStmt !== false ? ($openBreachesStmt->fetchColumn() ?: 0) : 0);
 
@@ -4256,6 +4269,7 @@ function fetchSupportSummary(PDO $pdo): array
  */
 function buildCustomerIntelligence(PDO $pdo): array
 {
+    $tenantId = \App\Services\TenantContext::id();
     $summary = [
         'total_customers' => 0,
         'portal_users' => 0,
@@ -4264,22 +4278,38 @@ function buildCustomerIntelligence(PDO $pdo): array
         'active_portal_last_30' => 0,
     ];
 
-    $summary['total_customers'] = (int) ($pdo->query('SELECT COUNT(*) FROM customers')->fetchColumn() ?: 0);
-    $summary['portal_users'] = (int) ($pdo->query('SELECT COUNT(*) FROM customer_portal_accounts')->fetchColumn() ?: 0);
-    $summary['active_portal_last_30'] = (int) ($pdo->query('SELECT COUNT(*) FROM customer_portal_accounts WHERE last_login_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)')->fetchColumn() ?: 0);
-    $summary['new_last_30'] = (int) ($pdo->query('SELECT COUNT(*) FROM customers WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)')->fetchColumn() ?: 0);
+    $totalCustomersStmt = $pdo->prepare('SELECT COUNT(*) FROM customers WHERE tenant_id = :tenant_id');
+    $totalCustomersStmt->execute([':tenant_id' => $tenantId]);
+    $summary['total_customers'] = (int) ($totalCustomersStmt->fetchColumn() ?: 0);
 
-    $activeStmt = $pdo->prepare(
-        'SELECT COUNT(DISTINCT customer_id)
-         FROM sales
-         WHERE customer_id IS NOT NULL
-           AND status = "Completed"
-           AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
+    $portalUsersStmt = $pdo->prepare('SELECT COUNT(*) FROM customer_portal_accounts WHERE tenant_id = :tenant_id');
+    $portalUsersStmt->execute([':tenant_id' => $tenantId]);
+    $summary['portal_users'] = (int) ($portalUsersStmt->fetchColumn() ?: 0);
+
+    $activePortalStmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM customer_portal_accounts WHERE tenant_id = :tenant_id AND last_login_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
     );
-    $activeStmt?->execute();
+    $activePortalStmt->execute([':tenant_id' => $tenantId]);
+    $summary['active_portal_last_30'] = (int) ($activePortalStmt->fetchColumn() ?: 0);
+
+    $newCustomersStmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM customers WHERE tenant_id = :tenant_id AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
+    );
+    $newCustomersStmt->execute([':tenant_id' => $tenantId]);
+    $summary['new_last_30'] = (int) ($newCustomersStmt->fetchColumn() ?: 0);
+
+        $activeStmt = $pdo->prepare(
+                'SELECT COUNT(DISTINCT customer_id)
+                 FROM sales
+                 WHERE tenant_id = :tenant_id
+                     AND customer_id IS NOT NULL
+                     AND status = "Completed"
+                     AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
+        );
+        $activeStmt?->execute([':tenant_id' => $tenantId]);
     $summary['active_last_30'] = (int) ($activeStmt !== false ? ($activeStmt->fetchColumn() ?: 0) : 0);
 
-    $topCustomersStmt = $pdo->query(
+    $topCustomersStmt = $pdo->prepare(
         'SELECT
             COALESCE(c.fullname, s.customer_name, "Cliente" ) AS customer_name,
             c.id AS customer_id,
@@ -4287,36 +4317,40 @@ function buildCustomerIntelligence(PDO $pdo): array
             COALESCE(SUM(s.total), 0) AS revenue,
             MAX(s.created_at) AS last_purchase
          FROM sales s
-         LEFT JOIN customers c ON c.id = s.customer_id
-         WHERE s.status = "Completed"
+         LEFT JOIN customers c ON c.id = s.customer_id AND c.tenant_id = :tenant_id
+         WHERE s.tenant_id = :tenant_id AND s.status = "Completed"
          GROUP BY c.id, customer_name
          ORDER BY revenue DESC
          LIMIT 5'
     );
+    $topCustomersStmt->execute([':tenant_id' => $tenantId]);
     $topCustomers = $topCustomersStmt !== false ? $topCustomersStmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
-    $atRiskStmt = $pdo->query(
+    $atRiskStmt = $pdo->prepare(
         'SELECT
             COALESCE(c.fullname, s.customer_name, "Cliente") AS customer_name,
             MAX(s.created_at) AS last_purchase,
             COUNT(*) AS orders,
             COALESCE(SUM(s.total), 0) AS revenue
          FROM sales s
-         LEFT JOIN customers c ON c.id = s.customer_id
-         WHERE s.status = "Completed"
+         LEFT JOIN customers c ON c.id = s.customer_id AND c.tenant_id = :tenant_id
+         WHERE s.tenant_id = :tenant_id AND s.status = "Completed"
          GROUP BY c.id, customer_name
          HAVING MAX(s.created_at) < DATE_SUB(NOW(), INTERVAL 60 DAY)
          ORDER BY last_purchase ASC
          LIMIT 5'
     );
+    $atRiskStmt->execute([':tenant_id' => $tenantId]);
     $atRisk = $atRiskStmt !== false ? $atRiskStmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
-    $recentCustomersStmt = $pdo->query(
+    $recentCustomersStmt = $pdo->prepare(
         'SELECT fullname, email, created_at
          FROM customers
+         WHERE tenant_id = :tenant_id
          ORDER BY created_at DESC
          LIMIT 5'
     );
+    $recentCustomersStmt->execute([':tenant_id' => $tenantId]);
     $recentCustomers = $recentCustomersStmt !== false ? $recentCustomersStmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
     return [
@@ -4332,32 +4366,38 @@ function buildCustomerIntelligence(PDO $pdo): array
  */
 function fetchBillingPipeline(PDO $pdo): array
 {
-    $pendingPaymentsStmt = $pdo->query(
+    $tenantId = \App\Services\TenantContext::id();
+    $pendingPaymentsStmt = $pdo->prepare(
         'SELECT COUNT(*) AS total, COALESCE(SUM(amount), 0) AS amount
          FROM customer_payments
-         WHERE status = "Pending"'
+         WHERE tenant_id = :tenant_id AND status = "Pending"'
     );
+    $pendingPaymentsStmt->execute([':tenant_id' => $tenantId]);
     $pendingPaymentsRow = $pendingPaymentsStmt !== false ? $pendingPaymentsStmt->fetch(PDO::FETCH_ASSOC) : null;
 
-    $overdueStmt = $pdo->query(
+    $overdueStmt = $pdo->prepare(
         "SELECT COUNT(*) AS total, COALESCE(SUM(balance_due), 0) AS amount
          FROM sales
-         WHERE status = 'Completed'
+         WHERE tenant_id = :tenant_id
+           AND status = 'Completed'
            AND payment_status IN ('Overdue','Pending','Partial')
            AND due_date IS NOT NULL
            AND due_date < CURRENT_DATE()
            AND balance_due > 0"
     );
+    $overdueStmt->execute([':tenant_id' => $tenantId]);
     $overdueRow = $overdueStmt !== false ? $overdueStmt->fetch(PDO::FETCH_ASSOC) : null;
 
-    $dueSoonStmt = $pdo->query(
+    $dueSoonStmt = $pdo->prepare(
         "SELECT COUNT(*) AS total, COALESCE(SUM(balance_due), 0) AS amount
          FROM sales
-         WHERE status = 'Completed'
+         WHERE tenant_id = :tenant_id
+           AND status = 'Completed'
            AND payment_status IN ('Pending','Partial')
            AND due_date BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)
            AND balance_due > 0"
     );
+    $dueSoonStmt->execute([':tenant_id' => $tenantId]);
     $dueSoonRow = $dueSoonStmt !== false ? $dueSoonStmt->fetch(PDO::FETCH_ASSOC) : null;
 
     return [
@@ -4381,6 +4421,7 @@ function fetchBillingPipeline(PDO $pdo): array
  */
 function buildSalesForecast(PDO $pdo, int $horizonDays = 7): array
 {
+    $tenantId = \App\Services\TenantContext::id();
     $horizonDays = max(1, min($horizonDays, 14));
     $lookbackDays = 28;
     $end = new DateTimeImmutable('today 23:59:59');
@@ -4391,11 +4432,12 @@ function buildSalesForecast(PDO $pdo, int $horizonDays = 7): array
                 SUM(CASE WHEN status = "Completed" THEN 1 ELSE 0 END) AS sales_count,
                 COALESCE(SUM(CASE WHEN status = "Completed" THEN total ELSE 0 END), 0) AS revenue_total
          FROM sales
-         WHERE created_at BETWEEN :start AND :end
+         WHERE tenant_id = :tenant_id AND created_at BETWEEN :start AND :end
          GROUP BY DATE(created_at)
          ORDER BY DATE(created_at) ASC'
     );
     $stmt?->execute([
+        ':tenant_id' => $tenantId,
         ':start' => $start->format('Y-m-d H:i:s'),
         ':end' => $end->format('Y-m-d H:i:s'),
     ]);
@@ -4471,22 +4513,41 @@ function buildSalesForecast(PDO $pdo, int $horizonDays = 7): array
  */
 function fetchGovernanceSnapshot(PDO $pdo): array
 {
-    $activePolicies = (int) ($pdo->query('SELECT COUNT(*) FROM privacy_policies WHERE is_active = 1')->fetchColumn() ?: 0);
-    $latestPolicyStmt = $pdo->query(
+    $tenantId = \App\Services\TenantContext::id();
+    $activePoliciesStmt = $pdo->prepare('SELECT COUNT(*) FROM privacy_policies WHERE tenant_id = :tenant_id AND is_active = 1');
+    $activePoliciesStmt->execute([':tenant_id' => $tenantId]);
+    $activePolicies = (int) ($activePoliciesStmt->fetchColumn() ?: 0);
+    $latestPolicyStmt = $pdo->prepare(
         'SELECT version, updated_at
          FROM privacy_policies
+         WHERE tenant_id = :tenant_id
          ORDER BY updated_at DESC
          LIMIT 1'
     );
+    $latestPolicyStmt->execute([':tenant_id' => $tenantId]);
     $latestPolicy = $latestPolicyStmt !== false ? $latestPolicyStmt->fetch(PDO::FETCH_ASSOC) : null;
 
-    $portalAccounts = (int) ($pdo->query('SELECT COUNT(*) FROM customer_portal_accounts')->fetchColumn() ?: 0);
-    $acceptancesTotal = (int) ($pdo->query('SELECT COUNT(*) FROM privacy_policy_acceptances')->fetchColumn() ?: 0);
-    $uniqueAcceptances = (int) ($pdo->query('SELECT COUNT(DISTINCT portal_account_id) FROM privacy_policy_acceptances')->fetchColumn() ?: 0);
+    $portalAccountsStmt = $pdo->prepare('SELECT COUNT(*) FROM customer_portal_accounts WHERE tenant_id = :tenant_id');
+    $portalAccountsStmt->execute([':tenant_id' => $tenantId]);
+    $portalAccounts = (int) ($portalAccountsStmt->fetchColumn() ?: 0);
+
+    $acceptancesTotalStmt = $pdo->prepare('SELECT COUNT(*) FROM privacy_policy_acceptances WHERE tenant_id = :tenant_id');
+    $acceptancesTotalStmt->execute([':tenant_id' => $tenantId]);
+    $acceptancesTotal = (int) ($acceptancesTotalStmt->fetchColumn() ?: 0);
+
+    $uniqueAcceptancesStmt = $pdo->prepare(
+        'SELECT COUNT(DISTINCT portal_account_id) FROM privacy_policy_acceptances WHERE tenant_id = :tenant_id'
+    );
+    $uniqueAcceptancesStmt->execute([':tenant_id' => $tenantId]);
+    $uniqueAcceptances = (int) ($uniqueAcceptancesStmt->fetchColumn() ?: 0);
     $acceptanceRate = $portalAccounts > 0 ? ($uniqueAcceptances / $portalAccounts) * 100 : null;
     $pendingAcceptances = max(0, $portalAccounts - $uniqueAcceptances);
 
-    $auditLast30 = (int) ($pdo->query('SELECT COUNT(*) FROM audit_log WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)')->fetchColumn() ?: 0);
+    $auditLast30Stmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM audit_log WHERE tenant_id = :tenant_id AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
+    );
+    $auditLast30Stmt->execute([':tenant_id' => $tenantId]);
+    $auditLast30 = (int) ($auditLast30Stmt->fetchColumn() ?: 0);
 
     return [
         'active_policies' => $activePolicies,
@@ -4669,6 +4730,7 @@ function formatDeltaBadgeMeta(array $delta): string
 
 function buildSalesTrend(PDO $pdo, int $days = 7): array
 {
+    $tenantId = \App\Services\TenantContext::id();
     $days = max(2, min($days, 30));
     $endDate = new DateTimeImmutable('today 23:59:59');
     $startDate = $endDate->sub(new DateInterval('P' . ($days - 1) . 'D'))->setTime(0, 0);
@@ -4678,11 +4740,12 @@ function buildSalesTrend(PDO $pdo, int $days = 7): array
                 SUM(CASE WHEN status = "Completed" THEN 1 ELSE 0 END) AS sales_count,
                 COALESCE(SUM(CASE WHEN status = "Completed" THEN total ELSE 0 END), 0) AS revenue_total
          FROM sales
-         WHERE created_at BETWEEN :start AND :end
+         WHERE tenant_id = :tenant_id AND created_at BETWEEN :start AND :end
          GROUP BY DATE(created_at)
          ORDER BY DATE(created_at) ASC'
     );
     $stmt->execute([
+        ':tenant_id' => $tenantId,
         ':start' => $startDate->format('Y-m-d H:i:s'),
         ':end' => $endDate->format('Y-m-d H:i:s'),
     ]);
@@ -4740,6 +4803,7 @@ function buildSalesTrend(PDO $pdo, int $days = 7): array
 
 function buildCampaignPerformance(PDO $pdo): array
 {
+    $tenantId = \App\Services\TenantContext::id();
     $sql = 'SELECT
                 dc.id,
                 dc.name,
@@ -4753,11 +4817,13 @@ function buildCampaignPerformance(PDO $pdo): array
                 COALESCE(SUM(CASE WHEN s.status = "Completed" THEN s.discount ELSE 0 END), 0) AS discount_total,
                 SUM(CASE WHEN s.status = "Completed" AND DATE(s.created_at) = CURRENT_DATE() THEN 1 ELSE 0 END) AS sales_today
             FROM discount_campaigns dc
-            LEFT JOIN sales s ON s.discount_campaign_id = dc.id
+            LEFT JOIN sales s ON s.discount_campaign_id = dc.id AND s.tenant_id = :tenant_id
+            WHERE dc.tenant_id = :tenant_id
             GROUP BY dc.id
             ORDER BY dc.is_active DESC, dc.ends_at IS NULL DESC, dc.ends_at ASC, dc.created_at DESC';
 
-    $stmt = $pdo->query($sql);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':tenant_id' => $tenantId]);
     $rows = $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
     $items = [];
@@ -4875,13 +4941,16 @@ function paginateAuditLogs(PDO $pdo, int $page, int $perPage = 10): array
 
 function fetchRecentEvents(PDO $pdo, int $limit = 6): array
 {
+    $tenantId = \App\Services\TenantContext::id();
     $limit = max(1, min($limit, 20));
     $sql = 'SELECT al.action, al.description, al.created_at, u.fullname, u.username
-            FROM audit_log al
-            LEFT JOIN users u ON u.id = al.user_id
-            ORDER BY al.created_at DESC
-            LIMIT ' . $limit;
-    $stmt = $pdo->query($sql);
+        FROM audit_log al
+        LEFT JOIN users u ON u.id = al.user_id
+        WHERE al.tenant_id = :tenant_id
+        ORDER BY al.created_at DESC
+        LIMIT ' . $limit;
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':tenant_id' => $tenantId]);
     $rows = $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
     return array_map(static function (array $row): array {
@@ -4917,14 +4986,17 @@ function formatAuditActionLabel(string $action, string $description = ''): strin
 
 function fetchOperatorActivity(PDO $pdo, int $limit = 5): array
 {
+    $tenantId = \App\Services\TenantContext::id();
     $limit = max(1, min($limit, 20));
     $sql = 'SELECT s.id, s.created_at, s.total, s.discount, s.payment_method, s.status,
                    u.fullname, u.username
             FROM sales s
             LEFT JOIN users u ON u.id = s.user_id
+            WHERE s.tenant_id = :tenant_id
             ORDER BY s.created_at DESC
             LIMIT ' . $limit;
-    $stmt = $pdo->query($sql);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([':tenant_id' => $tenantId]);
     $rows = $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
     return array_map(static function (array $row): array {
