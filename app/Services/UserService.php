@@ -453,6 +453,144 @@ final class UserService
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    private function findTenantDetails(int $tenantId): ?array
+    {
+        if ($tenantId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT id, name, slug, contact_email, contact_phone
+             FROM tenants
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $tenantId]);
+        $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $tenant !== false ? $tenant : null;
+    }
+
+    /**
+     * @param array<string, mixed> $tenant
+     * @return array{success:bool,message:string,error?:string,operator?:array<string,mixed>,password?:string}
+     */
+    private function createTenantOperator(array $tenant): array
+    {
+        $tenantId = (int) ($tenant['id'] ?? 0);
+        $tenantName = trim((string) ($tenant['name'] ?? ''));
+        $tenantSlug = trim((string) ($tenant['slug'] ?? ''));
+        $email = trim((string) ($tenant['contact_email'] ?? ''));
+
+        if ($tenantId <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Tenant non valido.',
+            ];
+        }
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Email contatto tenant non valida o mancante.',
+            ];
+        }
+
+        if ($this->emailExists($email)) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Email contatto già usata da un altro operatore.',
+            ];
+        }
+
+        $roleId = $this->findRoleIdByName('cassiere');
+        if ($roleId === null) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Ruolo cassiere non configurato.',
+            ];
+        }
+
+        $baseUsername = $tenantSlug !== '' ? $tenantSlug : ('tenant' . $tenantId);
+        $username = $this->ensureUniqueUsername($baseUsername);
+
+        $password = $this->generateTempPassword();
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        if ($hash === false) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Errore durante la generazione della password.',
+            ];
+        }
+
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO users (username, email, password_hash, role_id, fullname, tenant_id)
+             VALUES (:username, :email, :hash, :role, :fullname, :tenant_id)'
+        );
+        $stmt->execute([
+            ':username' => $username,
+            ':email' => $email,
+            ':hash' => $hash,
+            ':role' => $roleId,
+            ':fullname' => $tenantName !== '' ? $tenantName : $username,
+            ':tenant_id' => $tenantId,
+        ]);
+
+        return [
+            'success' => true,
+            'message' => 'Operatore tenant creato.',
+            'operator' => [
+                'id' => (int) $this->pdo->lastInsertId(),
+                'username' => $username,
+                'fullname' => $tenantName !== '' ? $tenantName : $username,
+                'email' => $email,
+            ],
+            'password' => $password,
+        ];
+    }
+
+    private function findRoleIdByName(string $roleName): ?int
+    {
+        $stmt = $this->pdo->prepare('SELECT id FROM roles WHERE LOWER(name) = :name LIMIT 1');
+        $stmt->execute([':name' => strtolower($roleName)]);
+        $roleId = $stmt->fetchColumn();
+        return $roleId !== false ? (int) $roleId : null;
+    }
+
+    private function ensureUniqueUsername(string $base): string
+    {
+        $base = preg_replace('/[^a-z0-9._-]/i', '', strtolower($base)) ?: 'tenant';
+        $candidate = $base;
+        $suffix = 1;
+        while ($this->usernameExists($candidate)) {
+            $candidate = $base . $suffix;
+            $suffix++;
+        }
+        return $candidate;
+    }
+
+    private function usernameExists(string $username): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM users WHERE username = :username LIMIT 1');
+        $stmt->execute([':username' => $username]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    private function emailExists(string $email): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM users WHERE email = :email LIMIT 1');
+        $stmt->execute([':email' => $email]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
      * @return array{success:bool,message:string,error?:string,email_sent?:bool}
      */
     public function resendTenantCredentials(int $tenantId): array
@@ -462,6 +600,15 @@ final class UserService
                 'success' => false,
                 'message' => 'Impossibile inviare le credenziali.',
                 'error' => 'Tenant non valido.',
+            ];
+        }
+
+        $tenantRow = $this->findTenantDetails($tenantId);
+        if ($tenantRow === null) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare le credenziali.',
+                'error' => 'Tenant non trovato.',
             ];
         }
 
@@ -475,8 +622,20 @@ final class UserService
         );
         $stmt->execute([':tenant_id' => $tenantId]);
         $operator = $stmt->fetch(PDO::FETCH_ASSOC);
+        $password = null;
+        $skipUpdate = false;
 
         if ($operator === false) {
+            $created = $this->createTenantOperator($tenantRow);
+            if (!$created['success']) {
+                return $created;
+            }
+            $operator = $created['operator'] ?? null;
+            $password = $created['password'] ?? null;
+            $skipUpdate = $password !== null;
+        }
+
+        if (!is_array($operator)) {
             return [
                 'success' => false,
                 'message' => 'Impossibile inviare le credenziali.',
@@ -493,26 +652,28 @@ final class UserService
             ];
         }
 
-        $password = $this->generateTempPassword();
-        $hash = password_hash($password, PASSWORD_DEFAULT);
-        if ($hash === false) {
-            return [
-                'success' => false,
-                'message' => 'Impossibile inviare le credenziali.',
-                'error' => 'Errore durante la generazione della password.',
-            ];
-        }
+        if (!$skipUpdate) {
+            $password = $this->generateTempPassword();
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+            if ($hash === false) {
+                return [
+                    'success' => false,
+                    'message' => 'Impossibile inviare le credenziali.',
+                    'error' => 'Errore durante la generazione della password.',
+                ];
+            }
 
-        $update = $this->pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
-        $update->execute([
-            ':hash' => $hash,
-            ':id' => (int) ($operator['id'] ?? 0),
-        ]);
+            $update = $this->pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
+            $update->execute([
+                ':hash' => $hash,
+                ':id' => (int) ($operator['id'] ?? 0),
+            ]);
+        }
 
         $sent = $this->sendResetCredentialsEmail(
             $email,
             (string) ($operator['username'] ?? ''),
-            $password,
+            (string) ($password ?? ''),
             (string) ($operator['fullname'] ?? '')
         );
 
