@@ -8,6 +8,7 @@ declare(strict_types=1);
  * @var array{success:bool,message:string,error?:string}|null $feedback
  * @var array{code:string,label?:string}|null $licenseGeneratedCode
  * @var int $selectedLicenseId
+ * @var int $selectedAssignmentId
  */
 $pageTitle = $pageTitle ?? 'Licenze';
 $tenants = isset($tenants) && is_array($tenants) ? $tenants : [];
@@ -16,12 +17,23 @@ $assignments = isset($assignments) && is_array($assignments) ? $assignments : []
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
 $licenseGeneratedCode = isset($licenseGeneratedCode) && is_array($licenseGeneratedCode) ? $licenseGeneratedCode : null;
 $selectedLicenseId = isset($selectedLicenseId) ? (int) $selectedLicenseId : 0;
+$selectedAssignmentId = isset($selectedAssignmentId) ? (int) $selectedAssignmentId : 0;
 
 $selectedLicense = null;
 if ($selectedLicenseId > 0) {
     foreach ($licenses as $license) {
         if ((int) ($license['id'] ?? 0) === $selectedLicenseId) {
             $selectedLicense = $license;
+            break;
+        }
+    }
+}
+
+$selectedAssignment = null;
+if ($selectedAssignmentId > 0) {
+    foreach ($assignments as $assignment) {
+        if ((int) ($assignment['id'] ?? 0) === $selectedAssignmentId) {
+            $selectedAssignment = $assignment;
             break;
         }
     }
@@ -59,6 +71,49 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
         </div>
     <?php endif; ?>
 
+
+    <?php if ($selectedAssignment): ?>
+        <?php
+            $assignmentPaidAt = $selectedAssignment['renewal_paid_at'] ?? null;
+            $assignmentPaid = !empty($assignmentPaidAt);
+        ?>
+        <section class="page__section" id="assignment-detail">
+            <header class="section__header">
+                <h3>Dettaglio assegnazione licenza</h3>
+            </header>
+            <div class="card">
+                <div class="card__header">
+                    <h3><?= htmlspecialchars((string) ($selectedAssignment['tenant_name'] ?? '')) ?></h3>
+                    <span class="badge badge--<?= $assignmentPaid ? 'success' : 'muted' ?>">
+                        <?= $assignmentPaid ? 'Pagata' : 'Da pagare' ?>
+                    </span>
+                </div>
+                <p class="card__meta">
+                    <?= htmlspecialchars((string) ($selectedAssignment['license_code'] ?? '')) ?>
+                    <?= !empty($selectedAssignment['license_label']) ? ' - ' . htmlspecialchars((string) $selectedAssignment['license_label']) : '' ?>
+                </p>
+                <ul class="card__list">
+                    <li>Assegnata: <?= htmlspecialchars($formatDate($selectedAssignment['assigned_at'] ?? null, 'd/m/Y H:i')) ?></li>
+                    <li>Scadenza: <?= htmlspecialchars($formatDate($selectedAssignment['license_expires_at'] ?? null, 'd/m/Y')) ?></li>
+                    <li>Max utenti: <?= htmlspecialchars($selectedAssignment['max_users_override'] ?? 'Default licenza') ?></li>
+                </ul>
+                <form method="post" class="form" style="margin-top:12px;">
+                    <input type="hidden" name="action" value="update_assignment_payment">
+                    <input type="hidden" name="assignment_id" value="<?= (int) ($selectedAssignment['id'] ?? 0) ?>">
+                    <div class="form__group">
+                        <label for="payment_status">Quota adesione</label>
+                        <select id="payment_status" name="payment_status" required>
+                            <option value="unpaid" <?= !$assignmentPaid ? 'selected' : '' ?>>Da pagare</option>
+                            <option value="paid" <?= $assignmentPaid ? 'selected' : '' ?>>Pagata</option>
+                        </select>
+                    </div>
+                    <footer class="form__footer">
+                        <button type="submit" class="btn btn--primary">Salva stato</button>
+                    </footer>
+                </form>
+            </div>
+        </section>
+    <?php endif; ?>
 
     <?php if ($selectedLicense): ?>
         <?php
@@ -248,7 +303,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                             $isRevoked = !empty($assignment['revoked_at']);
                             $renewalPaidAt = $assignment['renewal_paid_at'] ?? null;
                         ?>
-                        <tr>
+                        <tr class="<?= $selectedAssignmentId === (int) ($assignment['id'] ?? 0) ? 'highlight' : '' ?>">
                             <td>
                                 <?= htmlspecialchars((string) $assignment['tenant_name']) ?><br>
                                 <small><?= htmlspecialchars((string) $assignment['tenant_slug']) ?></small>
@@ -278,7 +333,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                                 </span>
                             </td>
                             <td>
-                                <a class="btn btn--ghost btn--small" href="index.php?page=licenses&license_id=<?= (int) $assignment['license_id'] ?>#license-<?= (int) $assignment['license_id'] ?>">Dettaglio</a>
+                                <a class="btn btn--ghost btn--small" href="index.php?page=licenses&assignment_id=<?= (int) $assignment['id'] ?>#assignment-detail">Dettaglio</a>
                                 <?php if (!$isRevoked): ?>
                                     <form method="post" class="table-actions">
                                         <input type="hidden" name="action" value="revoke_tenant_license">

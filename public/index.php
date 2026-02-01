@@ -2195,6 +2195,10 @@ switch ($page) {
             } elseif ($action === 'renew_tenant_license') {
                 $assignmentId = (int) ($_POST['assignment_id'] ?? 0);
                 $result = $tenantService->renewTenantLicense($assignmentId);
+            } elseif ($action === 'update_assignment_payment') {
+                $assignmentId = (int) ($_POST['assignment_id'] ?? 0);
+                $paid = isset($_POST['payment_status']) && (string) $_POST['payment_status'] === 'paid';
+                $result = $tenantService->updateAssignmentPayment($assignmentId, $paid);
             } elseif ($action === 'create_license') {
                 $label = isset($_POST['license_label']) ? trim((string) $_POST['license_label']) : null;
                 $maxUsers = isset($_POST['license_max_users']) ? (int) $_POST['license_max_users'] : 1;
@@ -2227,6 +2231,7 @@ switch ($page) {
         $assignments = $tenantService->listTenantLicenses();
 
         $selectedLicenseId = isset($_GET['license_id']) ? (int) $_GET['license_id'] : 0;
+        $selectedAssignmentId = isset($_GET['assignment_id']) ? (int) $_GET['assignment_id'] : 0;
 
         render('licenses', [
             'currentUser' => $currentUser,
@@ -2237,6 +2242,7 @@ switch ($page) {
             'assignments' => $assignments,
             'licenseGeneratedCode' => $licenseGeneratedCode,
             'selectedLicenseId' => $selectedLicenseId,
+            'selectedAssignmentId' => $selectedAssignmentId,
         ]);
         break;
 

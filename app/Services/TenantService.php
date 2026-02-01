@@ -423,4 +423,45 @@ final class TenantService
             'expires_at' => $newExpiry,
         ];
     }
+
+    /**
+     * @return array{success:bool,message:string,error?:string}
+     */
+    public function updateAssignmentPayment(int $assignmentId, bool $paid): array
+    {
+        if ($assignmentId <= 0) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile aggiornare la quota di adesione.',
+                'error' => 'Assegnazione non valida.',
+            ];
+        }
+
+        $stmt = $this->pdo->prepare('SELECT id FROM tenant_licenses WHERE id = :id');
+        $stmt->execute([':id' => $assignmentId]);
+        if (!$stmt->fetchColumn()) {
+            return [
+                'success' => false,
+                'message' => 'Impossibile aggiornare la quota di adesione.',
+                'error' => 'Assegnazione non trovata.',
+            ];
+        }
+
+        if ($paid) {
+            $update = $this->pdo->prepare(
+                'UPDATE tenant_licenses SET renewal_paid_at = NOW(), renewal_notice_sent_at = NULL WHERE id = :id'
+            );
+        } else {
+            $update = $this->pdo->prepare(
+                'UPDATE tenant_licenses SET renewal_paid_at = NULL WHERE id = :id'
+            );
+        }
+
+        $update->execute([':id' => $assignmentId]);
+
+        return [
+            'success' => true,
+            'message' => $paid ? 'Quota adesione aggiornata a Pagata.' : 'Quota adesione aggiornata a Da pagare.',
+        ];
+    }
 }
