@@ -624,7 +624,8 @@ function sendGuideSupportEmail(
     string $message,
     ?string $resendApiKey,
     ?string $resendFrom,
-    ?string $resendFromName
+    ?string $resendFromName,
+    ?string $htmlMessage = null
 ): bool {
     if ($resendApiKey !== null && $resendApiKey !== '' && function_exists('curl_init')) {
         $fromEmail = $resendFrom !== null && $resendFrom !== '' ? $resendFrom : 'support@coresuite.test';
@@ -636,6 +637,7 @@ function sendGuideSupportEmail(
             'to' => [$recipient],
             'subject' => $subject,
             'text' => $message,
+            'html' => $htmlMessage,
         ]);
 
         if ($payload === false) {
@@ -670,6 +672,12 @@ function sendGuideSupportEmail(
             ? $resendFromName . ' <' . $resendFrom . '>'
             : $resendFrom;
         $headers[] = 'From: ' . $from;
+    }
+
+    if ($htmlMessage !== null && $htmlMessage !== '') {
+        $headers[] = 'MIME-Version: 1.0';
+        $headers[] = 'Content-Type: text/html; charset=UTF-8';
+        return @mail($recipient, $subject, $htmlMessage, implode("\r\n", $headers));
     }
 
     return @mail($recipient, $subject, $message, implode("\r\n", $headers));
@@ -1634,13 +1642,75 @@ switch ($page) {
                     $lines[] = 'Messaggio: ' . $message;
                 }
 
+                $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+                $brandColor = '#1f2937';
+                $accentColor = '#2563eb';
+                $displayName = $name !== '' ? $name : 'te';
+                $htmlMessage = '<!doctype html>';
+                $htmlMessage .= '<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+                $htmlMessage .= '<title>' . $escape($appName) . '</title>';
+                $htmlMessage .= '</head><body style="margin:0;padding:0;background:#f4f6fb;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827;">';
+                $htmlMessage .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6fb;padding:32px 12px;">';
+                $htmlMessage .= '<tr><td align="center">';
+                $htmlMessage .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 18px 45px rgba(15,23,42,0.08);">';
+                $htmlMessage .= '<tr><td style="padding:24px 28px;background:' . $brandColor . ';color:#ffffff;">';
+                $htmlMessage .= '<h1 style="margin:0;font-size:20px;font-weight:600;">' . $escape($appName) . '</h1>';
+                $htmlMessage .= '<p style="margin:6px 0 0;font-size:14px;opacity:0.85;">Richiesta informazioni piani</p>';
+                $htmlMessage .= '</td></tr>';
+                $htmlMessage .= '<tr><td style="padding:28px;">';
+                $htmlMessage .= '<p style="margin:0 0 12px;font-size:16px;">Ciao <strong>' . $escape($displayName) . '</strong>,</p>';
+                $htmlMessage .= '<p style="margin:0 0 20px;color:#4b5563;">Ecco il riepilogo aggiornato dei piani disponibili.</p>';
+                $htmlMessage .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:16px;">';
+                $htmlMessage .= '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#111827;">Piano Start</p>';
+                $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">12 mesi · max 1 cassiere</p>';
+                $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">Dashboard, Magazzino SIM, Prodotti, Lista prodotti, Clienti, Listini, Nuova vendita, Storico vendite, Guida completa, Impostazioni.</p>';
+                $htmlMessage .= '</div>';
+                $htmlMessage .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:16px;">';
+                $htmlMessage .= '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#111827;">Piano Start Plus</p>';
+                $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">12 mesi · max 1 cassiere</p>';
+                $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">Tutto del Start + Report, Richieste supporto, Ordini store.</p>';
+                $htmlMessage .= '</div>';
+                $htmlMessage .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:16px;">';
+                $htmlMessage .= '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#111827;">Piano Core</p>';
+                $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">24 mesi · max 2 cassieri</p>';
+                $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">Tutto del Start Plus + Contratti energia, Report avanzati (KPI), Supporto prioritario.</p>';
+                $htmlMessage .= '</div>';
+                $htmlMessage .= '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:18px;">';
+                $htmlMessage .= '<p style="margin:0 0 6px;font-size:15px;font-weight:600;color:#111827;">Piano Business</p>';
+                $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">36 mesi · max 4 cassieri</p>';
+                $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">Tutto del Core + Report personalizzati, SLA dedicato, onboarding/training, integrazioni avanzate.</p>';
+                $htmlMessage .= '</div>';
+
+                if ($company !== '' || $message !== '') {
+                    $htmlMessage .= '<div style="border:1px dashed #d1d5db;border-radius:12px;padding:14px 16px;margin-bottom:18px;">';
+                    if ($company !== '') {
+                        $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">Azienda</p>';
+                        $htmlMessage .= '<p style="margin:0 0 12px;font-size:15px;color:#111827;font-weight:600;">' . $escape($company) . '</p>';
+                    }
+                    if ($message !== '') {
+                        $htmlMessage .= '<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">Messaggio</p>';
+                        $htmlMessage .= '<p style="margin:0;font-size:14px;color:#374151;">' . nl2br($escape($message)) . '</p>';
+                    }
+                    $htmlMessage .= '</div>';
+                }
+
+                $htmlMessage .= '<a href="mailto:' . $escape($resendFrom ?? 'support@coresuite.test') . '" style="display:inline-block;background:' . $accentColor . ';color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;">Richiedi una demo</a>';
+                $htmlMessage .= '</td></tr>';
+                $htmlMessage .= '<tr><td style="padding:20px 28px;border-top:1px solid #e5e7eb;background:#fafafa;color:#9ca3af;font-size:12px;">';
+                $htmlMessage .= 'Se non hai richiesto queste informazioni, ignora questa email.';
+                $htmlMessage .= '</td></tr>';
+                $htmlMessage .= '</table>';
+                $htmlMessage .= '</td></tr></table>';
+                $htmlMessage .= '</body></html>';
+
                 $sent = sendGuideSupportEmail(
                     $email,
                     $subject,
                     implode("\n", $lines),
                     $resendApiKey,
                     $resendFrom,
-                    $resendFromName
+                    $resendFromName,
+                    $htmlMessage
                 );
 
                 $_SESSION['landing_feedback'] = $sent
