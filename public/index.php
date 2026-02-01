@@ -4817,13 +4817,16 @@ function buildCampaignPerformance(PDO $pdo): array
                 COALESCE(SUM(CASE WHEN s.status = "Completed" THEN s.discount ELSE 0 END), 0) AS discount_total,
                 SUM(CASE WHEN s.status = "Completed" AND DATE(s.created_at) = CURRENT_DATE() THEN 1 ELSE 0 END) AS sales_today
             FROM discount_campaigns dc
-            LEFT JOIN sales s ON s.discount_campaign_id = dc.id AND s.tenant_id = :tenant_id
-            WHERE dc.tenant_id = :tenant_id
+                LEFT JOIN sales s ON s.discount_campaign_id = dc.id AND s.tenant_id = :tenant_id_sales
+                WHERE dc.tenant_id = :tenant_id_campaign
             GROUP BY dc.id
             ORDER BY dc.is_active DESC, dc.ends_at IS NULL DESC, dc.ends_at ASC, dc.created_at DESC';
 
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([':tenant_id' => $tenantId]);
+            $stmt->execute([
+            ':tenant_id_sales' => $tenantId,
+            ':tenant_id_campaign' => $tenantId,
+            ]);
     $rows = $stmt !== false ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
     $items = [];
