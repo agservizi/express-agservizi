@@ -322,6 +322,167 @@ function extractFirstByRegex(string $text, string $pattern, int $group = 1): ?fl
     return parseItalianNumber((string) $raw);
 }
 
+/**
+ * @return array<string, mixed>|null
+ */
+function resolveTenantLicense(PDO $pdo, int $tenantId): ?array
+{
+    if ($tenantId <= 0) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare(
+        'SELECT l.id, l.code, l.label, l.max_users, l.term_months, l.is_active,
+                tl.max_users_override, tl.assigned_at, tl.revoked_at
+         FROM tenant_licenses tl
+         INNER JOIN licenses l ON l.id = tl.license_id
+         WHERE tl.tenant_id = :tenant AND tl.revoked_at IS NULL
+         ORDER BY tl.assigned_at DESC
+         LIMIT 1'
+    );
+    $stmt->execute([':tenant' => $tenantId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($row === false) {
+        return null;
+    }
+
+    if ((int) ($row['is_active'] ?? 0) !== 1) {
+        return null;
+    }
+
+    return $row;
+}
+
+function resolveLicensePlanKey(?array $license): string
+{
+    if ($license === null) {
+        return 'start';
+    }
+
+    $label = strtolower(trim((string) ($license['label'] ?? '')));
+    $code = strtolower(trim((string) ($license['code'] ?? '')));
+    $haystack = trim($label . ' ' . $code);
+
+    if ($haystack !== '') {
+        if (str_contains($haystack, 'start plus') || str_contains($haystack, 'start+')) {
+            return 'start_plus';
+        }
+        if (str_contains($haystack, 'start')) {
+            return 'start';
+        }
+        if (str_contains($haystack, 'core')) {
+            return 'core';
+        }
+        if (str_contains($haystack, 'business')) {
+            return 'business';
+        }
+    }
+
+    return 'start';
+}
+
+/**
+ * @return array<string, array<int, string>>
+ */
+function buildPlanModuleMap(): array
+{
+    $startModules = [
+        'dashboard',
+        'sim_stock',
+        'products',
+        'products_list',
+        'customers',
+        'offers',
+        'sales_create',
+        'sales_list',
+        'guide',
+        'settings',
+    ];
+
+    $startPlusModules = array_merge($startModules, [
+        'reports',
+        'support_requests',
+        'product_requests',
+    ]);
+
+    $coreModules = array_merge($startPlusModules, [
+        'energy_contracts',
+    ]);
+
+    return [
+        'start' => $startModules,
+        'start_plus' => $startPlusModules,
+        'core' => $coreModules,
+        'business' => $coreModules,
+    ];
+}
+
+/**
+ * @return array{plan_key:string,modules:array<int,string>,license:array<string,mixed>|null}
+ */
+function resolveTenantModuleAccess(PDO $pdo, ?array $currentUser, \App\Services\AuthService $authService): array
+{
+    $planModules = buildPlanModuleMap();
+    $allModules = [];
+    foreach ($planModules as $modules) {
+        $allModules = array_merge($allModules, $modules);
+    }
+    $allModules = array_values(array_unique($allModules));
+
+    if ($currentUser === null) {
+        return [
+            'plan_key' => 'guest',
+            'modules' => $allModules,
+            'license' => null,
+        ];
+    }
+
+    if ($authService->hasRole('admin')) {
+        return [
+            'plan_key' => 'admin',
+            'modules' => $allModules,
+            'license' => null,
+        ];
+    }
+
+    $tenantId = (int) ($currentUser['tenant_id'] ?? 1);
+    $license = resolveTenantLicense($pdo, $tenantId);
+    $planKey = resolveLicensePlanKey($license);
+    $modules = $planModules[$planKey] ?? $planModules['start'];
+
+    return [
+        'plan_key' => $planKey,
+        'modules' => $modules,
+        'license' => $license,
+    ];
+}
+
+/**
+ * @return array<string, string>
+ */
+function buildPageModuleMap(): array
+{
+    return [
+        'dashboard' => 'dashboard',
+        'sim_stock' => 'sim_stock',
+        'products' => 'products',
+        'products_list' => 'products_list',
+        'customers' => 'customers',
+        'offers' => 'offers',
+        'sales_create' => 'sales_create',
+        'sales_list' => 'sales_list',
+        'energy_contracts' => 'energy_contracts',
+        'product_requests' => 'product_requests',
+        'product_request' => 'product_requests',
+        'support_requests' => 'support_requests',
+        'support_request' => 'support_requests',
+        'reports' => 'reports',
+        'guide' => 'guide',
+        'settings' => 'settings',
+    ];
+}
+
 function extractPeriodConsumption(string $text, string $unit): ?float
 {
     $unitPattern = $unit === 'kwh'
@@ -595,6 +756,12 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $currentUser = $authService->currentUser();
 TenantContext::setTenantId(isset($currentUser['tenant_id']) ? (int) $currentUser['tenant_id'] : 1);
 
+$moduleAccess = resolveTenantModuleAccess($pdo, $currentUser, $authService);
+$enabledModules = $moduleAccess['modules'];
+$GLOBALS['enabledModules'] = $enabledModules;
+$GLOBALS['tenantPlanKey'] = $moduleAccess['plan_key'];
+$GLOBALS['tenantLicense'] = $moduleAccess['license'];
+
 if ($currentUser !== null && $authService->hasRole('admin')) {
     maybeScheduleEnergyOffersImport();
 }
@@ -803,21 +970,21 @@ if ($page === 'global_search') {
     };
 
     $navItems = [
-        ['label' => 'Dashboard', 'keywords' => 'home panoramica', 'url' => 'index.php?page=dashboard'],
-        ['label' => 'Magazzino SIM', 'keywords' => 'sim stock iccid', 'url' => 'index.php?page=sim_stock'],
-        ['label' => 'Prodotti', 'keywords' => 'catalogo', 'url' => 'index.php?page=products'],
-        ['label' => 'Lista prodotti', 'keywords' => 'inventario', 'url' => 'index.php?page=products_list'],
-        ['label' => 'Clienti', 'keywords' => 'anagrafiche', 'url' => 'index.php?page=customers'],
-        ['label' => 'Listini', 'keywords' => 'offerte', 'url' => 'index.php?page=offers'],
-        ['label' => 'Nuova vendita', 'keywords' => 'cassa', 'url' => 'index.php?page=sales_create'],
-        ['label' => 'Storico vendite', 'keywords' => 'transazioni', 'url' => 'index.php?page=sales_list'],
-        ['label' => 'Contratti energia', 'keywords' => 'energia', 'url' => 'index.php?page=energy_contracts'],
-        ['label' => 'Ordini store', 'keywords' => 'richieste prodotti', 'url' => 'index.php?page=product_requests'],
-        ['label' => 'Supporto clienti', 'keywords' => 'assistenza', 'url' => 'index.php?page=support_requests'],
-        ['label' => 'Report', 'keywords' => 'statistiche', 'url' => 'index.php?page=reports'],
+        ['label' => 'Dashboard', 'keywords' => 'home panoramica', 'url' => 'index.php?page=dashboard', 'module' => 'dashboard'],
+        ['label' => 'Magazzino SIM', 'keywords' => 'sim stock iccid', 'url' => 'index.php?page=sim_stock', 'module' => 'sim_stock'],
+        ['label' => 'Prodotti', 'keywords' => 'catalogo', 'url' => 'index.php?page=products', 'module' => 'products'],
+        ['label' => 'Lista prodotti', 'keywords' => 'inventario', 'url' => 'index.php?page=products_list', 'module' => 'products_list'],
+        ['label' => 'Clienti', 'keywords' => 'anagrafiche', 'url' => 'index.php?page=customers', 'module' => 'customers'],
+        ['label' => 'Listini', 'keywords' => 'offerte', 'url' => 'index.php?page=offers', 'module' => 'offers'],
+        ['label' => 'Nuova vendita', 'keywords' => 'cassa', 'url' => 'index.php?page=sales_create', 'module' => 'sales_create'],
+        ['label' => 'Storico vendite', 'keywords' => 'transazioni', 'url' => 'index.php?page=sales_list', 'module' => 'sales_list'],
+        ['label' => 'Contratti energia', 'keywords' => 'energia', 'url' => 'index.php?page=energy_contracts', 'module' => 'energy_contracts'],
+        ['label' => 'Ordini store', 'keywords' => 'richieste prodotti', 'url' => 'index.php?page=product_requests', 'module' => 'product_requests'],
+        ['label' => 'Supporto clienti', 'keywords' => 'assistenza', 'url' => 'index.php?page=support_requests', 'module' => 'support_requests'],
+        ['label' => 'Report', 'keywords' => 'statistiche', 'url' => 'index.php?page=reports', 'module' => 'reports'],
         ['label' => 'Notifiche', 'keywords' => 'alert', 'url' => 'index.php?page=notifications'],
-        ['label' => 'Guida', 'keywords' => 'help', 'url' => 'index.php?page=guide'],
-        ['label' => 'Impostazioni', 'keywords' => 'configurazione', 'url' => 'index.php?page=settings'],
+        ['label' => 'Guida', 'keywords' => 'help', 'url' => 'index.php?page=guide', 'module' => 'guide'],
+        ['label' => 'Impostazioni', 'keywords' => 'configurazione', 'url' => 'index.php?page=settings', 'module' => 'settings'],
         ['label' => 'Sicurezza account', 'keywords' => 'mfa', 'url' => 'index.php?page=security'],
         ['label' => 'Profilo', 'keywords' => 'utente', 'url' => 'index.php?page=profile'],
     ];
@@ -829,6 +996,10 @@ if ($page === 'global_search') {
 
     $navMatches = [];
     foreach ($navItems as $item) {
+        $module = $item['module'] ?? null;
+        if ($module !== null && !in_array($module, $enabledModules, true)) {
+            continue;
+        }
         $haystack = $item['label'] . ' ' . ($item['keywords'] ?? '');
         if ($matches($haystack)) {
             $navMatches[] = [
@@ -1289,6 +1460,31 @@ if ($page === 'notifications_stream') {
     }
 
     exit;
+}
+
+if ($currentUser !== null && !$authService->hasRole('admin')) {
+    $pageModuleMap = buildPageModuleMap();
+    $requiredModule = $pageModuleMap[$page] ?? null;
+
+    if ($requiredModule !== null && !in_array($requiredModule, $enabledModules, true)) {
+        if (isAjaxRequest()) {
+            jsonResponse([
+                'success' => false,
+                'error' => 'license_forbidden',
+                'message' => 'Il modulo richiesto non è incluso nel piano attivo.',
+            ], 403);
+        }
+
+        pushFlashToast([
+            'type' => 'warning',
+            'title' => 'Modulo non incluso',
+            'message' => 'Il modulo richiesto non è incluso nel piano attivo.',
+            'duration' => 6000,
+            'dismissible' => true,
+        ]);
+        header('Location: index.php?page=dashboard');
+        exit;
+    }
 }
 
 switch ($page) {
@@ -3989,6 +4185,10 @@ function render(string $view, array $params = [], bool $layout = true): void
             $defaultIsAdmin = $GLOBALS['authService']->hasRole('admin');
         }
         $params['isAdmin'] = $defaultIsAdmin;
+    }
+
+    if ($layout && !array_key_exists('enabledModules', $params)) {
+        $params['enabledModules'] = $GLOBALS['enabledModules'] ?? null;
     }
 
     extract($params, EXTR_SKIP);
