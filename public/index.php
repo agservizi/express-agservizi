@@ -4317,13 +4317,16 @@ function buildCustomerIntelligence(PDO $pdo): array
             COALESCE(SUM(s.total), 0) AS revenue,
             MAX(s.created_at) AS last_purchase
          FROM sales s
-         LEFT JOIN customers c ON c.id = s.customer_id AND c.tenant_id = :tenant_id
-         WHERE s.tenant_id = :tenant_id AND s.status = "Completed"
+         LEFT JOIN customers c ON c.id = s.customer_id AND c.tenant_id = :tenant_id_customers
+         WHERE s.tenant_id = :tenant_id_sales AND s.status = "Completed"
          GROUP BY c.id, customer_name
          ORDER BY revenue DESC
          LIMIT 5'
     );
-    $topCustomersStmt->execute([':tenant_id' => $tenantId]);
+    $topCustomersStmt->execute([
+        ':tenant_id_customers' => $tenantId,
+        ':tenant_id_sales' => $tenantId,
+    ]);
     $topCustomers = $topCustomersStmt !== false ? $topCustomersStmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
     $atRiskStmt = $pdo->prepare(
@@ -4333,14 +4336,17 @@ function buildCustomerIntelligence(PDO $pdo): array
             COUNT(*) AS orders,
             COALESCE(SUM(s.total), 0) AS revenue
          FROM sales s
-         LEFT JOIN customers c ON c.id = s.customer_id AND c.tenant_id = :tenant_id
-         WHERE s.tenant_id = :tenant_id AND s.status = "Completed"
+         LEFT JOIN customers c ON c.id = s.customer_id AND c.tenant_id = :tenant_id_customers
+         WHERE s.tenant_id = :tenant_id_sales AND s.status = "Completed"
          GROUP BY c.id, customer_name
          HAVING MAX(s.created_at) < DATE_SUB(NOW(), INTERVAL 60 DAY)
          ORDER BY last_purchase ASC
          LIMIT 5'
     );
-    $atRiskStmt->execute([':tenant_id' => $tenantId]);
+    $atRiskStmt->execute([
+        ':tenant_id_customers' => $tenantId,
+        ':tenant_id_sales' => $tenantId,
+    ]);
     $atRisk = $atRiskStmt !== false ? $atRiskStmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
     $recentCustomersStmt = $pdo->prepare(
