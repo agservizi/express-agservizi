@@ -1500,7 +1500,7 @@ if ($page === 'global_search') {
     ]);
 }
 
-if ($currentUser === null && !in_array($page, ['landing', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
+if ($currentUser === null && !in_array($page, ['landing', 'prezzi', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
     header('Location: index.php?page=login');
     exit;
 }
@@ -1971,6 +1971,17 @@ switch ($page) {
             'currentUser' => $currentUser,
             'feedback' => is_array($landingFeedback) ? $landingFeedback : null,
             'oldInput' => is_array($landingOldInput) ? $landingOldInput : null,
+        ], false);
+        break;
+    case 'prezzi':
+        if ($currentUser !== null) {
+            header('Location: index.php?page=dashboard');
+            exit;
+        }
+
+        render('prezzi', [
+            'pageTitle' => 'Prezzi - ' . ($GLOBALS['config']['app']['name'] ?? 'Coresuite Express'),
+            'currentUser' => $currentUser,
         ], false);
         break;
     case 'dashboard':

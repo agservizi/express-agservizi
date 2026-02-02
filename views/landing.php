@@ -22,6 +22,15 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
                 <span class="landing-brand__dot"></span>
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
+            <nav class="landing-nav" aria-label="Navigazione principale">
+                <a class="landing-nav__link" href="index.php?page=landing">Home</a>
+                <a class="landing-nav__link" href="#funzionalita">Funzionalità</a>
+                <a class="landing-nav__link" href="#vantaggi">Vantaggi</a>
+                <a class="landing-nav__link" href="#piani">Piani</a>
+                <a class="landing-nav__link" href="index.php?page=prezzi">Prezzi</a>
+                <a class="landing-nav__link" href="#faq">FAQ</a>
+                <a class="landing-nav__link" href="#contatto">Contatto</a>
+            </nav>
             <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
         </div>
     </div>
@@ -109,7 +118,7 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
             </div>
         </section>
 
-        <section class="landing-section landing-section--accent">
+        <section id="vantaggi" class="landing-section landing-section--accent">
             <div class="landing-section__header">
                 <h2>Una piattaforma che accelera la vendita</h2>
                 <p>Ogni tenant dispone delle proprie impostazioni fiscali, scontrino personalizzato e dashboard dedicata.</p>
@@ -131,6 +140,100 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
                         <li>Accesso sicuro e configurazioni personalizzate.</li>
                     </ul>
                 </div>
+            </div>
+        </section>
+
+        <section id="piani" class="landing-section">
+            <div class="landing-section__header">
+                <h2>Piani pensati per scalare</h2>
+                <p>Confronta velocemente le opzioni e scopri i dettagli completi nella pagina Prezzi.</p>
+            </div>
+            <div class="landing-pricing__grid landing-pricing__grid--compact">
+                <article class="landing-pricing__card">
+                    <header>
+                        <h3>Start</h3>
+                        <p>12 mesi · max 1 cassiere</p>
+                        <span class="landing-pricing__price">€ 550</span>
+                    </header>
+                    <ul>
+                        <li>Dashboard, SIM, prodotti e vendite.</li>
+                        <li>Guida operativa completa.</li>
+                    </ul>
+                </article>
+                <article class="landing-pricing__card landing-pricing__card--highlight">
+                    <header>
+                        <h3>Start Plus</h3>
+                        <p>12 mesi · max 1 cassiere</p>
+                        <span class="landing-pricing__price">€ 650</span>
+                    </header>
+                    <ul>
+                        <li>Tutto del Start.</li>
+                        <li>Report e richieste supporto.</li>
+                    </ul>
+                </article>
+                <article class="landing-pricing__card">
+                    <header>
+                        <h3>Core</h3>
+                        <p>24 mesi · max 2 cassieri</p>
+                        <span class="landing-pricing__price">€ 850</span>
+                    </header>
+                    <ul>
+                        <li>Contratti energia e KPI avanzati.</li>
+                        <li>Supporto prioritario.</li>
+                    </ul>
+                </article>
+            </div>
+            <div class="landing-section__cta">
+                <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi">Vai ai prezzi completi</a>
+            </div>
+        </section>
+
+        <section class="landing-section landing-steps">
+            <div class="landing-section__header">
+                <h2>Attivazione in 3 step</h2>
+                <p>Onboarding guidato per partire in tempi rapidi con i tuoi store.</p>
+            </div>
+            <div class="landing-steps__grid">
+                <article class="landing-step">
+                    <span class="landing-step__index">1</span>
+                    <h3>Setup tenant</h3>
+                    <p>Configura licenze, operatori, IVA e diciture scontrino.</p>
+                </article>
+                <article class="landing-step">
+                    <span class="landing-step__index">2</span>
+                    <h3>Carica catalogo</h3>
+                    <p>Importa SIM, prodotti e listini con workflow guidati.</p>
+                </article>
+                <article class="landing-step">
+                    <span class="landing-step__index">3</span>
+                    <h3>Vai in vendita</h3>
+                    <p>Monitora KPI, stock e supporto clienti in tempo reale.</p>
+                </article>
+            </div>
+        </section>
+
+        <section id="faq" class="landing-section landing-faq">
+            <div class="landing-section__header">
+                <h2>FAQ</h2>
+                <p>Le risposte alle domande più frequenti.</p>
+            </div>
+            <div class="landing-faq__grid">
+                <article class="landing-faq__item">
+                    <h3>È adatto anche a un singolo punto vendita?</h3>
+                    <p>Sì. Il piano Start è pensato per singoli store e può crescere con il tuo business.</p>
+                </article>
+                <article class="landing-faq__item">
+                    <h3>Quanto tempo serve per partire?</h3>
+                    <p>Con il setup guidato e i template preconfigurati si parte in pochi giorni.</p>
+                </article>
+                <article class="landing-faq__item">
+                    <h3>Supportate l’energia luce & gas?</h3>
+                    <p>Sì, dal piano Core con gestione offerte e contratti energia.</p>
+                </article>
+                <article class="landing-faq__item">
+                    <h3>È possibile richiedere una demo?</h3>
+                    <p>Certo. Compila il modulo contatti per ricevere una demo guidata.</p>
+                </article>
             </div>
         </section>
 
