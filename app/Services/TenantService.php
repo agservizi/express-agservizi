@@ -22,7 +22,8 @@ final class TenantService
     public function listTenants(): array
     {
         $stmt = $this->pdo->query(
-            'SELECT id, name, slug, contact_email, contact_phone, is_active, created_at, updated_at
+            'SELECT id, name, slug, contact_email, contact_phone, vat_number, company_country, company_name, company_address,
+                is_active, created_at, updated_at
              FROM tenants
              ORDER BY created_at DESC'
         );
@@ -60,6 +61,16 @@ final class TenantService
         $slug = trim((string) ($input['tenant_slug'] ?? ''));
         $email = trim((string) ($input['tenant_email'] ?? ''));
         $phone = trim((string) ($input['tenant_phone'] ?? ''));
+        $vatNumber = strtoupper(trim((string) ($input['vat_number'] ?? '')));
+        $companyCountry = strtoupper(trim((string) ($input['company_country'] ?? '')));
+        if ($companyCountry !== '' && strncmp($vatNumber, $companyCountry, strlen($companyCountry)) === 0) {
+            $vatNumber = substr($vatNumber, strlen($companyCountry));
+        }
+        $companyName = trim((string) ($input['company_name'] ?? ''));
+        $companyAddress = trim((string) ($input['company_address'] ?? ''));
+        if ($vatNumber === '' && $companyName === '' && $companyAddress === '') {
+            $companyCountry = '';
+        }
         $skipWelcomeEmail = !empty($input['skip_welcome_email']);
 
         if ($name === '' || $slug === '') {
@@ -71,14 +82,18 @@ final class TenantService
         }
 
         $stmt = $this->pdo->prepare(
-            'INSERT INTO tenants (name, slug, contact_email, contact_phone, is_active)
-             VALUES (:name, :slug, :email, :phone, 1)'
+            'INSERT INTO tenants (name, slug, contact_email, contact_phone, vat_number, company_country, company_name, company_address, is_active)
+             VALUES (:name, :slug, :email, :phone, :vat_number, :company_country, :company_name, :company_address, 1)'
         );
         $stmt->execute([
             ':name' => $name,
             ':slug' => $slug,
             ':email' => $email !== '' ? $email : null,
             ':phone' => $phone !== '' ? $phone : null,
+            ':vat_number' => $vatNumber !== '' ? $vatNumber : null,
+            ':company_country' => $companyCountry !== '' ? $companyCountry : null,
+            ':company_name' => $companyName !== '' ? $companyName : null,
+            ':company_address' => $companyAddress !== '' ? $companyAddress : null,
         ]);
 
         $tenantId = (int) $this->pdo->lastInsertId();
@@ -206,6 +221,16 @@ final class TenantService
         $slug = trim((string) ($input['tenant_slug'] ?? ''));
         $email = trim((string) ($input['tenant_email'] ?? ''));
         $phone = trim((string) ($input['tenant_phone'] ?? ''));
+        $vatNumber = strtoupper(trim((string) ($input['vat_number'] ?? '')));
+        $companyCountry = strtoupper(trim((string) ($input['company_country'] ?? '')));
+        if ($companyCountry !== '' && strncmp($vatNumber, $companyCountry, strlen($companyCountry)) === 0) {
+            $vatNumber = substr($vatNumber, strlen($companyCountry));
+        }
+        $companyName = trim((string) ($input['company_name'] ?? ''));
+        $companyAddress = trim((string) ($input['company_address'] ?? ''));
+        if ($vatNumber === '' && $companyName === '' && $companyAddress === '') {
+            $companyCountry = '';
+        }
 
         if ($name === '' || $slug === '') {
             return [
@@ -217,7 +242,14 @@ final class TenantService
 
         $stmt = $this->pdo->prepare(
             'UPDATE tenants
-             SET name = :name, slug = :slug, contact_email = :email, contact_phone = :phone
+             SET name = :name,
+                 slug = :slug,
+                 contact_email = :email,
+                 contact_phone = :phone,
+                 vat_number = :vat_number,
+                 company_country = :company_country,
+                 company_name = :company_name,
+                 company_address = :company_address
              WHERE id = :id'
         );
         $stmt->execute([
@@ -225,6 +257,10 @@ final class TenantService
             ':slug' => $slug,
             ':email' => $email !== '' ? $email : null,
             ':phone' => $phone !== '' ? $phone : null,
+            ':vat_number' => $vatNumber !== '' ? $vatNumber : null,
+            ':company_country' => $companyCountry !== '' ? $companyCountry : null,
+            ':company_name' => $companyName !== '' ? $companyName : null,
+            ':company_address' => $companyAddress !== '' ? $companyAddress : null,
             ':id' => $tenantId,
         ]);
 

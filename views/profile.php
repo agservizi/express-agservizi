@@ -30,6 +30,14 @@ $isAdmin = isset($isAdmin) ? (bool) $isAdmin : false;
 
 $fullname = (string) ($profile['fullname'] ?? '');
 $username = (string) ($profile['username'] ?? '');
+$tenantName = (string) ($profile['tenant_name'] ?? '');
+$tenantSlug = (string) ($profile['tenant_slug'] ?? '');
+$tenantEmail = (string) ($profile['tenant_email'] ?? '');
+$tenantPhone = (string) ($profile['tenant_phone'] ?? '');
+$tenantVatNumber = (string) ($profile['tenant_vat_number'] ?? '');
+$tenantCompanyCountry = (string) ($profile['tenant_company_country'] ?? '');
+$tenantCompanyName = (string) ($profile['tenant_company_name'] ?? '');
+$tenantCompanyAddress = (string) ($profile['tenant_company_address'] ?? '');
 
 $displayName = $fullname !== '' ? $fullname : $username;
 if ($displayName === '') {
@@ -122,6 +130,53 @@ $totalRevenueFormatted = number_format((float) $salesSummary['total_revenue'], 2
                             <dd class="profile-meta__value"><?= htmlspecialchars($formatDateTime($lastSaleAt)) ?></dd>
                         </div>
                     <?php endif; ?>
+                </dl>
+            </article>
+
+            <article class="card profile-card">
+                <h3 class="profile-card__section">Dati tenant</h3>
+                <dl class="profile-meta">
+                    <div class="profile-meta__row">
+                        <dt class="profile-meta__label">Tenant</dt>
+                        <dd class="profile-meta__value">
+                            <?= htmlspecialchars($tenantName !== '' ? $tenantName : 'n/d') ?>
+                        </dd>
+                    </div>
+                    <div class="profile-meta__row">
+                        <dt class="profile-meta__label">Slug</dt>
+                        <dd class="profile-meta__value">
+                            <?= htmlspecialchars($tenantSlug !== '' ? $tenantSlug : 'n/d') ?>
+                        </dd>
+                    </div>
+                    <div class="profile-meta__row">
+                        <dt class="profile-meta__label">Contatti</dt>
+                        <dd class="profile-meta__value">
+                            <?= htmlspecialchars($tenantEmail !== '' ? $tenantEmail : 'n/d') ?><br>
+                            <?= htmlspecialchars($tenantPhone !== '' ? $tenantPhone : 'n/d') ?>
+                        </dd>
+                    </div>
+                    <div class="profile-meta__row">
+                        <dt class="profile-meta__label">Ragione sociale</dt>
+                        <dd class="profile-meta__value">
+                            <?= htmlspecialchars($tenantCompanyName !== '' ? $tenantCompanyName : 'n/d') ?>
+                        </dd>
+                    </div>
+                    <div class="profile-meta__row">
+                        <dt class="profile-meta__label">P.IVA</dt>
+                        <dd class="profile-meta__value">
+                            <?php if ($tenantVatNumber !== ''): ?>
+                                <?= htmlspecialchars($tenantCompanyCountry . $tenantVatNumber) ?>
+                            <?php else: ?>
+                                n/d
+                            <?php endif; ?>
+                        </dd>
+                    </div>
+                    <div class="profile-meta__row">
+                        <dt class="profile-meta__label">Indirizzo sede</dt>
+                        <dd class="profile-meta__value">
+                            <?= htmlspecialchars($tenantCompanyAddress !== '' ? $tenantCompanyAddress : 'n/d') ?>
+                        </dd>
+                    </div>
                 </dl>
             </article>
 

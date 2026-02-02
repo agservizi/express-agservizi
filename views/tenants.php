@@ -55,6 +55,26 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                     <label for="tenant_phone">Telefono</label>
                     <input type="text" name="tenant_phone" id="tenant_phone">
                 </div>
+                <div class="form__group">
+                    <label for="create_company_country">Paese P.IVA</label>
+                    <input type="text" name="company_country" id="create_company_country" maxlength="2" placeholder="IT" value="IT">
+                </div>
+                <div class="form__group">
+                    <label for="create_vat_number">P.IVA</label>
+                    <div class="form__inline">
+                        <input type="text" name="vat_number" id="create_vat_number" placeholder="IT12345678901">
+                        <button type="button" class="btn btn--ghost btn--small" data-vies-button="create">Cerca VIES</button>
+                    </div>
+                    <small id="create_vies_status" class="vies-status"></small>
+                </div>
+                <div class="form__group">
+                    <label for="create_company_name">Ragione sociale</label>
+                    <input type="text" name="company_name" id="create_company_name">
+                </div>
+                <div class="form__group">
+                    <label for="create_company_address">Indirizzo sede</label>
+                    <textarea name="company_address" id="create_company_address"></textarea>
+                </div>
             </div>
             <footer class="form__footer">
                 <button type="submit" class="btn btn--primary">Crea tenant</button>
@@ -96,6 +116,26 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                     <label for="update_tenant_phone">Telefono</label>
                     <input type="text" name="tenant_phone" id="update_tenant_phone">
                 </div>
+                <div class="form__group">
+                    <label for="update_company_country">Paese P.IVA</label>
+                    <input type="text" name="company_country" id="update_company_country" maxlength="2" placeholder="IT" value="IT">
+                </div>
+                <div class="form__group">
+                    <label for="update_vat_number">P.IVA</label>
+                    <div class="form__inline">
+                        <input type="text" name="vat_number" id="update_vat_number" placeholder="IT12345678901">
+                        <button type="button" class="btn btn--ghost btn--small" data-vies-button="update">Cerca VIES</button>
+                    </div>
+                    <small id="update_vies_status" class="vies-status"></small>
+                </div>
+                <div class="form__group">
+                    <label for="update_company_name">Ragione sociale</label>
+                    <input type="text" name="company_name" id="update_company_name">
+                </div>
+                <div class="form__group">
+                    <label for="update_company_address">Indirizzo sede</label>
+                    <textarea name="company_address" id="update_company_address"></textarea>
+                </div>
             </div>
             <footer class="form__footer">
                 <button type="submit" class="btn btn--secondary">Aggiorna tenant</button>
@@ -129,7 +169,13 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                             <td><?= htmlspecialchars((string) $tenant['slug']) ?></td>
                             <td>
                                 <?= $tenant['contact_email'] ? htmlspecialchars((string) $tenant['contact_email']) : '—' ?><br>
-                                <?= $tenant['contact_phone'] ? htmlspecialchars((string) $tenant['contact_phone']) : '—' ?>
+                                <?= $tenant['contact_phone'] ? htmlspecialchars((string) $tenant['contact_phone']) : '—' ?><br>
+                                <?= !empty($tenant['company_name']) ? htmlspecialchars((string) $tenant['company_name']) : '—' ?><br>
+                                <?php if (!empty($tenant['vat_number'])): ?>
+                                    <?= 'P.IVA ' . htmlspecialchars((string) ($tenant['company_country'] ?? '')) . htmlspecialchars((string) $tenant['vat_number']) ?>
+                                <?php else: ?>
+                                    —
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <span class="badge badge--<?= (int) $tenant['is_active'] === 1 ? 'success' : 'muted' ?>">
@@ -161,3 +207,78 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
         </div>
     </section>
 </section>
+
+<script>
+    (() => {
+        const lookupUrl = 'index.php?page=vies_lookup';
+        const buttons = document.querySelectorAll('[data-vies-button]');
+
+        const setStatus = (statusEl, message, variant) => {
+            if (!statusEl) {
+                return;
+            }
+            statusEl.textContent = message || '';
+            statusEl.classList.remove('is-success', 'is-error');
+            if (variant) {
+                statusEl.classList.add(variant === 'success' ? 'is-success' : 'is-error');
+            }
+        };
+
+        buttons.forEach((button) => {
+            button.addEventListener('click', async () => {
+                const prefix = button.dataset.viesButton;
+                const vatInput = document.getElementById(`${prefix}_vat_number`);
+                const countryInput = document.getElementById(`${prefix}_company_country`);
+                const nameInput = document.getElementById(`${prefix}_company_name`);
+                const addressInput = document.getElementById(`${prefix}_company_address`);
+                const statusEl = document.getElementById(`${prefix}_vies_status`);
+
+                if (!vatInput || !countryInput || !nameInput || !addressInput) {
+                    return;
+                }
+
+                const vat = vatInput.value.trim();
+                const country = countryInput.value.trim();
+                if (!vat || !country) {
+                    setStatus(statusEl, 'Inserisci paese e P.IVA.', 'error');
+                    return;
+                }
+
+                setStatus(statusEl, 'Verifica in corso…');
+                try {
+                    const response = await fetch(lookupUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ vat, country }),
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        setStatus(statusEl, data.message || 'Errore durante la verifica.', 'error');
+                        return;
+                    }
+                    if (!data.valid) {
+                        setStatus(statusEl, 'P.IVA non valida su VIES.', 'error');
+                        return;
+                    }
+
+                    if (data.company_name) {
+                        nameInput.value = data.company_name;
+                    }
+                    if (data.company_address) {
+                        addressInput.value = data.company_address;
+                    }
+                    if (data.country) {
+                        countryInput.value = data.country;
+                    }
+                    if (data.vat_number) {
+                        vatInput.value = data.vat_number;
+                    }
+
+                    setStatus(statusEl, 'Dati recuperati da VIES.', 'success');
+                } catch (error) {
+                    setStatus(statusEl, 'Impossibile contattare VIES.', 'error');
+                }
+            });
+        });
+    })();
+</script>

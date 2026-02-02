@@ -702,16 +702,93 @@ function pendingCheckoutExists(PDO $pdo, string $slug, string $email): bool
     return $stmt->fetchColumn() !== false;
 }
 
+function normalizeVatCountry(string $country): string
+{
+    $country = strtoupper(trim($country));
+    $country = preg_replace('/[^A-Z]/', '', $country) ?? '';
+    if ($country === 'GR') {
+        $country = 'EL';
+    }
+    return $country;
+}
+
+function normalizeVatNumber(string $vatNumber, string $country): string
+{
+    $vatNumber = strtoupper(trim($vatNumber));
+    $vatNumber = preg_replace('/[^A-Z0-9]/', '', $vatNumber) ?? '';
+    if ($country !== '' && strncmp($vatNumber, $country, strlen($country)) === 0) {
+        $vatNumber = substr($vatNumber, strlen($country));
+    }
+    return $vatNumber;
+}
+
+function isValidVatCountry(string $country): bool
+{
+    return in_array($country, [
+        'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'EL', 'ES',
+        'FI', 'FR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT',
+        'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK',
+    ], true);
+}
+
 /**
- * @param array{plan_key:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string} $payload
+ * @return array{success:bool,valid?:bool,company_name?:string,company_address?:string,message?:string}
+ */
+function fetchViesVat(string $country, string $vatNumber): array
+{
+    if (!class_exists('SoapClient')) {
+        return [
+            'success' => false,
+            'message' => 'Estensione SOAP non disponibile sul server.',
+        ];
+    }
+
+    $wsdl = 'https://ec.europa.eu/taxation_customs/vies/services/checkVatService.wsdl';
+
+    try {
+        $client = new SoapClient($wsdl, [
+            'exceptions' => true,
+            'connection_timeout' => 6,
+            'cache_wsdl' => WSDL_CACHE_MEMORY,
+        ]);
+        $response = $client->checkVat([
+            'countryCode' => $country,
+            'vatNumber' => $vatNumber,
+        ]);
+    } catch (Throwable $exception) {
+        return [
+            'success' => false,
+            'message' => 'Errore VIES: ' . $exception->getMessage(),
+        ];
+    }
+
+    $name = isset($response->name) ? trim((string) $response->name) : '';
+    if ($name === '---') {
+        $name = '';
+    }
+    $address = isset($response->address) ? trim((string) $response->address) : '';
+    if ($address === '---') {
+        $address = '';
+    }
+
+    return [
+        'success' => true,
+        'valid' => (bool) ($response->valid ?? false),
+        'company_name' => $name,
+        'company_address' => $address,
+    ];
+}
+
+/**
+ * @param array{plan_key:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string,vat_number:?string,company_country:?string,company_name:?string,company_address:?string} $payload
  */
 function createCheckoutRequest(PDO $pdo, array $payload): int
 {
     $stmt = $pdo->prepare(
         'INSERT INTO tenant_checkout_requests
-            (plan_key, tenant_name, tenant_slug, tenant_email, tenant_phone, status)
+            (plan_key, tenant_name, tenant_slug, tenant_email, tenant_phone, vat_number, company_country, company_name, company_address, status)
          VALUES
-            (:plan_key, :tenant_name, :tenant_slug, :tenant_email, :tenant_phone, "pending")'
+            (:plan_key, :tenant_name, :tenant_slug, :tenant_email, :tenant_phone, :vat_number, :company_country, :company_name, :company_address, "pending")'
     );
     $stmt->execute([
         ':plan_key' => $payload['plan_key'],
@@ -719,6 +796,10 @@ function createCheckoutRequest(PDO $pdo, array $payload): int
         ':tenant_slug' => $payload['tenant_slug'],
         ':tenant_email' => $payload['tenant_email'],
         ':tenant_phone' => $payload['tenant_phone'] !== '' ? $payload['tenant_phone'] : null,
+        ':vat_number' => $payload['vat_number'] !== '' ? $payload['vat_number'] : null,
+        ':company_country' => $payload['company_country'] !== '' ? $payload['company_country'] : null,
+        ':company_name' => $payload['company_name'] !== '' ? $payload['company_name'] : null,
+        ':company_address' => $payload['company_address'] !== '' ? $payload['company_address'] : null,
     ]);
 
     return (int) $pdo->lastInsertId();
@@ -1743,7 +1824,7 @@ if ($page === 'global_search') {
     ]);
 }
 
-if ($currentUser === null && !in_array($page, ['landing', 'prezzi', 'checkout', 'checkout_success', 'checkout_cancel', 'stripe_webhook', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
+if ($currentUser === null && !in_array($page, ['landing', 'prezzi', 'checkout', 'checkout_success', 'checkout_cancel', 'stripe_webhook', 'vies_lookup', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
     header('Location: index.php?page=login');
     exit;
 }
@@ -2033,6 +2114,63 @@ if ($currentUser !== null && !$authService->hasRole('admin')) {
 }
 
 switch ($page) {
+    case 'vies_lookup':
+        if (!in_array($method, ['GET', 'POST'], true)) {
+            http_response_code(405);
+            header('Allow: GET, POST');
+            exit;
+        }
+
+        $payload = [];
+        if ($method === 'POST') {
+            $raw = file_get_contents('php://input');
+            if (is_string($raw) && $raw !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    $payload = $decoded;
+                }
+            }
+        }
+
+        $vatInput = trim((string) ($payload['vat'] ?? $_POST['vat'] ?? $_GET['vat'] ?? ''));
+        $countryInput = trim((string) ($payload['country'] ?? $_POST['country'] ?? $_GET['country'] ?? ''));
+        $country = normalizeVatCountry($countryInput);
+        $vatNumber = normalizeVatNumber($vatInput, $country);
+
+        if ($country === '' || !isValidVatCountry($country)) {
+            jsonResponse([
+                'success' => false,
+                'message' => 'Paese P.IVA non valido.',
+            ], 400);
+        }
+
+        if ($vatNumber === '' || !preg_match('/^[A-Z0-9]{4,20}$/', $vatNumber)) {
+            jsonResponse([
+                'success' => false,
+                'message' => 'Numero P.IVA non valido.',
+            ], 400);
+        }
+
+        $result = fetchViesVat($country, $vatNumber);
+        if (!($result['success'] ?? false)) {
+            jsonResponse([
+                'success' => false,
+                'message' => (string) ($result['message'] ?? 'Impossibile contattare VIES.'),
+            ], 502);
+        }
+
+        $isValid = (bool) ($result['valid'] ?? false);
+        jsonResponse([
+            'success' => true,
+            'valid' => $isValid,
+            'message' => $isValid ? 'P.IVA valida.' : 'P.IVA non valida.',
+            'company_name' => (string) ($result['company_name'] ?? ''),
+            'company_address' => (string) ($result['company_address'] ?? ''),
+            'country' => $country,
+            'vat_number' => $vatNumber,
+        ]);
+        break;
+
     case 'stripe_webhook':
         if ($method !== 'POST') {
             http_response_code(405);
@@ -2123,6 +2261,10 @@ switch ($page) {
                 'tenant_slug' => (string) ($request['tenant_slug'] ?? ''),
                 'tenant_email' => (string) ($request['tenant_email'] ?? ''),
                 'tenant_phone' => (string) ($request['tenant_phone'] ?? ''),
+                'vat_number' => (string) ($request['vat_number'] ?? ''),
+                'company_country' => (string) ($request['company_country'] ?? ''),
+                'company_name' => (string) ($request['company_name'] ?? ''),
+                'company_address' => (string) ($request['company_address'] ?? ''),
                 'skip_welcome_email' => true,
             ];
             $tenantResult = $tenantService->createTenant($tenantPayload);
@@ -2208,6 +2350,15 @@ switch ($page) {
             $tenantEmail = trim((string) ($_POST['tenant_email'] ?? ''));
             $tenantEmail = function_exists('mb_strtolower') ? mb_strtolower($tenantEmail, 'UTF-8') : strtolower($tenantEmail);
             $tenantPhone = trim((string) ($_POST['tenant_phone'] ?? ''));
+            $companyCountryInput = (string) ($_POST['company_country'] ?? '');
+            $companyCountry = $companyCountryInput !== '' ? normalizeVatCountry($companyCountryInput) : '';
+            $vatNumberInput = trim((string) ($_POST['vat_number'] ?? ''));
+            $vatNumber = $vatNumberInput !== '' ? normalizeVatNumber($vatNumberInput, $companyCountry) : '';
+            $companyName = trim((string) ($_POST['company_name'] ?? ''));
+            $companyAddress = trim((string) ($_POST['company_address'] ?? ''));
+            if ($vatNumber === '' && $companyName === '' && $companyAddress === '') {
+                $companyCountry = '';
+            }
 
             $errors = [];
             if ($plan === null) {
@@ -2223,6 +2374,13 @@ switch ($page) {
             }
             if ($tenantEmail === '' || !filter_var($tenantEmail, FILTER_VALIDATE_EMAIL)) {
                 $errors[] = 'Inserisci un indirizzo email valido.';
+            }
+            if ($vatNumber !== '') {
+                if ($companyCountry === '' || !isValidVatCountry($companyCountry)) {
+                    $errors[] = 'Il paese della P.IVA non è valido.';
+                } elseif (!preg_match('/^[A-Z0-9]{4,20}$/', $vatNumber)) {
+                    $errors[] = 'Inserisci una P.IVA valida.';
+                }
             }
 
             if ($tenantSlug !== '' && tenantSlugExists($pdo, $tenantSlug)) {
@@ -2249,6 +2407,10 @@ switch ($page) {
                     'tenant_slug' => $tenantSlug,
                     'tenant_email' => $tenantEmail,
                     'tenant_phone' => $tenantPhone,
+                    'company_country' => $companyCountry,
+                    'vat_number' => $vatNumber,
+                    'company_name' => $companyName,
+                    'company_address' => $companyAddress,
                 ];
                 header('Location: index.php?page=checkout&plan=' . urlencode($planKey));
                 exit;
@@ -2267,6 +2429,10 @@ switch ($page) {
                     'tenant_slug' => $tenantSlug,
                     'tenant_email' => $tenantEmail,
                     'tenant_phone' => $tenantPhone,
+                    'company_country' => $companyCountry,
+                    'vat_number' => $vatNumber,
+                    'company_name' => $companyName,
+                    'company_address' => $companyAddress,
                 ];
                 header('Location: index.php?page=checkout&plan=' . urlencode($planKey));
                 exit;
@@ -2278,6 +2444,10 @@ switch ($page) {
                 'tenant_slug' => $tenantSlug,
                 'tenant_email' => $tenantEmail,
                 'tenant_phone' => $tenantPhone,
+                'vat_number' => $vatNumber,
+                'company_country' => $companyCountry,
+                'company_name' => $companyName,
+                'company_address' => $companyAddress,
             ]);
 
             $successUrl = $stripeConfig['success_url'] ?? null;
@@ -2330,6 +2500,10 @@ switch ($page) {
                     'tenant_slug' => $tenantSlug,
                     'tenant_email' => $tenantEmail,
                     'tenant_phone' => $tenantPhone,
+                    'company_country' => $companyCountry,
+                    'vat_number' => $vatNumber,
+                    'company_name' => $companyName,
+                    'company_address' => $companyAddress,
                 ];
                 header('Location: index.php?page=checkout&plan=' . urlencode($planKey));
                 exit;

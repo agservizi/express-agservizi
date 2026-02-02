@@ -65,7 +65,11 @@ final class UserService
 
         $stmt = $this->pdo->prepare(
             'SELECT u.id, u.username, u.email, u.fullname, u.role_id, u.created_at, u.updated_at,
-                    r.name AS role_name, u.mfa_enabled, u.mfa_enabled_at, u.tenant_id, t.name AS tenant_name
+                r.name AS role_name, u.mfa_enabled, u.mfa_enabled_at, u.tenant_id,
+                t.name AS tenant_name, t.slug AS tenant_slug, t.contact_email AS tenant_email,
+                t.contact_phone AS tenant_phone, t.vat_number AS tenant_vat_number,
+                t.company_country AS tenant_company_country, t.company_name AS tenant_company_name,
+                t.company_address AS tenant_company_address
              FROM users u
              INNER JOIN roles r ON r.id = u.role_id
              LEFT JOIN tenants t ON t.id = u.tenant_id
@@ -568,7 +572,7 @@ final class UserService
         }
 
         $stmt = $this->pdo->prepare(
-            'SELECT id, name, slug, contact_email, contact_phone
+            'SELECT id, name, slug, contact_email, contact_phone, vat_number, company_country, company_name, company_address
              FROM tenants
              WHERE id = :id
              LIMIT 1'

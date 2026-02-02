@@ -13,6 +13,10 @@ $tenantName = trim((string) ($oldInput['tenant_name'] ?? ''));
 $tenantSlug = trim((string) ($oldInput['tenant_slug'] ?? ''));
 $tenantEmail = trim((string) ($oldInput['tenant_email'] ?? ''));
 $tenantPhone = trim((string) ($oldInput['tenant_phone'] ?? ''));
+$tenantVatNumber = trim((string) ($oldInput['vat_number'] ?? ''));
+$tenantCompanyCountry = trim((string) ($oldInput['company_country'] ?? 'IT'));
+$tenantCompanyName = trim((string) ($oldInput['company_name'] ?? ''));
+$tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
 ?>
 <!doctype html>
 <html lang="it">
@@ -89,6 +93,26 @@ $tenantPhone = trim((string) ($oldInput['tenant_phone'] ?? ''));
                                     Telefono contatto
                                     <input type="text" name="tenant_phone" value="<?= htmlspecialchars($tenantPhone) ?>">
                                 </label>
+                                <label>
+                                    Paese P.IVA
+                                    <input type="text" name="company_country" value="<?= htmlspecialchars($tenantCompanyCountry !== '' ? $tenantCompanyCountry : 'IT') ?>" maxlength="2" placeholder="IT">
+                                </label>
+                                <label>
+                                    P.IVA
+                                    <div class="landing-form__inline">
+                                        <input type="text" name="vat_number" value="<?= htmlspecialchars($tenantVatNumber) ?>" placeholder="IT12345678901">
+                                        <button type="button" class="landing-btn landing-btn--secondary landing-btn--small" data-vies-button>Verifica VIES</button>
+                                    </div>
+                                    <span class="landing-form__status" data-vies-status></span>
+                                </label>
+                                <label>
+                                    Ragione sociale
+                                    <input type="text" name="company_name" value="<?= htmlspecialchars($tenantCompanyName) ?>">
+                                </label>
+                                <label>
+                                    Indirizzo sede
+                                    <textarea name="company_address" rows="3"><?= htmlspecialchars($tenantCompanyAddress) ?></textarea>
+                                </label>
                             </div>
                             <div class="landing-form__footer">
                                 <button type="submit" class="landing-btn landing-btn--primary">Procedi al pagamento</button>
@@ -126,5 +150,71 @@ $tenantPhone = trim((string) ($oldInput['tenant_phone'] ?? ''));
         </div>
         <span>Sviluppato e distribuito da AG SERVIZI P.Iva 08442881218</span>
     </footer>
+    <script>
+        (() => {
+            const button = document.querySelector('[data-vies-button]');
+            const status = document.querySelector('[data-vies-status]');
+            const vatInput = document.querySelector('input[name="vat_number"]');
+            const countryInput = document.querySelector('input[name="company_country"]');
+            const nameInput = document.querySelector('input[name="company_name"]');
+            const addressInput = document.querySelector('textarea[name="company_address"]');
+
+            if (!button || !status || !vatInput || !countryInput || !nameInput || !addressInput) {
+                return;
+            }
+
+            const setStatus = (message, variant) => {
+                status.textContent = message || '';
+                status.classList.remove('is-success', 'is-error');
+                if (variant) {
+                    status.classList.add(variant === 'success' ? 'is-success' : 'is-error');
+                }
+            };
+
+            button.addEventListener('click', async () => {
+                const vat = vatInput.value.trim();
+                const country = countryInput.value.trim();
+                if (!vat || !country) {
+                    setStatus('Inserisci paese e P.IVA.', 'error');
+                    return;
+                }
+
+                setStatus('Verifica in corso…');
+                try {
+                    const response = await fetch('index.php?page=vies_lookup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ vat, country }),
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        setStatus(data.message || 'Errore durante la verifica.', 'error');
+                        return;
+                    }
+                    if (!data.valid) {
+                        setStatus('P.IVA non valida su VIES.', 'error');
+                        return;
+                    }
+
+                    if (data.company_name) {
+                        nameInput.value = data.company_name;
+                    }
+                    if (data.company_address) {
+                        addressInput.value = data.company_address;
+                    }
+                    if (data.country) {
+                        countryInput.value = data.country;
+                    }
+                    if (data.vat_number) {
+                        vatInput.value = data.vat_number;
+                    }
+
+                    setStatus('Dati recuperati da VIES.', 'success');
+                } catch (error) {
+                    setStatus('Impossibile contattare VIES.', 'error');
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

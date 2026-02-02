@@ -14,6 +14,10 @@ CREATE TABLE tenants (
   slug VARCHAR(120) NOT NULL UNIQUE,
   contact_email VARCHAR(150) NULL,
   contact_phone VARCHAR(60) NULL,
+  vat_number VARCHAR(32) NULL,
+  company_country VARCHAR(2) NULL,
+  company_name VARCHAR(190) NULL,
+  company_address VARCHAR(255) NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
