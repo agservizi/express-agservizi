@@ -60,6 +60,7 @@ final class TenantService
         $slug = trim((string) ($input['tenant_slug'] ?? ''));
         $email = trim((string) ($input['tenant_email'] ?? ''));
         $phone = trim((string) ($input['tenant_phone'] ?? ''));
+        $skipWelcomeEmail = !empty($input['skip_welcome_email']);
 
         if ($name === '' || $slug === '') {
             return [
@@ -86,7 +87,7 @@ final class TenantService
         }
 
         $emailSent = false;
-        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (!$skipWelcomeEmail && $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $emailSent = $this->sendTenantWelcomeEmail($email, $name, $slug, $phone !== '' ? $phone : null);
         }
 
@@ -94,8 +95,9 @@ final class TenantService
             'success' => true,
             'message' => $emailSent
                 ? 'Tenant creato correttamente. Email inviata al contatto.'
-                : 'Tenant creato correttamente.' . ($email !== '' ? ' Email non inviata.' : ''),
+                : 'Tenant creato correttamente.' . ($email !== '' && !$skipWelcomeEmail ? ' Email non inviata.' : ''),
             'email_sent' => $emailSent,
+            'tenant_id' => $tenantId,
         ];
     }
 
@@ -306,9 +308,12 @@ final class TenantService
             ':notes' => $notes !== '' ? $notes : null,
         ]);
 
+        $assignmentId = (int) $this->pdo->lastInsertId();
+
         return [
             'success' => true,
             'message' => 'Licenza assegnata al tenant.',
+            'assignment_id' => $assignmentId,
         ];
     }
 

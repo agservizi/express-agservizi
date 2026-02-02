@@ -151,6 +151,11 @@ $notificationTopbarLimit = (int) ($getEnv('NOTIFICATIONS_TOPBAR_LIMIT', '10'));
 $ssoIssuer = $getEnv('SSO_ISSUER', 'coresuite-express');
 $ssoSharedSecret = $getEnv('SSO_SHARED_SECRET', null);
 $ssoTokenTtl = (int) ($getEnv('SSO_TOKEN_TTL', '3600'));
+$stripeSecretKey = $getEnv('STRIPE_SECRET_KEY', null);
+$stripeWebhookSecret = $getEnv('STRIPE_WEBHOOK_SECRET', null);
+$stripeSuccessUrl = $getEnv('STRIPE_SUCCESS_URL', null);
+$stripeCancelUrl = $getEnv('STRIPE_CANCEL_URL', null);
+$stripeCurrency = $getEnv('STRIPE_CURRENCY', 'eur');
 $pdaOcrEnabled = (int) ($getEnv('PDA_OCR_ENABLED', '1')) === 1;
 $pdaOcrMinChars = (int) ($getEnv('PDA_OCR_MIN_CHARS', '200'));
 $pdaOcrLang = $getEnv('PDA_OCR_LANG', 'ita');
@@ -205,6 +210,13 @@ $configCache = [
         'webhook_headers' => $notificationWebhookHeaders,
         'queue' => $notificationQueueConfig,
         'topbar_limit' => $notificationTopbarLimit > 0 ? min($notificationTopbarLimit, 30) : 10,
+    ],
+    'stripe' => [
+        'secret_key' => $stripeSecretKey,
+        'webhook_secret' => $stripeWebhookSecret,
+        'success_url' => $stripeSuccessUrl,
+        'cancel_url' => $stripeCancelUrl,
+        'currency' => $stripeCurrency !== null && $stripeCurrency !== '' ? strtolower($stripeCurrency) : 'eur',
     ],
     'sso' => [
         'enabled' => is_string($ssoSharedSecret) && $ssoSharedSecret !== '',

@@ -600,6 +600,246 @@ function resolveLicenseById(PDO $pdo, int $licenseId): ?array
     return $row !== false ? $row : null;
 }
 
+function buildPublicUrl(string $queryString): string
+{
+    $queryString = ltrim($queryString, '?');
+    if (!empty($_SERVER['HTTP_HOST'])) {
+        $httpsValue = $_SERVER['HTTPS'] ?? null;
+        $scheme = (is_string($httpsValue) && strtolower((string) $httpsValue) !== 'off' && $httpsValue !== '') ? 'https' : 'http';
+        return $scheme . '://' . $_SERVER['HTTP_HOST'] . '/public/index.php' . ($queryString !== '' ? '?' . $queryString : '');
+    }
+
+    return 'index.php' . ($queryString !== '' ? '?' . $queryString : '');
+}
+
+/**
+ * @return array<string, array<string, mixed>>
+ */
+function getCheckoutPlanCatalog(): array
+{
+    return [
+        'start' => [
+            'label' => 'Start',
+            'stripe_name' => 'Piano Start',
+            'stripe_description' => '12 mesi · max 1 cassiere',
+            'price_eur' => 550,
+            'term_months' => 12,
+            'max_users' => 1,
+            'license_label' => 'Start',
+        ],
+        'start_plus' => [
+            'label' => 'Start Plus',
+            'stripe_name' => 'Piano Start Plus',
+            'stripe_description' => '12 mesi · max 1 cassiere',
+            'price_eur' => 650,
+            'term_months' => 12,
+            'max_users' => 1,
+            'license_label' => 'Start Plus',
+        ],
+        'core' => [
+            'label' => 'Core',
+            'stripe_name' => 'Piano Core',
+            'stripe_description' => '24 mesi · max 2 cassieri',
+            'price_eur' => 850,
+            'term_months' => 24,
+            'max_users' => 2,
+            'license_label' => 'Core',
+        ],
+        'business' => [
+            'label' => 'Business',
+            'stripe_name' => 'Piano Business',
+            'stripe_description' => '36 mesi · max 4 cassieri',
+            'price_eur' => 1200,
+            'term_months' => 36,
+            'max_users' => 4,
+            'license_label' => 'Business',
+        ],
+    ];
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function resolveCheckoutPlan(string $planKey): ?array
+{
+    $catalog = getCheckoutPlanCatalog();
+    return $catalog[$planKey] ?? null;
+}
+
+function tenantSlugExists(PDO $pdo, string $slug): bool
+{
+    $stmt = $pdo->prepare('SELECT id FROM tenants WHERE slug = :slug LIMIT 1');
+    $stmt->execute([':slug' => $slug]);
+    return $stmt->fetchColumn() !== false;
+}
+
+function tenantContactEmailExists(PDO $pdo, string $email): bool
+{
+    $stmt = $pdo->prepare('SELECT id FROM tenants WHERE contact_email = :email LIMIT 1');
+    $stmt->execute([':email' => $email]);
+    return $stmt->fetchColumn() !== false;
+}
+
+function userEmailExists(PDO $pdo, string $email): bool
+{
+    $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+    $stmt->execute([':email' => $email]);
+    return $stmt->fetchColumn() !== false;
+}
+
+function pendingCheckoutExists(PDO $pdo, string $slug, string $email): bool
+{
+    $stmt = $pdo->prepare(
+        'SELECT id FROM tenant_checkout_requests
+         WHERE (tenant_slug = :slug OR tenant_email = :email)
+           AND status IN ("pending", "processing")
+         LIMIT 1'
+    );
+    $stmt->execute([
+        ':slug' => $slug,
+        ':email' => $email,
+    ]);
+    return $stmt->fetchColumn() !== false;
+}
+
+/**
+ * @param array{plan_key:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string} $payload
+ */
+function createCheckoutRequest(PDO $pdo, array $payload): int
+{
+    $stmt = $pdo->prepare(
+        'INSERT INTO tenant_checkout_requests
+            (plan_key, tenant_name, tenant_slug, tenant_email, tenant_phone, status)
+         VALUES
+            (:plan_key, :tenant_name, :tenant_slug, :tenant_email, :tenant_phone, "pending")'
+    );
+    $stmt->execute([
+        ':plan_key' => $payload['plan_key'],
+        ':tenant_name' => $payload['tenant_name'],
+        ':tenant_slug' => $payload['tenant_slug'],
+        ':tenant_email' => $payload['tenant_email'],
+        ':tenant_phone' => $payload['tenant_phone'] !== '' ? $payload['tenant_phone'] : null,
+    ]);
+
+    return (int) $pdo->lastInsertId();
+}
+
+function updateCheckoutSession(PDO $pdo, int $requestId, string $sessionId): void
+{
+    $stmt = $pdo->prepare(
+        'UPDATE tenant_checkout_requests
+         SET stripe_session_id = :session, updated_at = NOW()
+         WHERE id = :id'
+    );
+    $stmt->execute([
+        ':session' => $sessionId,
+        ':id' => $requestId,
+    ]);
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function getCheckoutRequestById(PDO $pdo, int $requestId): ?array
+{
+    $stmt = $pdo->prepare('SELECT * FROM tenant_checkout_requests WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $requestId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row !== false ? $row : null;
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function getCheckoutRequestBySession(PDO $pdo, string $sessionId): ?array
+{
+    $stmt = $pdo->prepare('SELECT * FROM tenant_checkout_requests WHERE stripe_session_id = :session LIMIT 1');
+    $stmt->execute([':session' => $sessionId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row !== false ? $row : null;
+}
+
+function lockCheckoutRequest(PDO $pdo, int $requestId, string $expectedStatus, string $nextStatus): bool
+{
+    $stmt = $pdo->prepare(
+        'UPDATE tenant_checkout_requests
+         SET status = :next_status, updated_at = NOW()
+         WHERE id = :id AND status = :expected'
+    );
+    $stmt->execute([
+        ':next_status' => $nextStatus,
+        ':id' => $requestId,
+        ':expected' => $expectedStatus,
+    ]);
+
+    return $stmt->rowCount() > 0;
+}
+
+function markCheckoutRequestPaid(PDO $pdo, int $requestId, array $data): void
+{
+    $stmt = $pdo->prepare(
+        'UPDATE tenant_checkout_requests
+         SET status = "paid",
+             stripe_payment_intent_id = :payment_intent,
+             stripe_customer_email = :customer_email,
+             tenant_id = :tenant_id,
+             license_id = :license_id,
+             error_message = NULL,
+             paid_at = NOW(),
+             updated_at = NOW()
+         WHERE id = :id'
+    );
+    $stmt->execute([
+        ':payment_intent' => $data['payment_intent'] ?? null,
+        ':customer_email' => $data['customer_email'] ?? null,
+        ':tenant_id' => $data['tenant_id'] ?? null,
+        ':license_id' => $data['license_id'] ?? null,
+        ':id' => $requestId,
+    ]);
+}
+
+function markCheckoutRequestFailed(PDO $pdo, int $requestId, string $message): void
+{
+    $stmt = $pdo->prepare(
+        'UPDATE tenant_checkout_requests
+         SET status = "failed",
+             error_message = :message,
+             updated_at = NOW()
+         WHERE id = :id'
+    );
+    $stmt->execute([
+        ':message' => $message,
+        ':id' => $requestId,
+    ]);
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function resolveLicenseByLabel(PDO $pdo, string $label): ?array
+{
+    $stmt = $pdo->prepare(
+        'SELECT id, code, label, max_users, term_months, is_active, expires_at
+         FROM licenses
+         WHERE is_active = 1 AND LOWER(label) = :label
+         ORDER BY created_at DESC
+         LIMIT 1'
+    );
+    $stmt->execute([':label' => strtolower($label)]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row !== false ? $row : null;
+}
+
+function logStripeEvent(string $message): void
+{
+    $dir = dirname(__DIR__) . '/storage/logs';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $line = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $message);
+    @file_put_contents($dir . '/stripe.log', $line, FILE_APPEND);
+}
+
 /**
  * @return array{plan_key:string,modules:array<int,string>,license:array<string,mixed>|null}
  */
@@ -863,6 +1103,9 @@ use App\Services\ReceiptSettingsService;
 use App\Services\LicenseService;
 use App\Services\TenantService;
 use App\Services\TenantContext;
+use Stripe\Stripe;
+use Stripe\Webhook;
+use Stripe\Checkout\Session;
 
 $pdo = Database::getConnection();
 
@@ -1500,7 +1743,7 @@ if ($page === 'global_search') {
     ]);
 }
 
-if ($currentUser === null && !in_array($page, ['landing', 'prezzi', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
+if ($currentUser === null && !in_array($page, ['landing', 'prezzi', 'checkout', 'checkout_success', 'checkout_cancel', 'stripe_webhook', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
     header('Location: index.php?page=login');
     exit;
 }
@@ -1790,6 +2033,345 @@ if ($currentUser !== null && !$authService->hasRole('admin')) {
 }
 
 switch ($page) {
+    case 'stripe_webhook':
+        if ($method !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            exit;
+        }
+
+        $stripeConfig = $GLOBALS['config']['stripe'] ?? [];
+        $stripeSecretKey = $stripeConfig['secret_key'] ?? null;
+        $stripeWebhookSecret = $stripeConfig['webhook_secret'] ?? null;
+        if ($stripeSecretKey === null || $stripeSecretKey === '' || $stripeWebhookSecret === null || $stripeWebhookSecret === '') {
+            http_response_code(503);
+            echo 'Stripe non configurato.';
+            exit;
+        }
+
+        $payload = file_get_contents('php://input') ?: '';
+        $sigHeader = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
+
+        try {
+            Stripe::setApiKey($stripeSecretKey);
+            $event = Webhook::constructEvent($payload, $sigHeader, $stripeWebhookSecret);
+        } catch (\Throwable $exception) {
+            logStripeEvent('Webhook non valido: ' . $exception->getMessage());
+            http_response_code(400);
+            echo 'Webhook non valido.';
+            exit;
+        }
+
+        $eventType = $event->type ?? '';
+        if (in_array($eventType, ['checkout.session.completed', 'checkout.session.async_payment_succeeded'], true)) {
+            $session = $event->data->object ?? null;
+            if (is_object($session) && isset($session->payment_status) && $session->payment_status !== 'paid') {
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+            $metadata = is_object($session) ? ($session->metadata ?? null) : null;
+            $requestId = is_object($metadata) ? (int) ($metadata->request_id ?? 0) : 0;
+
+            if ($requestId <= 0) {
+                logStripeEvent('Webhook senza request_id.');
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+
+            $request = getCheckoutRequestById($pdo, $requestId);
+            if ($request === null) {
+                logStripeEvent('Request ID non trovato: ' . $requestId);
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+
+            $status = (string) ($request['status'] ?? '');
+            if ($status === 'paid') {
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+
+            if (!lockCheckoutRequest($pdo, $requestId, 'pending', 'processing')) {
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+
+            $planKey = (string) ($request['plan_key'] ?? '');
+            $plan = resolveCheckoutPlan($planKey);
+            if ($plan === null) {
+                markCheckoutRequestFailed($pdo, $requestId, 'Piano non valido.');
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+
+            $license = resolveLicenseByLabel($pdo, (string) ($plan['license_label'] ?? ''));
+            if ($license === null) {
+                markCheckoutRequestFailed($pdo, $requestId, 'Licenza non disponibile per il piano selezionato.');
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+
+            $tenantPayload = [
+                'tenant_name' => (string) ($request['tenant_name'] ?? ''),
+                'tenant_slug' => (string) ($request['tenant_slug'] ?? ''),
+                'tenant_email' => (string) ($request['tenant_email'] ?? ''),
+                'tenant_phone' => (string) ($request['tenant_phone'] ?? ''),
+                'skip_welcome_email' => true,
+            ];
+            $tenantResult = $tenantService->createTenant($tenantPayload);
+            if (!($tenantResult['success'] ?? false)) {
+                markCheckoutRequestFailed($pdo, $requestId, (string) ($tenantResult['error'] ?? 'Creazione tenant fallita.'));
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+
+            $tenantId = (int) ($tenantResult['tenant_id'] ?? 0);
+            if ($tenantId <= 0) {
+                markCheckoutRequestFailed($pdo, $requestId, 'Tenant creato ma ID non disponibile.');
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+
+            $assign = $tenantService->assignLicense([
+                'tenant_id' => $tenantId,
+                'license_id' => (int) ($license['id'] ?? 0),
+                'assignment_notes' => 'Acquisto online - piano ' . $plan['label'],
+            ]);
+
+            if (!($assign['success'] ?? false)) {
+                markCheckoutRequestFailed($pdo, $requestId, (string) ($assign['error'] ?? 'Assegnazione licenza fallita.'));
+                http_response_code(200);
+                echo 'ok';
+                exit;
+            }
+
+            $assignmentId = (int) ($assign['assignment_id'] ?? 0);
+            if ($assignmentId > 0) {
+                $tenantService->updateAssignmentPayment($assignmentId, true);
+            }
+
+            $credentialResult = $userService->resendTenantCredentials($tenantId);
+            if (!($credentialResult['success'] ?? false)) {
+                logStripeEvent('Invio credenziali fallito per tenant #' . $tenantId . ': ' . ($credentialResult['error'] ?? 'Errore sconosciuto'));
+            }
+
+            $paymentIntent = null;
+            $customerEmail = null;
+            if (is_object($session)) {
+                $paymentIntent = $session->payment_intent ?? null;
+                $customerDetails = $session->customer_details ?? null;
+                if (is_object($customerDetails)) {
+                    $customerEmail = $customerDetails->email ?? null;
+                }
+            }
+
+            markCheckoutRequestPaid($pdo, $requestId, [
+                'payment_intent' => $paymentIntent,
+                'customer_email' => $customerEmail,
+                'tenant_id' => $tenantId,
+                'license_id' => (int) ($license['id'] ?? 0),
+            ]);
+        }
+
+        http_response_code(200);
+        echo 'ok';
+        exit;
+
+    case 'checkout':
+        if ($currentUser !== null) {
+            header('Location: index.php?page=dashboard');
+            exit;
+        }
+
+        $planKey = normalizeDemoPlanKey((string) ($_GET['plan'] ?? 'start'));
+        $plan = resolveCheckoutPlan($planKey);
+        $checkoutFeedback = $_SESSION['checkout_feedback'] ?? null;
+        unset($_SESSION['checkout_feedback']);
+        $checkoutOldInput = $_SESSION['checkout_old_input'] ?? null;
+        unset($_SESSION['checkout_old_input']);
+
+        if ($method === 'POST' && (($_POST['action'] ?? '') === 'checkout_start')) {
+            $planKey = normalizeDemoPlanKey((string) ($_POST['plan_key'] ?? 'start'));
+            $plan = resolveCheckoutPlan($planKey);
+            $tenantName = trim((string) ($_POST['tenant_name'] ?? ''));
+            $tenantSlug = trim((string) ($_POST['tenant_slug'] ?? ''));
+            $tenantSlug = function_exists('mb_strtolower') ? mb_strtolower($tenantSlug, 'UTF-8') : strtolower($tenantSlug);
+            $tenantEmail = trim((string) ($_POST['tenant_email'] ?? ''));
+            $tenantEmail = function_exists('mb_strtolower') ? mb_strtolower($tenantEmail, 'UTF-8') : strtolower($tenantEmail);
+            $tenantPhone = trim((string) ($_POST['tenant_phone'] ?? ''));
+
+            $errors = [];
+            if ($plan === null) {
+                $errors[] = 'Seleziona un piano valido.';
+            }
+            if ($tenantName === '') {
+                $errors[] = 'Inserisci il nome del tenant.';
+            }
+            if ($tenantSlug === '') {
+                $errors[] = 'Inserisci lo slug del tenant.';
+            } elseif (!preg_match('/^[a-z0-9][a-z0-9\-]{2,}$/', $tenantSlug)) {
+                $errors[] = 'Lo slug deve contenere solo lettere minuscole, numeri e trattini.';
+            }
+            if ($tenantEmail === '' || !filter_var($tenantEmail, FILTER_VALIDATE_EMAIL)) {
+                $errors[] = 'Inserisci un indirizzo email valido.';
+            }
+
+            if ($tenantSlug !== '' && tenantSlugExists($pdo, $tenantSlug)) {
+                $errors[] = 'Lo slug è già in uso. Scegline uno diverso.';
+            }
+            if ($tenantEmail !== '' && tenantContactEmailExists($pdo, $tenantEmail)) {
+                $errors[] = 'L’email è già associata a un tenant esistente.';
+            }
+            if ($tenantEmail !== '' && userEmailExists($pdo, $tenantEmail)) {
+                $errors[] = 'L’email è già associata a un account esistente.';
+            }
+            if ($tenantSlug !== '' && $tenantEmail !== '' && pendingCheckoutExists($pdo, $tenantSlug, $tenantEmail)) {
+                $errors[] = 'Esiste già una richiesta di attivazione in corso per questi dati.';
+            }
+
+            if ($errors !== []) {
+                $_SESSION['checkout_feedback'] = [
+                    'success' => false,
+                    'message' => 'Controlla i dati inseriti.',
+                    'errors' => $errors,
+                ];
+                $_SESSION['checkout_old_input'] = [
+                    'tenant_name' => $tenantName,
+                    'tenant_slug' => $tenantSlug,
+                    'tenant_email' => $tenantEmail,
+                    'tenant_phone' => $tenantPhone,
+                ];
+                header('Location: index.php?page=checkout&plan=' . urlencode($planKey));
+                exit;
+            }
+
+            $stripeConfig = $GLOBALS['config']['stripe'] ?? [];
+            $stripeSecretKey = $stripeConfig['secret_key'] ?? null;
+            if ($stripeSecretKey === null || $stripeSecretKey === '') {
+                $_SESSION['checkout_feedback'] = [
+                    'success' => false,
+                    'message' => 'Checkout non disponibile al momento.',
+                    'errors' => ['Stripe non configurato.'],
+                ];
+                $_SESSION['checkout_old_input'] = [
+                    'tenant_name' => $tenantName,
+                    'tenant_slug' => $tenantSlug,
+                    'tenant_email' => $tenantEmail,
+                    'tenant_phone' => $tenantPhone,
+                ];
+                header('Location: index.php?page=checkout&plan=' . urlencode($planKey));
+                exit;
+            }
+
+            $requestId = createCheckoutRequest($pdo, [
+                'plan_key' => $planKey,
+                'tenant_name' => $tenantName,
+                'tenant_slug' => $tenantSlug,
+                'tenant_email' => $tenantEmail,
+                'tenant_phone' => $tenantPhone,
+            ]);
+
+            $successUrl = $stripeConfig['success_url'] ?? null;
+            if ($successUrl === null || $successUrl === '') {
+                $successUrl = buildPublicUrl('page=checkout_success&session_id={CHECKOUT_SESSION_ID}');
+            }
+            $cancelUrl = $stripeConfig['cancel_url'] ?? null;
+            if ($cancelUrl === null || $cancelUrl === '') {
+                $cancelUrl = buildPublicUrl('page=checkout_cancel&plan=' . urlencode($planKey));
+            }
+            $currency = $stripeConfig['currency'] ?? 'eur';
+
+            try {
+                Stripe::setApiKey($stripeSecretKey);
+                $session = Session::create([
+                    'mode' => 'payment',
+                    'payment_method_types' => ['card'],
+                    'customer_email' => $tenantEmail,
+                    'line_items' => [[
+                        'quantity' => 1,
+                        'price_data' => [
+                            'currency' => $currency,
+                            'unit_amount' => (int) ((float) $plan['price_eur'] * 100),
+                            'product_data' => [
+                                'name' => (string) $plan['stripe_name'],
+                                'description' => (string) $plan['stripe_description'],
+                            ],
+                        ],
+                    ]],
+                    'success_url' => $successUrl,
+                    'cancel_url' => $cancelUrl,
+                    'metadata' => [
+                        'request_id' => (string) $requestId,
+                        'plan_key' => (string) $planKey,
+                    ],
+                ]);
+                updateCheckoutSession($pdo, $requestId, (string) $session->id);
+                header('Location: ' . $session->url);
+                exit;
+            } catch (\Throwable $exception) {
+                logStripeEvent('Errore creazione checkout: ' . $exception->getMessage());
+                markCheckoutRequestFailed($pdo, $requestId, 'Errore Stripe: ' . $exception->getMessage());
+                $_SESSION['checkout_feedback'] = [
+                    'success' => false,
+                    'message' => 'Impossibile avviare il checkout.',
+                    'errors' => ['Riprova tra qualche minuto.'],
+                ];
+                $_SESSION['checkout_old_input'] = [
+                    'tenant_name' => $tenantName,
+                    'tenant_slug' => $tenantSlug,
+                    'tenant_email' => $tenantEmail,
+                    'tenant_phone' => $tenantPhone,
+                ];
+                header('Location: index.php?page=checkout&plan=' . urlencode($planKey));
+                exit;
+            }
+        }
+
+        render('checkout', [
+            'pageTitle' => 'Attiva il piano',
+            'planKey' => $planKey,
+            'plan' => $plan,
+            'feedback' => is_array($checkoutFeedback) ? $checkoutFeedback : null,
+            'oldInput' => is_array($checkoutOldInput) ? $checkoutOldInput : null,
+        ], false);
+        break;
+
+    case 'checkout_success':
+        if ($currentUser !== null) {
+            header('Location: index.php?page=dashboard');
+            exit;
+        }
+
+        $sessionId = trim((string) ($_GET['session_id'] ?? ''));
+        $request = $sessionId !== '' ? getCheckoutRequestBySession($pdo, $sessionId) : null;
+        render('checkout_success', [
+            'pageTitle' => 'Pagamento completato',
+            'request' => $request,
+        ], false);
+        break;
+
+    case 'checkout_cancel':
+        if ($currentUser !== null) {
+            header('Location: index.php?page=dashboard');
+            exit;
+        }
+
+        $planKey = normalizeDemoPlanKey((string) ($_GET['plan'] ?? 'start'));
+        render('checkout_cancel', [
+            'pageTitle' => 'Pagamento annullato',
+            'planKey' => $planKey,
+        ], false);
+        break;
+
     case 'landing':
         if ($currentUser !== null) {
             header('Location: index.php?page=dashboard');

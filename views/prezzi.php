@@ -67,7 +67,7 @@ $landingUrl = 'index.php?page=landing';
                         <li>Guida completa e impostazioni.</li>
                     </ul>
                     <footer class="landing-pricing__cta">
-                        <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($landingUrl) ?>#contatto">Acquista</a>
+                        <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=start">Acquista</a>
                     </footer>
                 </article>
                 <article class="landing-pricing__card landing-pricing__card--highlight">
@@ -83,7 +83,7 @@ $landingUrl = 'index.php?page=landing';
                         <li>Ordini store integrati.</li>
                     </ul>
                     <footer class="landing-pricing__cta">
-                        <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($landingUrl) ?>#contatto">Acquista</a>
+                        <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=start_plus">Acquista</a>
                     </footer>
                 </article>
                 <article class="landing-pricing__card">
@@ -99,7 +99,7 @@ $landingUrl = 'index.php?page=landing';
                         <li>Supporto prioritario.</li>
                     </ul>
                     <footer class="landing-pricing__cta">
-                        <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($landingUrl) ?>#contatto">Acquista</a>
+                        <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=core">Acquista</a>
                     </footer>
                 </article>
                 <article class="landing-pricing__card">
@@ -115,7 +115,7 @@ $landingUrl = 'index.php?page=landing';
                         <li>Integrazioni avanzate.</li>
                     </ul>
                     <footer class="landing-pricing__cta">
-                        <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($landingUrl) ?>#contatto">Acquista</a>
+                        <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=business">Acquista</a>
                     </footer>
                 </article>
             </div>
