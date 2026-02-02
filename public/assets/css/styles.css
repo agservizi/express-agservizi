@@ -133,6 +133,10 @@ html{scroll-behavior:smooth;}
 .landing-btn--secondary:hover{border-color:rgba(148,163,184,.6);} 
 .landing-btn--ghost{background:transparent;color:#e2e8f0;border-color:rgba(148,163,184,.3);} 
 .landing-btn--ghost:hover{border-color:#94a3b8;} 
+.landing-checkout .landing-btn--secondary,
+.landing-checkout .landing-btn--ghost{background:#f8fafc;color:#0f172a;border-color:#cbd5e1;} 
+.landing-checkout .landing-btn--secondary:hover,
+.landing-checkout .landing-btn--ghost:hover{background:#eef2f7;border-color:#94a3b8;} 
 .landing-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;}
 .landing-metric{background:rgba(15,23,42,.6);border:1px solid rgba(148,163,184,.2);border-radius:14px;padding:16px;}
 .landing-metric__value{display:block;font-size:18px;font-weight:700;color:#f8fafc;}
