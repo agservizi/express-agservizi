@@ -237,7 +237,7 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
             </div>
         </section>
 
-        <section id="contatto" class="landing-section">
+        <section id="contatto" class="landing-section landing-contact">
             <div class="landing-section__header">
                 <h2>Richiedi informazioni sui piani</h2>
                 <p>Seleziona “Richiesta informazioni piani” e riceverai subito una mail con tutti i dettagli.</p>
