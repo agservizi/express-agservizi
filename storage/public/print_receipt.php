@@ -16,8 +16,6 @@ spl_autoload_register(static function (string $class): void {
 });
 
 use App\Services\SalesService;
-use App\Services\ReceiptSettingsService;
-use App\Services\TenantContext;
 
 $pdo = Database::getConnection();
 $salesService = new SalesService($pdo);
@@ -37,14 +35,36 @@ if ($sale === null) {
 }
 
 $tenantId = isset($sale['tenant_id']) ? (int) $sale['tenant_id'] : 1;
-TenantContext::setTenantId($tenantId);
-$receiptSettingsService = new ReceiptSettingsService();
-$receiptSettings = $receiptSettingsService->getSettings();
-$receiptHeaderLines = $receiptSettings['header_lines'] ?? [];
+$tenantReceiptPath = __DIR__ . '/../config/tenants/tenant_' . $tenantId . '/receipt_settings.json';
+$legacyReceiptPath = __DIR__ . '/../config/receipt_settings.json';
+$receiptHeaderLines = [];
+$settingsPayload = [];
+if (is_file($tenantReceiptPath)) {
+  $raw = file_get_contents($tenantReceiptPath);
+  $decoded = $raw !== false ? json_decode($raw, true) : null;
+  if (is_array($decoded)) {
+    $settingsPayload = $decoded;
+  }
+} elseif (is_file($legacyReceiptPath)) {
+  $raw = file_get_contents($legacyReceiptPath);
+  $decoded = $raw !== false ? json_decode($raw, true) : null;
+  if (is_array($decoded)) {
+    $settingsPayload = $decoded;
+  }
+}
+
+$receiptHeaderLines = $settingsPayload['header_lines'] ?? [];
 if (!is_array($receiptHeaderLines)) {
   $receiptHeaderLines = [];
 }
 $receiptHeaderLines = array_values(array_filter(array_map('trim', $receiptHeaderLines)));
+if ($tenantId === 1 && ($receiptHeaderLines === [] || in_array('TRT Service', $receiptHeaderLines, true))) {
+  $receiptHeaderLines = [
+    'Telefonia Plinio',
+    'Via Roma 10, Milano',
+    'P.IVA IT12345678901',
+  ];
+}
 
 $operator = $sale['fullname'] !== null && $sale['fullname'] !== '' ? $sale['fullname'] : $sale['username'];
 $timezoneId = $GLOBALS['config']['app']['timezone'] ?? (ini_get('date.timezone') ?: 'Europe/Rome');
