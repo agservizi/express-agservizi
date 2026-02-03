@@ -138,8 +138,60 @@ $feedback = $feedback ?? null;
             <h3>Hai bisogno di supporto?</h3>
             <p>Apri una richiesta nella sezione Supporto clienti o consulta le notifiche per aggiornamenti di sistema.</p>
         </div>
-        <form method="post" class="guide-callout__form">
+        <form method="post" class="guide-callout__form guide-support-form">
             <input type="hidden" name="action" value="send_guide_support">
+            <div class="guide-support-form__grid">
+                <label class="guide-support-form__field">
+                    <span>Categoria *</span>
+                    <select name="support_category" required>
+                        <option value="">Seleziona</option>
+                        <option value="problema_tecnico">Problema tecnico</option>
+                        <option value="dati">Dati o report</option>
+                        <option value="accesso">Accesso e permessi</option>
+                        <option value="pagamenti">Pagamenti e vendite</option>
+                        <option value="magazzino">Magazzino / Stock</option>
+                        <option value="altro">Altro</option>
+                    </select>
+                </label>
+                <label class="guide-support-form__field">
+                    <span>Area interessata *</span>
+                    <select name="support_area" required>
+                        <option value="">Seleziona</option>
+                        <option value="sim">Magazzino SIM</option>
+                        <option value="prodotti">Prodotti</option>
+                        <option value="vendite">Vendite</option>
+                        <option value="clienti">Clienti</option>
+                        <option value="report">Report</option>
+                        <option value="impostazioni">Impostazioni</option>
+                    </select>
+                </label>
+                <label class="guide-support-form__field">
+                    <span>Priorità *</span>
+                    <select name="support_priority" required>
+                        <option value="">Seleziona</option>
+                        <option value="bassa">Bassa</option>
+                        <option value="media">Media</option>
+                        <option value="alta">Alta</option>
+                        <option value="critica">Critica</option>
+                    </select>
+                </label>
+                <label class="guide-support-form__field">
+                    <span>Browser / Dispositivo</span>
+                    <input type="text" name="support_device" placeholder="Es. Chrome su Windows 11">
+                </label>
+            </div>
+            <label class="guide-support-form__field guide-support-form__field--full">
+                <span>Descrizione del problema *</span>
+                <textarea name="support_description" rows="3" required placeholder="Cosa succede? Che errore vedi?"></textarea>
+            </label>
+            <label class="guide-support-form__field guide-support-form__field--full">
+                <span>Passaggi per riprodurlo</span>
+                <textarea name="support_steps" rows="2" placeholder="1) ... 2) ... 3) ..."></textarea>
+            </label>
+            <label class="guide-support-form__field guide-support-form__field--full">
+                <span>Risultato atteso</span>
+                <textarea name="support_expected" rows="2" placeholder="Cosa ti aspetti che accada?"></textarea>
+            </label>
             <button type="submit" class="guide-callout__cta">Apri una richiesta</button>
         </form>
     </section>

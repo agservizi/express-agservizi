@@ -405,9 +405,16 @@ body[data-sidebar-collapsed="true"] .topbar{padding-left:24px;padding-right:24px
 .guide-callout{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 24px;border-radius:18px;background:linear-gradient(120deg,#2563eb,#4f46e5);color:#fff;box-shadow:0 16px 28px rgba(37,99,235,.28);}
 .guide-callout h3{font-size:18px;color:#fff;}
 .guide-callout p{font-size:13px;color:rgba(255,255,255,.85);}
-.guide-callout__cta{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:999px;background:#fff;color:#1d4ed8;font-weight:700;font-size:13px;box-shadow:0 10px 20px rgba(15,23,42,.2);}
+.guide-callout__cta{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:999px;background:#fff;color:#1d4ed8;font-weight:700;font-size:13px;box-shadow:0 10px 20px rgba(15,23,42,.2);} 
 .guide-callout__cta:hover{transform:translateY(-1px);box-shadow:0 14px 24px rgba(15,23,42,.25);}
-.guide-callout__form{margin:0;}
+.guide-callout__form{margin:0;display:flex;flex-direction:column;gap:12px;min-width:280px;} 
+.guide-support-form__grid{display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:12px;}
+.guide-support-form__field{display:flex;flex-direction:column;gap:6px;font-size:12px;color:rgba(255,255,255,.9);} 
+.guide-support-form__field span{font-weight:600;}
+.guide-support-form__field input,
+.guide-support-form__field select,
+.guide-support-form__field textarea{border:none;border-radius:10px;padding:10px 12px;font-size:13px;background:#fff;color:#0f172a;}
+.guide-support-form__field--full{grid-column:1/-1;}
 
 @media (max-width:960px){
   .page--guide .guide-hero{grid-template-columns:1fr;}
@@ -559,6 +566,7 @@ body[data-sidebar-collapsed="true"] .topbar{padding-left:24px;padding-right:24px
 .action-list__motivation strong{font-weight:600;}
 @media (max-width:768px){
   .action-list__content{flex-direction:column;gap:6px;}
+  .guide-support-form__grid{grid-template-columns:1fr;}
   .action-list__motivation{width:100%;}
 }
 .action-list__item--warning{border-color:#f97316;}

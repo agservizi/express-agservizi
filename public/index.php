@@ -3265,11 +3265,184 @@ switch ($page) {
                 $supportRecipient = 'ag.servizi16@gmail.com';
                 $username = (string) ($currentUser['username'] ?? 'utente');
                 $fullName = trim((string) ($currentUser['fullname'] ?? ''));
+                $supportCategory = trim((string) ($_POST['support_category'] ?? ''));
+                $supportArea = trim((string) ($_POST['support_area'] ?? ''));
+                $supportPriority = trim((string) ($_POST['support_priority'] ?? ''));
+                $supportDevice = trim((string) ($_POST['support_device'] ?? ''));
+                $supportDescription = trim((string) ($_POST['support_description'] ?? ''));
+                $supportSteps = trim((string) ($_POST['support_steps'] ?? ''));
+                $supportExpected = trim((string) ($_POST['support_expected'] ?? ''));
+
+                $errors = [];
+                if ($supportCategory === '') {
+                    $errors[] = 'Seleziona una categoria.';
+                }
+                if ($supportArea === '') {
+                    $errors[] = 'Seleziona un’area interessata.';
+                }
+                if ($supportPriority === '') {
+                    $errors[] = 'Seleziona una priorità.';
+                }
+                if ($supportDescription === '') {
+                    $errors[] = 'Inserisci una descrizione del problema.';
+                }
+                if ($errors !== []) {
+                    $_SESSION['guide_feedback'] = [
+                        'success' => false,
+                        'message' => 'Compila i campi obbligatori prima di inviare la richiesta.',
+                        'error' => implode(' ', $errors),
+                    ];
+                    header('Location: index.php?page=guide');
+                    exit;
+                }
+
+                $categoryLabels = [
+                    'problema_tecnico' => 'Problema tecnico',
+                    'dati' => 'Dati o report',
+                    'accesso' => 'Accesso e permessi',
+                    'pagamenti' => 'Pagamenti e vendite',
+                    'magazzino' => 'Magazzino / Stock',
+                    'altro' => 'Altro',
+                ];
+                $areaLabels = [
+                    'sim' => 'Magazzino SIM',
+                    'prodotti' => 'Prodotti',
+                    'vendite' => 'Vendite',
+                    'clienti' => 'Clienti',
+                    'report' => 'Report',
+                    'impostazioni' => 'Impostazioni',
+                ];
+                $priorityLabels = [
+                    'bassa' => 'Bassa',
+                    'media' => 'Media',
+                    'alta' => 'Alta',
+                    'critica' => 'Critica',
+                ];
+                $categoryLabel = $categoryLabels[$supportCategory] ?? $supportCategory;
+                $areaLabel = $areaLabels[$supportArea] ?? $supportArea;
+                $priorityLabel = $priorityLabels[$supportPriority] ?? $supportPriority;
+
+                $supportSubject = 'Guida: ' . $categoryLabel . ' · ' . $areaLabel . ' · ' . $priorityLabel;
+                $supportMessage = "Categoria: {$categoryLabel}\n";
+                $supportMessage .= "Area: {$areaLabel}\n";
+                $supportMessage .= "Priorità: {$priorityLabel}\n";
+                if ($supportDevice !== '') {
+                    $supportMessage .= 'Browser/Dispositivo: ' . $supportDevice . "\n";
+                }
+                $supportMessage .= "Descrizione:\n" . $supportDescription . "\n";
+                if ($supportSteps !== '') {
+                    $supportMessage .= "Passaggi per riprodurre:\n" . $supportSteps . "\n";
+                }
+                if ($supportExpected !== '') {
+                    $supportMessage .= "Risultato atteso:\n" . $supportExpected . "\n";
+                }
+
+                $tenantId = (int) ($currentUser['tenant_id'] ?? 1);
+                $customerEmail = trim((string) ($currentUser['email'] ?? ''));
+                if ($customerEmail === '') {
+                    $customerEmail = strtolower($username) . '@support.local';
+                }
+                $customerName = $fullName !== '' ? $fullName : $username;
+
+                try {
+                    $pdo->beginTransaction();
+
+                    $stmt = $pdo->prepare('SELECT id FROM customers WHERE tenant_id = :tenant_id AND email = :email LIMIT 1');
+                    $stmt->execute([':tenant_id' => $tenantId, ':email' => $customerEmail]);
+                    $customerId = (int) $stmt->fetchColumn();
+                    if ($customerId === 0) {
+                        $insertCustomer = $pdo->prepare(
+                            'INSERT INTO customers (tenant_id, fullname, email, phone, tax_code, note)
+                             VALUES (:tenant_id, :fullname, :email, :phone, :tax_code, :note)'
+                        );
+                        $insertCustomer->execute([
+                            ':tenant_id' => $tenantId,
+                            ':fullname' => $customerName,
+                            ':email' => $customerEmail,
+                            ':phone' => null,
+                            ':tax_code' => strtoupper(bin2hex(random_bytes(8))),
+                            ':note' => 'Richiesta supporto da guida.',
+                        ]);
+                        $customerId = (int) $pdo->lastInsertId();
+                    }
+
+                    $stmt = $pdo->prepare('SELECT id, customer_id FROM customer_portal_accounts WHERE tenant_id = :tenant_id AND email = :email LIMIT 1');
+                    $stmt->execute([':tenant_id' => $tenantId, ':email' => $customerEmail]);
+                    $portalRow = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $portalAccountId = $portalRow ? (int) $portalRow['id'] : 0;
+                    if ($portalAccountId === 0) {
+                        $insertPortal = $pdo->prepare(
+                            'INSERT INTO customer_portal_accounts (tenant_id, customer_id, email, password_hash, invite_token)
+                             VALUES (:tenant_id, :customer_id, :email, :password_hash, :invite_token)'
+                        );
+                        $insertPortal->execute([
+                            ':tenant_id' => $tenantId,
+                            ':customer_id' => $customerId,
+                            ':email' => $customerEmail,
+                            ':password_hash' => password_hash(bin2hex(random_bytes(12)), PASSWORD_DEFAULT),
+                            ':invite_token' => null,
+                        ]);
+                        $portalAccountId = (int) $pdo->lastInsertId();
+                    } elseif (!empty($portalRow['customer_id'])) {
+                        $customerId = (int) $portalRow['customer_id'];
+                    }
+
+                    $insertSupport = $pdo->prepare(
+                        'INSERT INTO customer_support_requests
+                            (tenant_id, customer_id, portal_account_id, type, subject, message, status, preferred_slot, created_at, updated_at)
+                         VALUES
+                            (:tenant_id, :customer_id, :portal_account_id, :type, :subject, :message, :status, :preferred_slot, NOW(), NOW())'
+                    );
+                    $insertSupport->execute([
+                        ':tenant_id' => $tenantId,
+                        ':customer_id' => $customerId,
+                        ':portal_account_id' => $portalAccountId,
+                        ':type' => 'Support',
+                        ':subject' => $supportSubject,
+                        ':message' => $supportMessage,
+                        ':status' => 'Open',
+                        ':preferred_slot' => null,
+                    ]);
+
+                    $pdo->commit();
+                } catch (\Throwable $exception) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    $_SESSION['guide_feedback'] = [
+                        'success' => false,
+                        'message' => 'Impossibile salvare la richiesta di supporto.',
+                        'error' => 'Riprova tra qualche minuto.',
+                    ];
+                    header('Location: index.php?page=guide');
+                    exit;
+                }
                 $subject = 'Richiesta supporto da guida Coresuite Express';
                 $message = "Richiesta supporto dalla pagina Guida.\n";
                 $message .= 'Username: ' . $username . "\n";
                 if ($fullName !== '') {
                     $message .= 'Nome completo: ' . $fullName . "\n";
+                }
+                if ($supportCategory !== '') {
+                    $message .= 'Categoria: ' . $supportCategory . "\n";
+                }
+                if ($supportArea !== '') {
+                    $message .= 'Area: ' . $supportArea . "\n";
+                }
+                if ($supportPriority !== '') {
+                    $message .= 'Priorità: ' . $supportPriority . "\n";
+                }
+                if ($supportDevice !== '') {
+                    $message .= 'Browser/Dispositivo: ' . $supportDevice . "\n";
+                }
+                if ($supportDescription !== '') {
+                    $message .= "Descrizione:\n" . $supportDescription . "\n";
+                }
+                if ($supportSteps !== '') {
+                    $message .= "Passaggi per riprodurre:\n" . $supportSteps . "\n";
+                }
+                if ($supportExpected !== '') {
+                    $message .= "Risultato atteso:\n" . $supportExpected . "\n";
                 }
                 $message .= 'Data: ' . date('Y-m-d H:i:s');
 
@@ -3282,10 +3455,10 @@ switch ($page) {
                     $resendFromName
                 );
 
-                $_SESSION['guide_feedback'] = $sent
-                    ? ['success' => true, 'message' => 'Email inviata correttamente al supporto.']
+                $_SESSION['support_requests_feedback'] = $sent
+                    ? ['success' => true, 'message' => 'Richiesta supporto inviata correttamente.']
                     : ['success' => false, 'message' => 'Invio email non riuscito.', 'error' => 'Riprova tra qualche minuto.'];
-                header('Location: index.php?page=guide');
+                header('Location: index.php?page=support_requests');
                 exit;
             }
         }
