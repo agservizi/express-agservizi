@@ -1,0 +1,13 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Evita loop se la richiesta è già sotto /public
+    RewriteCond %{REQUEST_URI} !^/public/
+
+    # Non riscrivere file o cartelle esistenti nella root
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Inoltra tutto a /public mantenendo il path
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
