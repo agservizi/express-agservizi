@@ -918,7 +918,10 @@ function logStripeEvent(string $message): void
         @mkdir($dir, 0775, true);
     }
     $line = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $message);
-    @file_put_contents($dir . '/stripe.log', $line, FILE_APPEND);
+    $written = @file_put_contents($dir . '/stripe.log', $line, FILE_APPEND);
+    if ($written === false) {
+        error_log('[stripe] ' . trim($line));
+    }
 }
 
 /**
