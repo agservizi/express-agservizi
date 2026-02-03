@@ -135,6 +135,54 @@ function generateFiscalCode(): string
     return $letters . $year . $month . $day . $city . $control;
 }
 
+function writeReceiptSettings(int $tenantId, array $headerLines): void
+{
+    if ($tenantId <= 0) {
+        return;
+    }
+
+    $baseDir = dirname(__DIR__) . '/storage/config/tenants/tenant_' . $tenantId;
+    if (!is_dir($baseDir)) {
+        @mkdir($baseDir, 0775, true);
+    }
+
+    $path = $baseDir . '/receipt_settings.json';
+    $payload = [
+        'header_lines' => $headerLines,
+        'document_title' => 'DOCUMENTO GESTIONALE',
+        'document_number_template' => '{{document_title}} #{{sale_id}}',
+        'thanks_text' => 'Grazie per il tuo acquisto!',
+        'footer_text' => 'Hai bisogno di stampare di nuovo? Puoi sempre recuperare questo DOCUMENTO GESTIONALE dalla sezione vendite.',
+        'labels' => [
+            'date' => 'Data',
+            'operator' => 'Operatore',
+            'customer' => 'Cliente',
+            'vat' => 'IVA',
+            'vat_included' => 'IVA compresa',
+            'vat_codes' => 'Codici IVA applicati',
+            'discount' => 'Sconto',
+            'total' => 'Totale',
+            'total_original' => 'Totale originario',
+            'payment' => 'Pagamento',
+            'refund_amount' => 'Importo reso',
+            'cancelled_at' => 'Annullato il',
+            'cancellation_reason' => 'Motivo annullo',
+            'refunded_at' => 'Reso registrato il',
+            'refund_note' => 'Note reso',
+        ],
+        'status_labels' => [
+            'cancelled' => 'ANNULLATO',
+            'refunded' => 'RESO',
+        ],
+        'configured_at' => date('Y-m-d H:i:s'),
+    ];
+
+    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json !== false) {
+        file_put_contents($path, $json);
+    }
+}
+
 function seedDemoTenant(PDO $pdo): void
 {
     if (!tableExists($pdo, 'tenants')) {
@@ -172,6 +220,12 @@ function seedDemoTenant(PDO $pdo): void
     }
 
     $emailDomain = $tenantSlug . '.coresuite.test';
+
+    writeReceiptSettings($tenantId, [
+        'Telefonia Plinio',
+        'Via Roma 10, Milano',
+        'P.IVA IT12345678901',
+    ]);
 
     $pdo->beginTransaction();
 
