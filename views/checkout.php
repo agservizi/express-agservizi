@@ -216,5 +216,51 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
             });
         })();
     </script>
+    <script>
+        (() => {
+            const nameInput = document.querySelector('input[name="tenant_name"]');
+            const slugInput = document.querySelector('input[name="tenant_slug"]');
+            const form = document.querySelector('form.landing-form');
+            if (!nameInput || !slugInput) {
+                return;
+            }
+
+            let slugTouched = false;
+
+            const slugify = (value) => {
+                if (!value) {
+                    return '';
+                }
+                return value
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+                    .replace(/-+/g, '-');
+            };
+
+            const syncSlug = () => {
+                if (slugTouched && slugInput.value.trim() !== '') {
+                    return;
+                }
+                const nextSlug = slugify(nameInput.value.trim());
+                if (nextSlug !== '') {
+                    slugInput.value = nextSlug;
+                }
+            };
+
+            slugInput.addEventListener('input', () => {
+                slugTouched = slugInput.value.trim() !== '';
+            });
+
+            nameInput.addEventListener('input', syncSlug);
+            nameInput.addEventListener('blur', syncSlug);
+
+            if (form) {
+                form.addEventListener('submit', syncSlug);
+            }
+        })();
+    </script>
 </body>
 </html>

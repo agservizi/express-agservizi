@@ -681,6 +681,26 @@ function tenantSlugExists(PDO $pdo, string $slug): bool
     return $stmt->fetchColumn() !== false;
 }
 
+function buildTenantSlug(string $name): string
+{
+    $slug = trim($name);
+    if ($slug === '') {
+        return '';
+    }
+    if (function_exists('iconv')) {
+        $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $slug);
+        if ($converted !== false) {
+            $slug = $converted;
+        }
+    }
+    $slug = function_exists('mb_strtolower') ? mb_strtolower($slug, 'UTF-8') : strtolower($slug);
+    $slug = preg_replace('/[^a-z0-9]+/i', '-', $slug) ?? '';
+    $slug = trim($slug, '-');
+    $slug = preg_replace('/-+/', '-', $slug) ?? '';
+
+    return $slug;
+}
+
 function tenantContactEmailExists(PDO $pdo, string $email): bool
 {
     $stmt = $pdo->prepare('SELECT id FROM tenants WHERE contact_email = :email LIMIT 1');
@@ -2358,6 +2378,9 @@ switch ($page) {
             $tenantName = trim((string) ($_POST['tenant_name'] ?? ''));
             $tenantSlug = trim((string) ($_POST['tenant_slug'] ?? ''));
             $tenantSlug = function_exists('mb_strtolower') ? mb_strtolower($tenantSlug, 'UTF-8') : strtolower($tenantSlug);
+            if ($tenantSlug === '') {
+                $tenantSlug = buildTenantSlug($tenantName);
+            }
             $tenantEmail = trim((string) ($_POST['tenant_email'] ?? ''));
             $tenantEmail = function_exists('mb_strtolower') ? mb_strtolower($tenantEmail, 'UTF-8') : strtolower($tenantEmail);
             $tenantPhone = trim((string) ($_POST['tenant_phone'] ?? ''));
@@ -2379,7 +2402,7 @@ switch ($page) {
                 $errors[] = 'Inserisci il nome del tenant.';
             }
             if ($tenantSlug === '') {
-                $errors[] = 'Inserisci lo slug del tenant.';
+                $errors[] = 'Impossibile generare lo slug del tenant.';
             } elseif (!preg_match('/^[a-z0-9][a-z0-9\-]{2,}$/', $tenantSlug)) {
                 $errors[] = 'Lo slug deve contenere solo lettere minuscole, numeri e trattini.';
             }

@@ -16,6 +16,26 @@ final class TenantService
     ) {
     }
 
+    private function buildSlug(string $value): string
+    {
+        $slug = trim($value);
+        if ($slug === '') {
+            return '';
+        }
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $slug);
+            if ($converted !== false) {
+                $slug = $converted;
+            }
+        }
+        $slug = function_exists('mb_strtolower') ? mb_strtolower($slug, 'UTF-8') : strtolower($slug);
+        $slug = preg_replace('/[^a-z0-9]+/i', '-', $slug) ?? '';
+        $slug = trim($slug, '-');
+        $slug = preg_replace('/-+/', '-', $slug) ?? '';
+
+        return $slug;
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -59,6 +79,9 @@ final class TenantService
     {
         $name = trim((string) ($input['tenant_name'] ?? ''));
         $slug = trim((string) ($input['tenant_slug'] ?? ''));
+        if ($slug === '' && $name !== '') {
+            $slug = $this->buildSlug($name);
+        }
         $email = trim((string) ($input['tenant_email'] ?? ''));
         $phone = trim((string) ($input['tenant_phone'] ?? ''));
         $vatNumber = strtoupper(trim((string) ($input['vat_number'] ?? '')));
@@ -219,6 +242,9 @@ final class TenantService
 
         $name = trim((string) ($input['tenant_name'] ?? ''));
         $slug = trim((string) ($input['tenant_slug'] ?? ''));
+        if ($slug === '' && $name !== '') {
+            $slug = $this->buildSlug($name);
+        }
         $email = trim((string) ($input['tenant_email'] ?? ''));
         $phone = trim((string) ($input['tenant_phone'] ?? ''));
         $vatNumber = strtoupper(trim((string) ($input['vat_number'] ?? '')));

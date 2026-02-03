@@ -280,5 +280,51 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                 }
             });
         });
+
+        const slugify = (value) => {
+            if (!value) {
+                return '';
+            }
+            return value
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .replace(/-+/g, '-');
+        };
+
+        const bindSlug = (nameId, slugId) => {
+            const nameInput = document.getElementById(nameId);
+            const slugInput = document.getElementById(slugId);
+            if (!nameInput || !slugInput) {
+                return;
+            }
+
+            let slugTouched = false;
+            const syncSlug = () => {
+                if (slugTouched && slugInput.value.trim() !== '') {
+                    return;
+                }
+                const nextSlug = slugify(nameInput.value.trim());
+                if (nextSlug !== '') {
+                    slugInput.value = nextSlug;
+                }
+            };
+
+            slugInput.addEventListener('input', () => {
+                slugTouched = slugInput.value.trim() !== '';
+            });
+            nameInput.addEventListener('input', syncSlug);
+            nameInput.addEventListener('blur', syncSlug);
+
+            const form = nameInput.closest('form');
+            if (form) {
+                form.addEventListener('submit', syncSlug);
+            }
+        };
+
+        bindSlug('tenant_name', 'tenant_slug');
+        bindSlug('update_tenant_name', 'update_tenant_slug');
     })();
 </script>
