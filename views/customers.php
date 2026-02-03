@@ -135,14 +135,14 @@ $searchQueryParams = static function (array $extra = []) use ($searchTerm, $curr
 
         <div class="customers-layout__list">
             <div class="table-wrapper">
-                <table class="table">
+                <table class="table table--customers">
                     <thead>
                         <tr>
-                            <th>Nome</th>
-                            <th>Contatti</th>
-                            <th>Codice fiscale</th>
-                            <th>Note</th>
-                            <th>Creato</th>
+                            <th class="table__col--name">Nome</th>
+                            <th class="table__col--contacts">Contatti</th>
+                            <th class="table__col--tax">Codice fiscale</th>
+                            <th class="table__col--note">Note</th>
+                            <th class="table__col--created">Creato</th>
                             <th class="table__col--actions">Azioni</th>
                         </tr>
                     </thead>
@@ -194,11 +194,11 @@ $searchQueryParams = static function (array $extra = []) use ($searchTerm, $curr
                                         : 'Aggiungi un indirizzo email valido per inviare l\'invito';
                                 ?>
                                 <tr>
-                                    <td><?= htmlspecialchars((string) ($customer['fullname'] ?? '')) ?></td>
-                                    <td><?= htmlspecialchars(implode(' · ', $contactParts)) ?: 'n/d' ?></td>
-                                    <td><?= htmlspecialchars((string) ($customer['tax_code'] ?? '')) ?: 'n/d' ?></td>
-                                    <td><?= htmlspecialchars($noteSnippet ?: '—') ?></td>
-                                    <td>
+                                    <td class="table__col--name"><?= htmlspecialchars((string) ($customer['fullname'] ?? '')) ?></td>
+                                    <td class="table__col--contacts"><?= htmlspecialchars(implode(' · ', $contactParts)) ?: 'n/d' ?></td>
+                                    <td class="table__col--tax"><?= htmlspecialchars((string) ($customer['tax_code'] ?? '')) ?: 'n/d' ?></td>
+                                    <td class="table__col--note"><?= htmlspecialchars($noteSnippet ?: '—') ?></td>
+                                    <td class="table__col--created">
                                         <?php if (!empty($customer['created_at'])): ?>
                                             <?= htmlspecialchars(date('d/m/Y H:i', strtotime((string) $customer['created_at']))) ?>
                                         <?php else: ?>
