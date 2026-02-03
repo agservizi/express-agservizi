@@ -134,7 +134,7 @@ $searchQueryParams = static function (array $extra = []) use ($searchTerm, $curr
         </div>
 
         <div class="customers-layout__list">
-            <div class="table-wrapper">
+            <div class="table-wrapper table-wrapper--customers">
                 <table class="table table--customers">
                     <thead>
                         <tr>
