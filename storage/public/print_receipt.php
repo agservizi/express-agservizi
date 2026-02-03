@@ -301,7 +301,7 @@ $vatAmount = isset($sale['vat_amount']) ? max((float) $sale['vat_amount'], 0.0) 
     <div class="actions" id="pdf-actions" hidden>
       <button type="button" class="primary" id="btn-print-pdf">Stampa</button>
       <button type="button" class="secondary" id="btn-download-pdf">Scarica PDF</button>
-      <a class="secondary" href="index.php?page=sales_create">Torna alla cassa</a>
+      <a class="secondary" href="index.php?page=sales_create" target="_top" rel="noopener">Torna alla cassa</a>
     </div>
   </div>
 </main>
