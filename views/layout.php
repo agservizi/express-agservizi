@@ -333,6 +333,12 @@ if ($notificationsPayload === false) {
 }
 ?>
 <div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
+<button type="button" class="back-to-top" data-back-to-top aria-label="Torna su">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 5l-7 7h4v7h6v-7h4z"></path>
+    </svg>
+    <span>Torna su</span>
+</button>
 <div class="modal" data-receipt-modal aria-hidden="true">
     <div class="modal__backdrop" data-receipt-dismiss></div>
     <div class="modal__dialog" role="dialog" aria-modal="true" aria-label="Anteprima scontrino">

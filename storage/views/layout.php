@@ -74,6 +74,12 @@ if ($initialToastsPayload === false) {
 }
 ?>
 <div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
+<button type="button" class="back-to-top" data-back-to-top aria-label="Torna su">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 5l-7 7h4v7h6v-7h4z"></path>
+    </svg>
+    <span>Torna su</span>
+</button>
 <script>
     window.AppInitialToasts = <?= $initialToastsPayload ?>;
 </script>

@@ -3644,4 +3644,33 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  function setupBackToTop() {
+    const button = document.querySelector('[data-back-to-top]');
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    const minScroll = 400;
+    const isLongPage = () => document.documentElement.scrollHeight > window.innerHeight * 1.4;
+
+    const toggleVisibility = () => {
+      if (!isLongPage()) {
+        button.classList.remove('is-visible');
+        return;
+      }
+      const shouldShow = window.scrollY > minScroll;
+      button.classList.toggle('is-visible', shouldShow);
+    };
+
+    button.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    window.addEventListener('scroll', toggleVisibility, { passive: true });
+    window.addEventListener('resize', toggleVisibility);
+    toggleVisibility();
+  }
+
+  setupBackToTop();
 });
