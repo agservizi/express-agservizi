@@ -132,6 +132,7 @@ if ($dbUser === null) {
 
 $appEnv = $getEnv('APP_ENV', 'development');
 $appName = $getEnv('APP_NAME', 'Coresuite');
+$appBaseUrl = $getEnv('APP_BASE_URL', null);
 $taxRate = (float) ($getEnv('APP_TAX_RATE', '0.0'));
 $taxNote = $getEnv('APP_TAX_NOTE', "Operazione non soggetta a IVA ai sensi dell'art. 74 DPR 633/72");
 $alertEmail = $getEnv('ALERT_EMAIL', null);
@@ -193,6 +194,7 @@ $configCache = [
     ],
     'app' => [
         'name' => $appName,
+        'base_url' => $appBaseUrl,
         'tax_rate' => $taxRate,
         'tax_note' => $taxNote,
         'timezone' => $appTimezone,

@@ -603,10 +603,18 @@ function resolveLicenseById(PDO $pdo, int $licenseId): ?array
 function buildPublicUrl(string $queryString): string
 {
     $queryString = ltrim($queryString, '?');
+    $envBaseUrl = $_ENV['APP_BASE_URL'] ?? getenv('APP_BASE_URL');
+    if (is_string($envBaseUrl)) {
+        $envBaseUrl = trim($envBaseUrl);
+    }
+    if (!empty($envBaseUrl)) {
+        $base = rtrim($envBaseUrl, '/');
+        return $base . '/index.php' . ($queryString !== '' ? '?' . $queryString : '');
+    }
     if (!empty($_SERVER['HTTP_HOST'])) {
         $httpsValue = $_SERVER['HTTPS'] ?? null;
         $scheme = (is_string($httpsValue) && strtolower((string) $httpsValue) !== 'off' && $httpsValue !== '') ? 'https' : 'http';
-        return $scheme . '://' . $_SERVER['HTTP_HOST'] . '/public/index.php' . ($queryString !== '' ? '?' . $queryString : '');
+        return $scheme . '://' . $_SERVER['HTTP_HOST'] . '/index.php' . ($queryString !== '' ? '?' . $queryString : '');
     }
 
     return 'index.php' . ($queryString !== '' ? '?' . $queryString : '');
@@ -2620,12 +2628,7 @@ switch ($page) {
                     $lines[] = 'Messaggio: ' . $message;
                 }
 
-                $appLoginUrl = 'index.php?page=login';
-                if (!empty($_SERVER['HTTP_HOST'])) {
-                    $httpsValue = $_SERVER['HTTPS'] ?? null;
-                    $scheme = (is_string($httpsValue) && strtolower((string) $httpsValue) !== 'off' && $httpsValue !== '') ? 'https' : 'http';
-                    $appLoginUrl = $scheme . '://' . $_SERVER['HTTP_HOST'] . '/public/index.php?page=login';
-                }
+                $appLoginUrl = buildPublicUrl('page=login');
                 $lines[] = '';
                 $lines[] = 'Accedi alla demo (durata 1 ora) e seleziona il piano da testare:';
                 $lines[] = $appLoginUrl;

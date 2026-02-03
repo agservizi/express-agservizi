@@ -967,10 +967,17 @@ final class UserService
 
     private function buildLoginUrl(): string
     {
+        $envBaseUrl = $_ENV['APP_BASE_URL'] ?? getenv('APP_BASE_URL');
+        if (is_string($envBaseUrl)) {
+            $envBaseUrl = trim($envBaseUrl);
+        }
+        if (!empty($envBaseUrl)) {
+            return rtrim($envBaseUrl, '/') . '/index.php?page=login';
+        }
         if (!empty($_SERVER['HTTP_HOST'])) {
             $httpsValue = $_SERVER['HTTPS'] ?? null;
             $scheme = (is_string($httpsValue) && strtolower((string) $httpsValue) !== 'off' && $httpsValue !== '') ? 'https' : 'http';
-            return $scheme . '://' . $_SERVER['HTTP_HOST'] . '/public/index.php?page=login';
+            return $scheme . '://' . $_SERVER['HTTP_HOST'] . '/index.php?page=login';
         }
         return 'index.php?page=login';
     }
