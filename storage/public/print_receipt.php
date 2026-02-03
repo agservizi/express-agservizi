@@ -16,6 +16,8 @@ spl_autoload_register(static function (string $class): void {
 });
 
 use App\Services\SalesService;
+use App\Services\ReceiptSettingsService;
+use App\Services\TenantContext;
 
 $pdo = Database::getConnection();
 $salesService = new SalesService($pdo);
@@ -33,6 +35,16 @@ if ($sale === null) {
     echo 'Scontrino non trovato.';
     exit;
 }
+
+$tenantId = isset($sale['tenant_id']) ? (int) $sale['tenant_id'] : 1;
+TenantContext::setTenantId($tenantId);
+$receiptSettingsService = new ReceiptSettingsService();
+$receiptSettings = $receiptSettingsService->getSettings();
+$receiptHeaderLines = $receiptSettings['header_lines'] ?? [];
+if (!is_array($receiptHeaderLines)) {
+  $receiptHeaderLines = [];
+}
+$receiptHeaderLines = array_values(array_filter(array_map('trim', $receiptHeaderLines)));
 
 $operator = $sale['fullname'] !== null && $sale['fullname'] !== '' ? $sale['fullname'] : $sale['username'];
 $timezoneId = $GLOBALS['config']['app']['timezone'] ?? (ini_get('date.timezone') ?: 'Europe/Rome');
@@ -279,7 +291,13 @@ $vatAmount = isset($sale['vat_amount']) ? max((float) $sale['vat_amount'], 0.0) 
 <div class="receipt-source" aria-hidden="true">
 <div class="receipt" id="printable-receipt">
   <div class="center">
-  <h3>AG SERVIZI VIA PLINIO 72 DI CAVALIERE CARMINE</h3>
+  <?php if ($receiptHeaderLines !== []): ?>
+    <?php foreach ($receiptHeaderLines as $headerLine): ?>
+      <h3><?= htmlspecialchars($headerLine) ?></h3>
+    <?php endforeach; ?>
+  <?php else: ?>
+    <h3>DOCUMENTO GESTIONALE</h3>
+  <?php endif; ?>
   <div class="muted">DOCUMENTO GESTIONALE #<?= htmlspecialchars((string) $saleId) ?></div>
   </div>
   <?php if (($sale['status'] ?? 'Completed') !== 'Completed'): ?>
