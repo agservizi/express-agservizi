@@ -1,6 +1,8 @@
 {
     "header_lines": [
-        "TRT Service"
+        "Telefonia Plinio",
+        "Via Roma 10, Milano",
+        "P.IVA IT12345678901"
     ],
     "document_title": "DOCUMENTO GESTIONALE",
     "document_number_template": "{{document_title}} #{{sale_id}}",
