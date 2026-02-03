@@ -208,6 +208,38 @@ $isActiveSidebar = static function (string $page) use ($currentPage): string {
                 </div>
             </div>
             <div class="topbar__actions">
+                <div class="topbar__search" data-global-search="true" data-min-length="2">
+                    <div class="topbar__search-field">
+                        <span class="topbar__search-icon" aria-hidden="true">🔍</span>
+                        <input
+                            class="topbar__search-input"
+                            type="search"
+                            name="global_search"
+                            placeholder="Cerca clienti, vendite, prodotti..."
+                            autocomplete="off"
+                            aria-label="Ricerca globale"
+                            data-global-search-input="true"
+                        >
+                        <button
+                            type="button"
+                            class="topbar__search-clear"
+                            data-global-search-clear="true"
+                            data-visible="false"
+                            aria-label="Svuota ricerca"
+                        >×</button>
+                    </div>
+                    <div
+                        class="topbar__search-panel"
+                        data-global-search-panel="true"
+                        data-open="false"
+                        role="dialog"
+                        aria-label="Risultati ricerca"
+                        tabindex="-1"
+                    >
+                        <div class="topbar__search-status" data-global-search-status="true">Inizia a digitare per cercare.</div>
+                        <div class="topbar__search-results" data-global-search-results="true"></div>
+                    </div>
+                </div>
                 <?php if ($currentUser): ?>
                     <div class="topbar__notifications" data-notification>
                         <button type="button" class="topbar__notification-toggle" data-notification-toggle aria-haspopup="true" aria-expanded="false">
