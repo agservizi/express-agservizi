@@ -115,6 +115,26 @@ function randomDateOnly(string $start, string $end): string
     return date('Y-m-d', random_int($min, $max));
 }
 
+function randomLetter(): string
+{
+    return chr(random_int(65, 90));
+}
+
+function generateFiscalCode(): string
+{
+    $letters = '';
+    for ($i = 0; $i < 6; $i++) {
+        $letters .= randomLetter();
+    }
+    $year = str_pad((string) random_int(60, 99), 2, '0', STR_PAD_LEFT);
+    $month = ['A','B','C','D','E','H','L','M','P','R','S','T'][array_rand(['A','B','C','D','E','H','L','M','P','R','S','T'])];
+    $day = str_pad((string) random_int(1, 28), 2, '0', STR_PAD_LEFT);
+    $city = randomLetter() . str_pad((string) random_int(100, 999), 3, '0', STR_PAD_LEFT);
+    $control = randomLetter();
+
+    return $letters . $year . $month . $day . $city . $control;
+}
+
 function seedDemoTenant(PDO $pdo): void
 {
     if (!tableExists($pdo, 'tenants')) {
@@ -355,14 +375,42 @@ function seedDemoTenant(PDO $pdo): void
     ]);
 
     $customerIds = [];
+    $firstNames = [
+        'Luca', 'Marco', 'Giulia', 'Sara', 'Francesco', 'Chiara', 'Alessandro', 'Martina',
+        'Matteo', 'Elena', 'Davide', 'Valentina', 'Simone', 'Laura', 'Paolo', 'Federica',
+        'Andrea', 'Silvia', 'Giorgio', 'Ilaria', 'Riccardo', 'Elisa', 'Roberto', 'Marta',
+        'Stefano', 'Alice', 'Nicola', 'Beatrice', 'Gabriele', 'Camilla'
+    ];
+    $lastNames = [
+        'Rossi', 'Bianchi', 'Ferrari', 'Russo', 'Esposito', 'Romano', 'Gallo', 'Costa',
+        'Fontana', 'Conti', 'Giordano', 'Mancini', 'Rizzo', 'Lombardi', 'Moretti', 'Barbieri',
+        'Mariani', 'Santoro', 'Caruso', 'Greco', 'Bruno', 'Marino', 'De Luca', 'Coppola',
+        'Vitale', 'Ricci', 'Serra', 'Ferri', 'Pellegrini', 'Fabbri'
+    ];
+    $customerNotes = [
+        'Preferisce contatto via WhatsApp.',
+        'Richiede fattura elettronica ogni fine mese.',
+        'Cliente storico con più linee attive.',
+        'Disponibile solo la mattina.',
+        'Ha richiesto preventivo per upgrade fibra.',
+        'Pagamenti sempre puntuali.',
+        'Preferisce pagamento con carta.',
+        'Da ricontattare per rinnovo offerta.',
+        'Ha segnalato problemi di copertura in zona.',
+        'Vuole attivare SIM aggiuntiva per familiare.'
+    ];
     for ($i = 1; $i <= 30; $i++) {
+        $first = $firstNames[array_rand($firstNames)];
+        $last = $lastNames[array_rand($lastNames)];
+        $fullName = $first . ' ' . $last;
+        $emailLocal = strtolower($first . '.' . $last . $i);
         $customerIds[] = insertRow($pdo, 'customers', [
             'tenant_id' => $tenantId,
-            'fullname' => 'Cliente Demo ' . $i,
-            'email' => 'cliente' . $i . '@' . $emailDomain,
-            'phone' => '+39 39' . randomDigits(8),
-            'tax_code' => strtoupper(bin2hex(random_bytes(8))),
-            'note' => 'Cliente demo generato automaticamente.',
+            'fullname' => $fullName,
+            'email' => $emailLocal . '@' . $emailDomain,
+            'phone' => '+39 3' . randomDigits(9),
+            'tax_code' => generateFiscalCode(),
+            'note' => $customerNotes[array_rand($customerNotes)],
         ]);
     }
 
