@@ -83,7 +83,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                                 </label>
                                 <label>
                                     Slug tenant *
-                                    <input type="text" name="tenant_slug" value="<?= htmlspecialchars($tenantSlug) ?>" placeholder="es. ag-servizi" required>
+                                    <input type="text" name="tenant_slug" value="<?= htmlspecialchars($tenantSlug) ?>" placeholder="es. ag-servizi" required readonly>
                                 </label>
                                 <label>
                                     Email contatto *

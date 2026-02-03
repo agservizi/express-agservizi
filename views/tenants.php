@@ -45,7 +45,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                 </div>
                 <div class="form__group">
                     <label for="tenant_slug">Slug *</label>
-                    <input type="text" name="tenant_slug" id="tenant_slug" required>
+                    <input type="text" name="tenant_slug" id="tenant_slug" required readonly>
                 </div>
                 <div class="form__group">
                     <label for="tenant_email">Email contatto</label>
@@ -106,7 +106,7 @@ $formatDate = static function (?string $value, string $pattern = 'd/m/Y H:i'): s
                 </div>
                 <div class="form__group">
                     <label for="update_tenant_slug">Slug *</label>
-                    <input type="text" name="tenant_slug" id="update_tenant_slug" required>
+                    <input type="text" name="tenant_slug" id="update_tenant_slug" required readonly>
                 </div>
                 <div class="form__group">
                     <label for="update_tenant_email">Email contatto</label>
