@@ -199,6 +199,14 @@ function seedDemoTenant(PDO $pdo): void
     } else {
         $updateColumns = [];
         $params = [':id' => $tenantId];
+        if (hasColumn($pdo, 'tenants', 'contact_email')) {
+            $updateColumns[] = 'contact_email = :contact_email';
+            $params[':contact_email'] = 'info@telefonia-plinio.it';
+        }
+        if (hasColumn($pdo, 'tenants', 'contact_phone')) {
+            $updateColumns[] = 'contact_phone = :contact_phone';
+            $params[':contact_phone'] = '+39 02 9475 8801';
+        }
         if (hasColumn($pdo, 'tenants', 'company_name')) {
             $updateColumns[] = 'company_name = :company_name';
             $params[':company_name'] = 'Demo Store S.r.l.';
@@ -206,6 +214,14 @@ function seedDemoTenant(PDO $pdo): void
         if (hasColumn($pdo, 'tenants', 'company_address')) {
             $updateColumns[] = 'company_address = :company_address';
             $params[':company_address'] = 'Via Roma 10, Milano';
+        }
+        if (hasColumn($pdo, 'tenants', 'company_country')) {
+            $updateColumns[] = 'company_country = :company_country';
+            $params[':company_country'] = 'IT';
+        }
+        if (hasColumn($pdo, 'tenants', 'vat_number')) {
+            $updateColumns[] = 'vat_number = :vat_number';
+            $params[':vat_number'] = '12345678901';
         }
         if ($updateColumns !== []) {
             $pdo->prepare('UPDATE tenants SET ' . implode(', ', $updateColumns) . ' WHERE id = :id')->execute($params);

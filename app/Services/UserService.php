@@ -79,7 +79,90 @@ final class UserService
         $stmt->execute([':id' => $userId]);
         $user = $stmt->fetch();
 
-        return $user !== false ? $user : null;
+        if ($user === false) {
+            return null;
+        }
+
+        $tenantId = (int) ($user['tenant_id'] ?? 0);
+        $tenantEmail = trim((string) ($user['tenant_email'] ?? ''));
+        $tenantPhone = trim((string) ($user['tenant_phone'] ?? ''));
+        $tenantVatNumber = trim((string) ($user['tenant_vat_number'] ?? ''));
+        $tenantCompanyCountry = trim((string) ($user['tenant_company_country'] ?? ''));
+        $tenantCompanyName = trim((string) ($user['tenant_company_name'] ?? ''));
+        $tenantCompanyAddress = trim((string) ($user['tenant_company_address'] ?? ''));
+
+        if ($tenantId > 0 && (
+            $tenantEmail === ''
+            || $tenantPhone === ''
+            || $tenantVatNumber === ''
+            || $tenantCompanyCountry === ''
+            || $tenantCompanyName === ''
+            || $tenantCompanyAddress === ''
+        )) {
+            try {
+                $fallbackStmt = $this->pdo->prepare(
+                    'SELECT tenant_email, tenant_phone, vat_number, company_country, company_name, company_address
+                     FROM tenant_checkout_requests
+                     WHERE tenant_id = :tenant_id AND status IN ("paid", "processing")
+                     ORDER BY paid_at DESC, updated_at DESC
+                     LIMIT 1'
+                );
+                $fallbackStmt->execute([':tenant_id' => $tenantId]);
+                $fallback = $fallbackStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($fallback !== false) {
+                    $fallbackEmail = trim((string) ($fallback['tenant_email'] ?? ''));
+                    $fallbackPhone = trim((string) ($fallback['tenant_phone'] ?? ''));
+                    $fallbackVatNumber = trim((string) ($fallback['vat_number'] ?? ''));
+                    $fallbackCompanyCountry = trim((string) ($fallback['company_country'] ?? ''));
+                    $fallbackCompanyName = trim((string) ($fallback['company_name'] ?? ''));
+                    $fallbackCompanyAddress = trim((string) ($fallback['company_address'] ?? ''));
+                    $updateFields = [];
+                    $updateParams = [':id' => $tenantId];
+
+                    if ($tenantEmail === '' && $fallbackEmail !== '') {
+                        $user['tenant_email'] = $fallbackEmail;
+                        $updateFields[] = 'contact_email = :contact_email';
+                        $updateParams[':contact_email'] = $fallbackEmail;
+                    }
+                    if ($tenantPhone === '' && $fallbackPhone !== '') {
+                        $user['tenant_phone'] = $fallbackPhone;
+                        $updateFields[] = 'contact_phone = :contact_phone';
+                        $updateParams[':contact_phone'] = $fallbackPhone;
+                    }
+                    if ($tenantVatNumber === '' && $fallbackVatNumber !== '') {
+                        $user['tenant_vat_number'] = $fallbackVatNumber;
+                        $updateFields[] = 'vat_number = :vat_number';
+                        $updateParams[':vat_number'] = $fallbackVatNumber;
+                    }
+                    if ($tenantCompanyCountry === '' && $fallbackCompanyCountry !== '') {
+                        $user['tenant_company_country'] = $fallbackCompanyCountry;
+                        $updateFields[] = 'company_country = :company_country';
+                        $updateParams[':company_country'] = $fallbackCompanyCountry;
+                    }
+                    if ($tenantCompanyName === '' && $fallbackCompanyName !== '') {
+                        $user['tenant_company_name'] = $fallbackCompanyName;
+                        $updateFields[] = 'company_name = :company_name';
+                        $updateParams[':company_name'] = $fallbackCompanyName;
+                    }
+                    if ($tenantCompanyAddress === '' && $fallbackCompanyAddress !== '') {
+                        $user['tenant_company_address'] = $fallbackCompanyAddress;
+                        $updateFields[] = 'company_address = :company_address';
+                        $updateParams[':company_address'] = $fallbackCompanyAddress;
+                    }
+
+                    if ($updateFields !== []) {
+                        $this->pdo->prepare(
+                            'UPDATE tenants SET ' . implode(', ', $updateFields) . ' WHERE id = :id'
+                        )->execute($updateParams);
+                    }
+                }
+            } catch (PDOException) {
+                // Ignora fallback se la tabella non esiste o la query fallisce.
+            }
+        }
+
+        return $user;
     }
 
     /**
