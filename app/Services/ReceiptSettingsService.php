@@ -59,7 +59,8 @@ final class ReceiptSettingsService
      */
     public function getSettings(): array
     {
-        return $this->mergeDefaults($this->readSettings());
+        $settings = $this->mergeDefaults($this->readSettings());
+        return $this->normalizeDemoHeader($settings);
     }
 
     /**
@@ -181,6 +182,35 @@ final class ReceiptSettingsService
         }
 
         return $merged;
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>
+     */
+    private function normalizeDemoHeader(array $settings): array
+    {
+        $tenantId = TenantContext::id();
+        if ($tenantId !== 1) {
+            return $settings;
+        }
+
+        $header = $settings['header_lines'] ?? [];
+        if (!is_array($header)) {
+            $header = [];
+        }
+        $header = array_values(array_filter(array_map('trim', $header)));
+
+        $hasLegacyHeader = in_array('TRT Service', $header, true);
+        if ($header === [] || $hasLegacyHeader) {
+            $settings['header_lines'] = [
+                'Telefonia Plinio',
+                'Via Roma 10, Milano',
+                'P.IVA IT12345678901',
+            ];
+        }
+
+        return $settings;
     }
 
     /**
