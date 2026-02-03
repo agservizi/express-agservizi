@@ -110,6 +110,9 @@ body[data-sidebar-collapsed="true"] .main{margin-left:72px;}
 .footer__links{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .footer__links a{color:#2563eb;font-weight:600;font-size:12px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);padding:6px 10px;border-radius:999px;transition:all .2s ease;}
 html{scroll-behavior:smooth;}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto;}
+}
 .landing-body{margin:0;font-family:'Inter','Segoe UI',Arial,sans-serif;background:#0b1020;color:#e2e8f0;overflow-x:hidden;}
 .landing-topbar{position:fixed;top:0;left:0;right:0;z-index:50;background:transparent;backdrop-filter:blur(6px);border-bottom:1px solid rgba(148,163,184,.08);color:#f8fafc;mix-blend-mode:difference;} 
 .landing-topbar__inner{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 6vw;} 
