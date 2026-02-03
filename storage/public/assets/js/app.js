@@ -587,6 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupLiveRefreshContainers();
   setupDraggableDashboard();
   setupAccordions();
+  setupGlobalSearch();
 
   if (discountCampaignSelect && discountCampaignSelect.value) {
     scheduleDiscountUpdate();
@@ -1831,6 +1832,239 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     });
+  }
+
+  function setupGlobalSearch() {
+    let root = document.querySelector('[data-global-search]');
+    if (!root) {
+      const actions = document.querySelector('.topbar__actions');
+      if (!actions) {
+        return;
+      }
+      root = buildGlobalSearchNode();
+      const notificationNode = actions.querySelector('[data-notification]');
+      if (notificationNode) {
+        actions.insertBefore(root, notificationNode);
+      } else {
+        actions.insertBefore(root, actions.firstChild);
+      }
+    }
+
+    const input = root.querySelector('[data-global-search-input]');
+    const panel = root.querySelector('[data-global-search-panel]');
+    const status = root.querySelector('[data-global-search-status]');
+    const results = root.querySelector('[data-global-search-results]');
+    const clearBtn = root.querySelector('[data-global-search-clear]');
+
+    if (!(input instanceof HTMLInputElement) || !(panel instanceof HTMLElement) || !(status instanceof HTMLElement) || !(results instanceof HTMLElement)) {
+      return;
+    }
+
+    const minLength = Number.parseInt(root.dataset.minLength || '2', 10) || 2;
+    let debounceId = 0;
+    let activeController = null;
+    let lastQuery = '';
+
+    const setOpen = isOpen => {
+      panel.dataset.open = isOpen ? 'true' : 'false';
+      if (isOpen) {
+        panel.setAttribute('tabindex', '-1');
+      }
+    };
+
+    const setStatus = message => {
+      status.textContent = message;
+      status.hidden = false;
+      results.innerHTML = '';
+    };
+
+    const updateClear = () => {
+      if (!(clearBtn instanceof HTMLElement)) {
+        return;
+      }
+      const hasValue = input.value.trim() !== '';
+      clearBtn.dataset.visible = hasValue ? 'true' : 'false';
+    };
+
+    const buildItemHtml = item => {
+      const title = item && item.title ? escapeHtml(String(item.title)) : '';
+      const subtitle = item && item.subtitle ? `<span class="topbar__search-item-subtitle">${escapeHtml(String(item.subtitle))}</span>` : '';
+      const meta = item && item.meta ? `<span class="topbar__search-item-meta">${escapeHtml(String(item.meta))}</span>` : '';
+      const content = `<span class="topbar__search-item-title">${title}</span>${subtitle}${meta}`;
+      const url = item && item.url ? String(item.url) : '';
+      if (url) {
+        return `<a class="topbar__search-item" href="${escapeHtml(url)}">${content}</a>`;
+      }
+      return `<div class="topbar__search-item">${content}</div>`;
+    };
+
+    const renderResults = sections => {
+      if (!Array.isArray(sections) || sections.length === 0) {
+        setStatus('Nessun risultato trovato.');
+        return;
+      }
+
+      status.hidden = true;
+      results.innerHTML = sections
+        .map(section => {
+          const title = section && section.title ? escapeHtml(String(section.title)) : '';
+          const items = Array.isArray(section.items) ? section.items : [];
+          if (!items.length) {
+            return '';
+          }
+          const itemsHtml = items.map(buildItemHtml).join('');
+          return `<div class="topbar__search-section"><div class="topbar__search-section-title">${title}</div><div class="topbar__search-section-items">${itemsHtml}</div></div>`;
+        })
+        .join('');
+    };
+
+    const fetchResults = query => {
+      if (activeController) {
+        activeController.abort();
+      }
+      activeController = new AbortController();
+
+      const url = `index.php?page=global_search&q=${encodeURIComponent(query)}`;
+      fetch(url, {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        signal: activeController.signal
+      })
+        .then(response => (response.ok ? response.json() : Promise.reject(response)))
+        .then(data => {
+          if (query !== lastQuery) {
+            return;
+          }
+          renderResults(data && data.sections ? data.sections : []);
+        })
+        .catch(error => {
+          if (error && error.name === 'AbortError') {
+            return;
+          }
+          setStatus('Errore di rete. Riprova.');
+        });
+    };
+
+    const handleInput = () => {
+      updateClear();
+      const query = input.value.trim();
+      lastQuery = query;
+
+      if (query.length < minLength) {
+        if (activeController) {
+          activeController.abort();
+        }
+        const message = query.length === 0
+          ? 'Inizia a digitare per cercare.'
+          : `Inserisci almeno ${minLength} caratteri.`;
+        setStatus(message);
+        setOpen(true);
+        return;
+      }
+
+      if (debounceId) {
+        window.clearTimeout(debounceId);
+      }
+
+      setStatus('Ricerca in corso…');
+      setOpen(true);
+      debounceId = window.setTimeout(() => fetchResults(query), 280);
+    };
+
+    input.addEventListener('focus', () => {
+      if (input.value.trim() === '') {
+        setStatus('Inizia a digitare per cercare.');
+      }
+      setOpen(true);
+    });
+
+    input.addEventListener('input', handleInput);
+
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        input.blur();
+      }
+    });
+
+    if (clearBtn instanceof HTMLElement) {
+      clearBtn.addEventListener('click', () => {
+        input.value = '';
+        updateClear();
+        setStatus('Inizia a digitare per cercare.');
+        setOpen(true);
+        input.focus();
+      });
+    }
+
+    document.addEventListener('click', event => {
+      if (!root.contains(event.target)) {
+        setOpen(false);
+      }
+    });
+
+    updateClear();
+  }
+
+  function buildGlobalSearchNode() {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'topbar__search';
+    wrapper.dataset.globalSearch = 'true';
+    wrapper.dataset.minLength = '2';
+
+    const field = document.createElement('div');
+    field.className = 'topbar__search-field';
+
+    const icon = document.createElement('span');
+    icon.className = 'topbar__search-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '🔍';
+
+    const input = document.createElement('input');
+    input.className = 'topbar__search-input';
+    input.type = 'search';
+    input.name = 'global_search';
+    input.placeholder = 'Cerca clienti, vendite, prodotti...';
+    input.autocomplete = 'off';
+    input.setAttribute('aria-label', 'Ricerca globale');
+    input.dataset.globalSearchInput = 'true';
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'topbar__search-clear';
+    clearBtn.dataset.globalSearchClear = 'true';
+    clearBtn.dataset.visible = 'false';
+    clearBtn.setAttribute('aria-label', 'Svuota ricerca');
+    clearBtn.textContent = '×';
+
+    field.appendChild(icon);
+    field.appendChild(input);
+    field.appendChild(clearBtn);
+
+    const panel = document.createElement('div');
+    panel.className = 'topbar__search-panel';
+    panel.dataset.globalSearchPanel = 'true';
+    panel.dataset.open = 'false';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Risultati ricerca');
+    panel.setAttribute('tabindex', '-1');
+
+    const status = document.createElement('div');
+    status.className = 'topbar__search-status';
+    status.dataset.globalSearchStatus = 'true';
+    status.textContent = 'Inizia a digitare per cercare.';
+
+    const results = document.createElement('div');
+    results.className = 'topbar__search-results';
+    results.dataset.globalSearchResults = 'true';
+
+    panel.appendChild(status);
+    panel.appendChild(results);
+
+    wrapper.appendChild(field);
+    wrapper.appendChild(panel);
+
+    return wrapper;
   }
 
   function setupBackToTop() {
