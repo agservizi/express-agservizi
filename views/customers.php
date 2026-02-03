@@ -221,7 +221,7 @@ $searchQueryParams = static function (array $extra = []) use ($searchTerm, $curr
                                                 <input type="hidden" name="per_page" value="<?= $perPage ?>">
                                                 <button type="submit" class="micro-actions__btn micro-actions__btn--invite" data-tooltip="<?= htmlspecialchars($inviteTooltip) ?>" aria-label="<?= htmlspecialchars($inviteTooltip) ?>"<?= $canResendCredentials ? '' : ' disabled' ?>>
                                                     <svg class="micro-actions__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                                        <path d="M20 4h-3.17l-1.41-1.41A2 2 0 0 0 14.17 2H9.83a2 2 0 0 0-1.41.59L7 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 14H4V6h4.05l1.41-1.41.09-.09h4.9l.09.09L15.95 6H20zm-8-9a3 3 0 1 0 3 3 3 3 0 0 0-3-3zm0 8a6 6 0 0 0-5.33-3H6a1 1 0 0 0 0 2h.67A4 4 0 0 1 10 18h4a4 4 0 0 1 3.33-2H18a1 1 0 0 0 0-2h-.67A6 6 0 0 0 12 17z"></path>
+                                                        <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z"></path>
                                                     </svg>
                                                 </button>
                                             </form>
