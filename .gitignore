@@ -3,7 +3,7 @@
 .env.local
 
 # Composer dependencies
-/vendor/
+
 
 # Node dependencies (if any)
 /node_modules/
