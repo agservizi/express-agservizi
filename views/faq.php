@@ -4,6 +4,7 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - FAQ');
 $loginUrl = 'index.php?page=login';
+$landingUrl = 'index.php?page=landing';
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $metaDescription = 'FAQ sul gestionale: tempi di attivazione, demo, piani e supporto.';
 $canonical = $baseUrl . '/index.php?page=faq';
@@ -56,11 +57,12 @@ $faqItems = [
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
-                <a class="landing-nav__link" href="index.php?page=landing">Home</a>
+                <a class="landing-nav__link" href="<?= htmlspecialchars($landingUrl) ?>">Home</a>
                 <a class="landing-nav__link" href="index.php?page=demo">Demo</a>
                 <a class="landing-nav__link" href="index.php?page=funzionalita">Funzionalità</a>
                 <a class="landing-nav__link" href="index.php?page=vantaggi">Vantaggi</a>
                 <a class="landing-nav__link" href="index.php?page=piani">Piani</a>
+                <a class="landing-nav__link" href="index.php?page=prezzi">Prezzi</a>
                 <a class="landing-nav__link" href="index.php?page=faq">FAQ</a>
                 <a class="landing-nav__link" href="index.php?page=contatto">Contatto</a>
             </nav>
@@ -68,11 +70,27 @@ $faqItems = [
         </div>
     </div>
 
+    <header class="landing-hero landing-hero--compact">
+        <div class="landing-hero__content">
+            <div class="landing-hero__text">
+                <p class="landing-kicker">Risposte rapide e chiare</p>
+                <h1>FAQ</h1>
+                <p class="landing-subtitle">
+                    Tempi di attivazione, demo, piani e supporto: trovi tutto qui.
+                </p>
+                <div class="landing-hero__actions">
+                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Contattaci</a>
+                    <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi">Vedi i prezzi</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
     <main class="landing-main">
         <section class="landing-section landing-faq" id="faq">
             <div class="landing-section__header">
-                <h1>FAQ</h1>
-                <p>Le risposte alle domande più frequenti.</p>
+                <h2>Le domande più frequenti</h2>
+                <p>Se non trovi la risposta, scrivici: rispondiamo entro 24 ore.</p>
             </div>
             <div class="landing-faq__grid">
                 <?php foreach ($faqItems as $item): ?>
@@ -81,6 +99,17 @@ $faqItems = [
                         <p><?= htmlspecialchars($item['answer']) ?></p>
                     </article>
                 <?php endforeach; ?>
+            </div>
+        </section>
+
+        <section class="landing-section landing-section--accent">
+            <div class="landing-section__header">
+                <h2>Pronto a partire?</h2>
+                <p>Accedi alla demo o richiedi una consulenza personalizzata.</p>
+            </div>
+            <div class="landing-hero__actions">
+                <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
+                <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Parla con un consulente</a>
             </div>
         </section>
     </main>

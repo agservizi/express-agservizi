@@ -4,6 +4,7 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Piani');
 $loginUrl = 'index.php?page=login';
+$landingUrl = 'index.php?page=landing';
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $metaDescription = 'Confronto piani: Start, Start Plus, Core. Scopri costi e funzionalità per il tuo punto vendita.';
 $canonical = $baseUrl . '/index.php?page=piani';
@@ -38,11 +39,12 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
-                <a class="landing-nav__link" href="index.php?page=landing">Home</a>
+                <a class="landing-nav__link" href="<?= htmlspecialchars($landingUrl) ?>">Home</a>
                 <a class="landing-nav__link" href="index.php?page=demo">Demo</a>
                 <a class="landing-nav__link" href="index.php?page=funzionalita">Funzionalità</a>
                 <a class="landing-nav__link" href="index.php?page=vantaggi">Vantaggi</a>
                 <a class="landing-nav__link" href="index.php?page=piani">Piani</a>
+                <a class="landing-nav__link" href="index.php?page=prezzi">Prezzi</a>
                 <a class="landing-nav__link" href="index.php?page=faq">FAQ</a>
                 <a class="landing-nav__link" href="index.php?page=contatto">Contatto</a>
             </nav>
@@ -50,11 +52,27 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
         </div>
     </div>
 
+    <header class="landing-hero landing-hero--compact">
+        <div class="landing-hero__content">
+            <div class="landing-hero__text">
+                <p class="landing-kicker">Scegli il piano giusto per il tuo store</p>
+                <h1>Piani</h1>
+                <p class="landing-subtitle">
+                    Durate e limiti pensati per garantire controllo operativo e crescita graduale della rete vendita.
+                </p>
+                <div class="landing-hero__actions">
+                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Richiedi informazioni</a>
+                    <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi">Confronta i prezzi</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
     <main class="landing-main">
         <section class="landing-section" id="piani">
             <div class="landing-section__header">
-                <h1>Piani</h1>
-                <p>Confronta velocemente le opzioni e scegli il piano più adatto al tuo store.</p>
+                <h2>Confronto rapido</h2>
+                <p>Le opzioni principali per avviare o potenziare il tuo negozio.</p>
             </div>
             <div class="landing-pricing__grid landing-pricing__grid--compact">
                 <article class="landing-pricing__card">
@@ -139,6 +157,17 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 <p>Checklist operativa + template report per partire subito con margini sotto controllo.</p>
             </div>
             <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Scarica il kit</a>
+        </section>
+
+        <section class="landing-section landing-section--accent">
+            <div class="landing-section__header">
+                <h2>Vuoi una consulenza rapida?</h2>
+                <p>Ti aiutiamo a scegliere il piano in base ai volumi e al team.</p>
+            </div>
+            <div class="landing-hero__actions">
+                <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Parla con un consulente</a>
+                <a class="landing-btn landing-btn--secondary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
+            </div>
         </section>
     </main>
 

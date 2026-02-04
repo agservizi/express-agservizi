@@ -4,6 +4,7 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Vantaggi');
 $loginUrl = 'index.php?page=login';
+$landingUrl = 'index.php?page=landing';
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $metaDescription = 'Vantaggi per store e responsabili di rete: processi standardizzati, controllo realtime e rollout rapido.';
 $canonical = $baseUrl . '/index.php?page=vantaggi';
@@ -38,11 +39,12 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
-                <a class="landing-nav__link" href="index.php?page=landing">Home</a>
+                <a class="landing-nav__link" href="<?= htmlspecialchars($landingUrl) ?>">Home</a>
                 <a class="landing-nav__link" href="index.php?page=demo">Demo</a>
                 <a class="landing-nav__link" href="index.php?page=funzionalita">Funzionalità</a>
                 <a class="landing-nav__link" href="index.php?page=vantaggi">Vantaggi</a>
                 <a class="landing-nav__link" href="index.php?page=piani">Piani</a>
+                <a class="landing-nav__link" href="index.php?page=prezzi">Prezzi</a>
                 <a class="landing-nav__link" href="index.php?page=faq">FAQ</a>
                 <a class="landing-nav__link" href="index.php?page=contatto">Contatto</a>
             </nav>
@@ -50,11 +52,27 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
         </div>
     </div>
 
-    <main class="landing-main">
-        <section class="landing-section landing-section--accent" id="vantaggi">
-            <div class="landing-section__header">
+    <header class="landing-hero landing-hero--compact">
+        <div class="landing-hero__content">
+            <div class="landing-hero__text">
+                <p class="landing-kicker">Efficienza reale per network e store</p>
                 <h1>Vantaggi</h1>
-                <p>Ogni tenant dispone delle proprie impostazioni fiscali, scontrino personalizzato e dashboard dedicata.</p>
+                <p class="landing-subtitle">
+                    Ogni tenant ha impostazioni fiscali, scontrini personalizzati e dashboard dedicate per una gestione scalabile.
+                </p>
+                <div class="landing-hero__actions">
+                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Parla con un consulente</a>
+                    <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi">Scopri i piani</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="landing-main">
+        <section class="landing-section" id="vantaggi">
+            <div class="landing-section__header">
+                <h2>Una piattaforma pensata per crescere</h2>
+                <p>Standardizza i processi e migliora la visibilità su vendite e stock.</p>
             </div>
             <div class="landing-columns">
                 <div>
@@ -73,6 +91,17 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                         <li>Accesso sicuro e configurazioni personalizzate.</li>
                     </ul>
                 </div>
+            </div>
+        </section>
+
+        <section class="landing-section landing-section--accent">
+            <div class="landing-section__header">
+                <h2>Vuoi attivare un rollout rapido?</h2>
+                <p>Ti aiutiamo a configurare licenze, utenti e stock iniziale in pochi giorni.</p>
+            </div>
+            <div class="landing-hero__actions">
+                <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Richiedi informazioni</a>
+                <a class="landing-btn landing-btn--secondary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
             </div>
         </section>
     </main>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Demo');
 $loginUrl = 'index.php?page=login';
+$landingUrl = 'index.php?page=landing';
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $metaDescription = 'Demo del gestionale per negozi di telefonia: flussi vendita, magazzino SIM e report in un unico cruscotto.';
 $canonical = $baseUrl . '/index.php?page=demo';
@@ -44,11 +45,12 @@ $demoSlides = [
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
-                <a class="landing-nav__link" href="index.php?page=landing">Home</a>
+                <a class="landing-nav__link" href="<?= htmlspecialchars($landingUrl) ?>">Home</a>
                 <a class="landing-nav__link" href="index.php?page=demo">Demo</a>
                 <a class="landing-nav__link" href="index.php?page=funzionalita">Funzionalità</a>
                 <a class="landing-nav__link" href="index.php?page=vantaggi">Vantaggi</a>
                 <a class="landing-nav__link" href="index.php?page=piani">Piani</a>
+                <a class="landing-nav__link" href="index.php?page=prezzi">Prezzi</a>
                 <a class="landing-nav__link" href="index.php?page=faq">FAQ</a>
                 <a class="landing-nav__link" href="index.php?page=contatto">Contatto</a>
             </nav>
@@ -56,20 +58,36 @@ $demoSlides = [
         </div>
     </div>
 
+    <header class="landing-hero landing-hero--compact">
+        <div class="landing-hero__content">
+            <div class="landing-hero__text">
+                <p class="landing-kicker">Esperienza guidata in pochi minuti</p>
+                <h1>Demo del gestionale</h1>
+                <p class="landing-subtitle">
+                    Scopri il flusso di vendita, il magazzino SIM e i report KPI in un’unica piattaforma pensata per i punti vendita.
+                </p>
+                <div class="landing-hero__actions">
+                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Richiedi demo personalizzata</a>
+                    <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
     <main class="landing-main">
         <section class="landing-section landing-demo" id="demo">
+            <div class="landing-section__header">
+                <h2>Anteprima interattiva</h2>
+                <p>Schermate reali per valutare operatività, dashboard e flussi SIM.</p>
+            </div>
             <div class="landing-demo__grid">
                 <div>
-                    <div class="landing-section__header">
-                        <h1>Demo del gestionale</h1>
-                        <p>Esplora il flusso di vendita, magazzino SIM e report in pochi click.</p>
-                    </div>
                     <ul class="landing-demo__list">
                         <li>Flusso vendita rapido con stampa scontrino.</li>
                         <li>Gestione SIM e scorte con alert automatici.</li>
                         <li>Dashboard KPI per ogni punto vendita.</li>
                     </ul>
-                    <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Richiedi demo personalizzata</a>
+                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Richiedi demo personalizzata</a>
                 </div>
                 <div class="landing-demo__frame" aria-label="Anteprima demo piattaforma">
                     <div class="landing-demo__slider" data-demo-slider>
@@ -89,6 +107,17 @@ $demoSlides = [
                         </div>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <section class="landing-section landing-section--accent">
+            <div class="landing-section__header">
+                <h2>Vuoi una demo guidata?</h2>
+                <p>Ti inviamo credenziali e supporto dedicato per configurare il tuo primo store.</p>
+            </div>
+            <div class="landing-hero__actions">
+                <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Richiedi informazioni</a>
+                <a class="landing-btn landing-btn--secondary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
             </div>
         </section>
     </main>
