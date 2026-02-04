@@ -6,11 +6,32 @@ $pageTitle = $pageTitle ?? ($appName . ' - Gestionale multi-tenant');
 $loginUrl = 'index.php?page=login';
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
 $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
+$baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
+$metaDescription = 'Gestionale per negozi di telefonia: SIM, vendite, stock e report in un solo cruscotto. Demo rapida e onboarding guidato.';
+$ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
 $demoSlides = [
     'Screenshot 2026-01-31 alle 18.27.35.png',
     'Screenshot 2026-01-31 alle 18.27.42.png',
     'Screenshot 2026-01-31 alle 18.27.56.png',
     'Screenshot 2026-01-31 alle 18.28.03.png',
+];
+$faqItems = [
+    [
+        'question' => 'È adatto anche a un singolo punto vendita?',
+        'answer' => 'Sì. Il piano Start è pensato per singoli store e può crescere con il tuo business.',
+    ],
+    [
+        'question' => 'Quanto tempo serve per partire?',
+        'answer' => 'Con il setup guidato e i template preconfigurati si parte in pochi giorni.',
+    ],
+    [
+        'question' => 'Supportate l’energia luce & gas?',
+        'answer' => 'Sì, dal piano Core con gestione offerte e contratti energia.',
+    ],
+    [
+        'question' => 'È possibile richiedere una demo?',
+        'answer' => 'Certo. Compila il modulo contatti per ricevere una demo guidata.',
+    ],
 ];
 ?>
 <!doctype html>
@@ -19,8 +40,19 @@ $demoSlides = [
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle) ?></title>
-    <meta name="description" content="Gestionale per negozi di telefonia: SIM, vendite, stock e report in un solo cruscotto. Demo rapida e onboarding guidato.">
-    <link rel="canonical" href="<?= htmlspecialchars($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it') ?>">
+    <meta name="description" content="<?= htmlspecialchars($metaDescription) ?>">
+    <link rel="canonical" href="<?= htmlspecialchars($baseUrl) ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="<?= htmlspecialchars($pageTitle) ?>">
+    <meta property="og:description" content="<?= htmlspecialchars($metaDescription) ?>">
+    <meta property="og:url" content="<?= htmlspecialchars($baseUrl) ?>">
+    <meta property="og:image" content="<?= htmlspecialchars($ogImage) ?>">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="<?= htmlspecialchars($pageTitle) ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($metaDescription) ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($ogImage) ?>">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="preload" href="assets/css/styles.css" as="style">
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body class="landing-body">
@@ -64,10 +96,6 @@ $demoSlides = [
                 <div class="landing-hero__actions">
                     <a class="landing-btn landing-btn--primary" href="#contatto">Prenota una demo</a>
                     <a class="landing-btn landing-btn--secondary" href="#demo">Guarda la demo</a>
-                </div>
-                <div class="landing-social-proof">
-                    <strong>+120 store</strong>
-                    <span>già operativi con flussi standardizzati</span>
                 </div>
                 <div class="landing-metrics">
                     <div class="landing-metric">
@@ -129,16 +157,6 @@ $demoSlides = [
             </div>
         </section>
 
-        <section class="landing-logos">
-            <p class="landing-logos__title">Scelto da store e reti di vendita</p>
-            <div class="landing-logos__grid" aria-label="Loghi clienti">
-                <span>Plinio Mobile</span>
-                <span>Urban Telco</span>
-                <span>Nord SIM</span>
-                <span>Retail Hub</span>
-                <span>Centro Telefonia</span>
-            </div>
-        </section>
 
         <section id="demo" class="landing-section landing-demo">
             <div class="landing-demo__grid">
@@ -159,7 +177,7 @@ $demoSlides = [
                         <div class="landing-demo__slides">
                             <?php foreach ($demoSlides as $index => $slide): ?>
                                 <figure class="landing-demo__slide" data-demo-slide <?= $index === 0 ? 'data-active="true"' : '' ?>">
-                                    <img src="assets/img/<?= rawurlencode($slide) ?>" alt="Anteprima gestionale <?= $index + 1 ?>">
+                                    <img src="assets/img/<?= rawurlencode($slide) ?>" alt="Anteprima gestionale <?= $index + 1 ?>" loading="lazy">
                                 </figure>
                             <?php endforeach; ?>
                         </div>
@@ -378,22 +396,12 @@ $demoSlides = [
                 <p>Le risposte alle domande più frequenti.</p>
             </div>
             <div class="landing-faq__grid">
-                <article class="landing-faq__item">
-                    <h3>È adatto anche a un singolo punto vendita?</h3>
-                    <p>Sì. Il piano Start è pensato per singoli store e può crescere con il tuo business.</p>
-                </article>
-                <article class="landing-faq__item">
-                    <h3>Quanto tempo serve per partire?</h3>
-                    <p>Con il setup guidato e i template preconfigurati si parte in pochi giorni.</p>
-                </article>
-                <article class="landing-faq__item">
-                    <h3>Supportate l’energia luce & gas?</h3>
-                    <p>Sì, dal piano Core con gestione offerte e contratti energia.</p>
-                </article>
-                <article class="landing-faq__item">
-                    <h3>È possibile richiedere una demo?</h3>
-                    <p>Certo. Compila il modulo contatti per ricevere una demo guidata.</p>
-                </article>
+                <?php foreach ($faqItems as $item): ?>
+                    <article class="landing-faq__item">
+                        <h3><?= htmlspecialchars($item['question']) ?></h3>
+                        <p><?= htmlspecialchars($item['answer']) ?></p>
+                    </article>
+                <?php endforeach; ?>
             </div>
         </section>
 
@@ -483,7 +491,25 @@ $demoSlides = [
             "@context": "https://schema.org",
             "@type": "Organization",
             "name": "<?= htmlspecialchars($appName) ?>",
-            "url": "<?= htmlspecialchars($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it') ?>"
+            "url": "<?= htmlspecialchars($baseUrl) ?>"
+        }
+        </script>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                <?php foreach ($faqItems as $index => $item): ?>
+                {
+                    "@type": "Question",
+                    "name": "<?= htmlspecialchars($item['question']) ?>",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "<?= htmlspecialchars($item['answer']) ?>"
+                    }
+                }<?= $index < count($faqItems) - 1 ? ',' : '' ?>
+                <?php endforeach; ?>
+            ]
         }
         </script>
 
