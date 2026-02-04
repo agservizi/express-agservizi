@@ -2095,4 +2095,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   setupBackToTop();
+
+  const scrollToHashTarget = () => {
+    if (!window.location.hash) {
+      return;
+    }
+    const target = document.querySelector(window.location.hash);
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  scrollToHashTarget();
+  window.addEventListener('hashchange', scrollToHashTarget);
 });
