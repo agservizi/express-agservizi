@@ -963,10 +963,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const hidden = row.querySelector('input[name="item_iccid_code[]"]');
       const descInput = row.querySelector('input[name="item_description[]"]');
+      const qtyInput = row.querySelector('input[name="item_quantity[]"]');
 
       if (!target.value) {
         if (hidden) {
           hidden.value = '';
+        }
+        if (descInput instanceof HTMLInputElement) {
+          descInput.value = '';
+        }
+        if (priceInput instanceof HTMLInputElement) {
+          priceInput.value = '';
+        }
+        if (qtyInput instanceof HTMLInputElement) {
+          qtyInput.value = '1';
         }
         return;
       }
@@ -995,8 +1005,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (info && hidden) {
         hidden.value = info.code;
       }
-      if (info && descInput && !descInput.value) {
+      if (info && descInput instanceof HTMLInputElement) {
         descInput.value = 'SIM ' + info.provider;
+      }
+      if (priceInput instanceof HTMLInputElement) {
+        priceInput.value = '';
+      }
+      if (qtyInput instanceof HTMLInputElement) {
+        qtyInput.value = '1';
       }
     });
 
@@ -2542,6 +2558,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         qtyInput.min = '1';
       }
+    }
+
+    const imeiInput = row.querySelector('input[name="product_imei[]"]');
+    if (imeiInput instanceof HTMLInputElement && settings.force) {
+      imeiInput.value = '';
     }
 
     if (info.barcode) {

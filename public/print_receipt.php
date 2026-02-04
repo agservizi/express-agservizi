@@ -400,6 +400,9 @@ $receiptRefundedBanner = (string) ($receiptStatusLabels['refunded'] ?? 'RESO');
           ?>
               <div class="muted">IVA <?= number_format($itemVatRate, 2, ',', '.') ?>% · Cod. <?= htmlspecialchars($itemVatCode) ?></div>
           <?php endif; ?>
+            <?php if (!empty($item['product_imei'])): ?>
+              <div class="muted">IMEI: <?= htmlspecialchars((string) $item['product_imei']) ?></div>
+            <?php endif; ?>
         </td>
         <td style="text-align:right;">€ <?= number_format((float) $item['price'], 2, ',', '.') ?></td>
       </tr>

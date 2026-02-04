@@ -339,6 +339,9 @@ $vatAmount = isset($sale['vat_amount']) ? max((float) $sale['vat_amount'], 0.0) 
           <?php if (($item['quantity'] ?? 1) > 1): ?>
             <span class="muted">x<?= (int) $item['quantity'] ?></span>
           <?php endif; ?>
+          <?php if (!empty($item['product_imei'])): ?>
+            <div class="muted">IMEI: <?= htmlspecialchars((string) $item['product_imei']) ?></div>
+          <?php endif; ?>
         </td>
         <td style="text-align:right;">€ <?= number_format((float) $item['price'], 2, ',', '.') ?></td>
       </tr>

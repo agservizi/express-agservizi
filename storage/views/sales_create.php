@@ -165,6 +165,7 @@ $taxNote = $GLOBALS['config']['app']['tax_note'] ?? "Operazione non soggetta a I
                                         <div class="table-field">
                                             <input type="text" name="item_description[]" placeholder="Descrizione" class="table-field__input">
                                         </div>
+                                        <th>IMEI</th>
                                     </td>
                                     <td>
                                         <div class="table-field">
@@ -174,6 +175,11 @@ $taxNote = $GLOBALS['config']['app']['tax_note'] ?? "Operazione non soggetta a I
                                     <td>
                                         <div class="table-field table-field--quantity">
                                             <input type="number" min="1" value="1" name="item_quantity[]" class="table-field__input table-field__input--number">
+                                        <td>
+                                            <div class="table-field">
+                                                <input type="text" name="product_imei[]" placeholder="IMEI" class="table-field__input">
+                                            </div>
+                                        </td>
                                         </div>
                                     </td>
                                     <td><button type="button" class="btn btn--icon" data-action="remove-item">✖</button></td>

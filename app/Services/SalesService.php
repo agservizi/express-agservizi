@@ -26,7 +26,8 @@ final class SalesService
      *         iccid_id?:int|null,
      *         iccid_code?:string|null,
      *         product_id?:int|null,
-     *         tax_rate?:float|null
+    *         tax_rate?:float|null,
+    *         product_imei?:string|null
      *     }>,
      *     payment_method?:string,
      *     discount?:float,
@@ -355,8 +356,8 @@ final class SalesService
             $saleId = (int) $this->pdo->lastInsertId();
 
             $stmtItem = $this->pdo->prepare(
-                'INSERT INTO sale_items (tenant_id, sale_id, iccid_id, product_id, description, quantity, price, tax_rate, tax_amount, vat_code)
-                 VALUES (:tenant_id, :s, :iccid, :product, :desc, :qty, :price, :tax_rate, :tax_amount, :vat_code)'
+                'INSERT INTO sale_items (tenant_id, sale_id, iccid_id, product_id, product_imei, description, quantity, price, tax_rate, tax_amount, vat_code)
+                 VALUES (:tenant_id, :s, :iccid, :product, :product_imei, :desc, :qty, :price, :tax_rate, :tax_amount, :vat_code)'
             );
             $stmtUpdateICCID = $this->pdo->prepare(
                 "UPDATE iccid_stock
@@ -405,6 +406,7 @@ final class SalesService
                     ':s' => $saleId,
                     ':iccid' => $iccidId,
                     ':product' => $productId,
+                    ':product_imei' => isset($item['product_imei']) ? (string) $item['product_imei'] : null,
                     ':desc' => $description,
                     ':qty' => $quantity,
                     ':price' => (float) $item['price'],

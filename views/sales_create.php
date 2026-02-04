@@ -502,6 +502,7 @@ $previewHasErrors = $previewErrors !== [];
                                     <th>Descrizione</th>
                                     <th>Prezzo (€)</th>
                                     <th>Q.tà</th>
+                                    <th>IMEI</th>
                                     <th>IVA / Stock</th>
                                     <th>Azioni</th>
                                 </tr>
@@ -553,6 +554,11 @@ $previewHasErrors = $previewErrors !== [];
                                     <td>
                                         <div class="table-field table-field--quantity">
                                             <input type="number" min="1" value="1" name="product_quantity[]" class="table-field__input table-field__input--number">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="table-field">
+                                            <input type="text" name="product_imei[]" placeholder="IMEI" class="table-field__input">
                                         </div>
                                     </td>
                                     <td>

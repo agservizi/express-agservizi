@@ -22,7 +22,11 @@ final class SalesController
      */
     public function create(int $userId, array $input): array
     {
-        $items = $this->buildItems($input);
+        try {
+            $items = $this->buildItems($input);
+        } catch (\RuntimeException $exception) {
+            return ['success' => false, 'errors' => [$exception->getMessage()]];
+        }
         if ($items === []) {
             return ['success' => false, 'errors' => ['Aggiungi almeno un articolo.']];
         }
@@ -192,6 +196,7 @@ final class SalesController
         $productPrices = $input['product_price'] ?? [];
         $productQuantities = $input['product_quantity'] ?? [];
         $productTaxRates = $input['product_tax_rate'] ?? [];
+        $productImeis = $input['product_imei'] ?? [];
 
         foreach ($productIds as $index => $productIdValue) {
             $productId = (int) $productIdValue;
@@ -206,6 +211,9 @@ final class SalesController
 
             $description = isset($productDescriptions[$index]) ? trim((string) $productDescriptions[$index]) : '';
             $taxRate = isset($productTaxRates[$index]) ? (float) $productTaxRates[$index] : null;
+            $imei = isset($productImeis[$index]) ? trim((string) $productImeis[$index]) : '';
+
+            $imeiValue = $this->normalizeSingleImei($imei);
 
             $items[] = [
                 'type' => 'product',
@@ -214,10 +222,26 @@ final class SalesController
                 'price' => $price,
                 'quantity' => $quantity,
                 'tax_rate' => $taxRate,
+                'product_imei' => $imeiValue,
             ];
         }
 
         return $items;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function normalizeSingleImei(string $raw): ?string
+    {
+        $digits = preg_replace('/\D+/', '', $raw);
+        if ($digits === null || $digits === '') {
+            return null;
+        }
+        if (strlen($digits) !== 15) {
+            throw new \RuntimeException('IMEI non valido: deve avere 15 cifre.');
+        }
+        return $digits;
     }
 
     /**
