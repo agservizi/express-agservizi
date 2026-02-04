@@ -255,7 +255,7 @@ if ($page === 'login' && $method === 'POST') {
     exit;
 }
 
-if ($currentUser === null && $page !== 'login') {
+if ($currentUser === null && !in_array($page, ['landing', 'demo', 'funzionalita', 'vantaggi', 'piani', 'faq', 'contatto', 'prezzi', 'login'], true)) {
     header('Location: index.php?page=login');
     exit;
 }

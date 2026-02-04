@@ -1869,7 +1869,7 @@ if ($page === 'global_search') {
     ]);
 }
 
-if ($currentUser === null && !in_array($page, ['landing', 'prezzi', 'checkout', 'checkout_success', 'checkout_cancel', 'stripe_webhook', 'vies_lookup', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
+if ($currentUser === null && !in_array($page, ['landing', 'demo', 'funzionalita', 'vantaggi', 'piani', 'faq', 'contatto', 'prezzi', 'checkout', 'checkout_success', 'checkout_cancel', 'stripe_webhook', 'vies_lookup', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
     header('Location: index.php?page=login');
     exit;
 }
