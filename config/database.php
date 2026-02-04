@@ -25,29 +25,45 @@ if (!isset($activeConfig['timezone']) || !is_string($activeConfig['timezone']) |
 final class Database
 {
     private static ?PDO $pdo = null;
-    private static array $settings = [];
+    private static ?PDO $serverPdo = null;
     private static ?string $timezone = null;
 
     public static function configure(array $settings): void
     {
-        self::$settings = $settings;
         $tz = $settings['timezone'] ?? null;
         self::$timezone = is_string($tz) && $tz !== '' ? $tz : null;
+    }
+
+    private static function getEnv(string $key): ?string
+    {
+        $value = getenv($key);
+        if ($value !== false && $value !== '') {
+            return $value;
+        }
+        $envValue = $_ENV[$key] ?? null;
+        return is_string($envValue) && $envValue !== '' ? $envValue : null;
     }
 
     public static function getConnection(): PDO
     {
         if (self::$pdo === null) {
-            if (self::$settings === []) {
-                throw new RuntimeException('Database non configurato.');
+            $host = self::getEnv('DB_HOST');
+            $port = self::getEnv('DB_PORT') ?: '3306';
+            $name = self::getEnv('DB_NAME');
+            $user = self::getEnv('DB_USER');
+            $pass = self::getEnv('DB_PASS') ?? '';
+
+            if ($host === null || $name === null || $user === null) {
+                throw new RuntimeException('Variabili DB_HOST/DB_NAME/DB_USER mancanti.');
             }
 
-            self::$pdo = new PDO(
-                self::$settings['dsn'],
-                self::$settings['user'],
-                self::$settings['pass'],
-                self::$settings['options'] ?? []
-            );
+            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $name);
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_PERSISTENT => false,
+            ];
+
+            self::$pdo = new PDO($dsn, $user, $pass, $options);
 
             if (self::$timezone !== null) {
                 try {
@@ -76,9 +92,34 @@ final class Database
         return self::$pdo;
     }
 
+    public static function getServerConnection(): PDO
+    {
+        if (self::$serverPdo === null) {
+            $host = self::getEnv('DB_HOST');
+            $port = self::getEnv('DB_PORT') ?: '3306';
+            $user = self::getEnv('DB_USER');
+            $pass = self::getEnv('DB_PASS') ?? '';
+
+            if ($host === null || $user === null) {
+                throw new RuntimeException('Variabili DB_HOST/DB_USER mancanti.');
+            }
+
+            $dsn = sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $host, $port);
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_PERSISTENT => false,
+            ];
+
+            self::$serverPdo = new PDO($dsn, $user, $pass, $options);
+        }
+
+        return self::$serverPdo;
+    }
+
     public static function reset(): void
     {
         self::$pdo = null;
+        self::$serverPdo = null;
     }
 }
 

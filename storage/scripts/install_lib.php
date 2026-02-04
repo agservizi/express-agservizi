@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 use PDO;
 
+require_once __DIR__ . '/../config/database.php';
+
 if (!class_exists('AppInstaller')) {
     final class AppInstaller
     {
@@ -34,8 +36,7 @@ if (!class_exists('AppInstaller')) {
                     $optionsPdo[PDO::MYSQL_ATTR_MULTI_STATEMENTS] = true;
                 }
 
-                $serverDsn = self::ensureCharset(self::buildServerDsn((string) $dbConfig['dsn']));
-                $pdoServer = new PDO($serverDsn, (string) $dbConfig['user'], (string) $dbConfig['pass'], $optionsPdo);
+                $pdoServer = Database::getServerConnection();
                 $messages[] = 'Connessione al server MySQL riuscita.';
 
                 if (!empty($options['force'])) {
@@ -46,7 +47,7 @@ if (!class_exists('AppInstaller')) {
                 $pdoServer->exec('CREATE DATABASE IF NOT EXISTS `' . $dbName . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci');
                 $messages[] = "Database '$dbName' pronto.";
 
-                $pdo = new PDO(self::ensureCharset((string) $dbConfig['dsn']), (string) $dbConfig['user'], (string) $dbConfig['pass'], $optionsPdo);
+                $pdo = Database::getConnection();
                 $messages[] = 'Connessione al database riuscita.';
 
                 $schemaPath = realpath(__DIR__ . '/../migrations/create_db.sql');
@@ -114,7 +115,7 @@ if (!class_exists('AppInstaller')) {
                     $optionsPdo[PDO::MYSQL_ATTR_MULTI_STATEMENTS] = true;
                 }
 
-                $pdo = new PDO(self::ensureCharset((string) $dbConfig['dsn']), (string) $dbConfig['user'], (string) $dbConfig['pass'], $optionsPdo);
+                $pdo = Database::getConnection();
                 $messages[] = 'Connessione al database riuscita.';
 
                 self::prepareMigrationsTable($pdo);
