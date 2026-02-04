@@ -4,6 +4,7 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Gestionale multi-tenant');
 $loginUrl = 'index.php?page=login';
+$currentPage = 'landing';
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
 $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
@@ -63,14 +64,14 @@ $faqItems = [
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
-                <a class="landing-nav__link" href="index.php?page=landing">Home</a>
-                <a class="landing-nav__link" href="index.php?page=demo">Demo</a>
-                <a class="landing-nav__link" href="index.php?page=funzionalita">Funzionalità</a>
-                <a class="landing-nav__link" href="index.php?page=vantaggi">Vantaggi</a>
-                <a class="landing-nav__link" href="index.php?page=piani">Piani</a>
-                <a class="landing-nav__link" href="index.php?page=prezzi">Prezzi</a>
-                <a class="landing-nav__link" href="index.php?page=faq">FAQ</a>
-                <a class="landing-nav__link" href="index.php?page=contatto">Contatto</a>
+                <a class="landing-nav__link <?= $currentPage === 'landing' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=landing">Home</a>
+                <a class="landing-nav__link <?= $currentPage === 'demo' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=demo">Demo</a>
+                <a class="landing-nav__link <?= $currentPage === 'funzionalita' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=funzionalita">Funzionalità</a>
+                <a class="landing-nav__link <?= $currentPage === 'vantaggi' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=vantaggi">Vantaggi</a>
+                <a class="landing-nav__link <?= $currentPage === 'piani' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=piani">Piani</a>
+                <a class="landing-nav__link <?= $currentPage === 'prezzi' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=prezzi">Prezzi</a>
+                <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq">FAQ</a>
+                <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto">Contatto</a>
             </nav>
             <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
         </div>
