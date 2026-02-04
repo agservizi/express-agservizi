@@ -24,6 +24,30 @@ $recentEvents = (array) ($metrics['recent_events'] ?? []);
 $operatorActivity = (array) ($metrics['operator_activity'] ?? []);
 $stockRiskSummary = (array) ($stockRiskSummary ?? []);
 $nextSteps = (array) ($nextSteps ?? []);
+$providerInsights = (array) ($providerInsights ?? []);
+
+$providerPerPage = 6;
+$providerTotal = count($providerInsights);
+$providerPages = max(1, (int) ceil($providerTotal / $providerPerPage));
+$providerPage = isset($_GET['provider_page']) ? max(1, (int) $_GET['provider_page']) : 1;
+$providerPage = min($providerPage, $providerPages);
+$providerPageItems = $providerTotal > 0
+    ? array_slice($providerInsights, ($providerPage - 1) * $providerPerPage, $providerPerPage)
+    : [];
+
+$buildDashboardUrl = static function (array $overrides): string {
+    $params = $_GET;
+    $params['page'] = 'dashboard';
+    foreach ($overrides as $key => $value) {
+        if ($value === null) {
+            unset($params[$key]);
+        } else {
+            $params[$key] = $value;
+        }
+    }
+
+    return 'index.php?' . http_build_query($params);
+};
 $formatDateTime = static function (?string $value, string $format = 'd/m/Y H:i'): string {
     if ($value === null || $value === '') {
         return 'n/d';
@@ -305,10 +329,10 @@ $formatDateTime = static function (?string $value, string $format = 'd/m/Y H:i')
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($providerInsights)): ?>
+                        <?php if (empty($providerPageItems)): ?>
                             <tr><td colspan="7">Nessun operatore configurato.</td></tr>
                         <?php else: ?>
-                            <?php foreach ($providerInsights as $insight): ?>
+                            <?php foreach ($providerPageItems as $insight): ?>
                                 <?php $isLow = !empty($insight['below_threshold']); ?>
                                 <tr class="<?= $isLow ? 'table-row--warning' : '' ?>">
                                     <td><?= htmlspecialchars((string) $insight['provider_name']) ?></td>
@@ -342,6 +366,17 @@ $formatDateTime = static function (?string $value, string $format = 'd/m/Y H:i')
                     </tbody>
                 </table>
             </div>
+            <?php if ($providerPages > 1): ?>
+                <?php
+                    $providerPrev = $providerPage > 1 ? $providerPage - 1 : null;
+                    $providerNext = $providerPage < $providerPages ? $providerPage + 1 : null;
+                ?>
+                <div class="pagination" style="margin-top:12px;">
+                    <a class="pagination__link<?= $providerPrev === null ? ' is-disabled' : '' ?>" href="<?= $providerPrev !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerPrev])) : '#' ?>">Precedente</a>
+                    <span class="pagination__info">Pagina <?= $providerPage ?> di <?= $providerPages ?></span>
+                    <a class="pagination__link<?= $providerNext === null ? ' is-disabled' : '' ?>" href="<?= $providerNext !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerNext])) : '#' ?>">Successiva</a>
+                </div>
+            <?php endif; ?>
         </section>
     </div>
 

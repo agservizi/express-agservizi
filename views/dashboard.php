@@ -50,6 +50,38 @@ $stockAlerts = (array) ($stockAlerts ?? []);
 $productAlerts = (array) ($productAlerts ?? []);
 $nextSteps = (array) ($nextSteps ?? []);
 
+$providerPerPage = 6;
+$providerTotal = count($providerInsights);
+$providerPages = max(1, (int) ceil($providerTotal / $providerPerPage));
+$providerPage = isset($_GET['provider_page']) ? max(1, (int) $_GET['provider_page']) : 1;
+$providerPage = min($providerPage, $providerPages);
+$providerPageItems = $providerTotal > 0
+    ? array_slice($providerInsights, ($providerPage - 1) * $providerPerPage, $providerPerPage)
+    : [];
+
+$productPerPage = 6;
+$productTotal = count($productInsights);
+$productPages = max(1, (int) ceil($productTotal / $productPerPage));
+$productPage = isset($_GET['product_page']) ? max(1, (int) $_GET['product_page']) : 1;
+$productPage = min($productPage, $productPages);
+$productPageItems = $productTotal > 0
+    ? array_slice($productInsights, ($productPage - 1) * $productPerPage, $productPerPage)
+    : [];
+
+$buildDashboardUrl = static function (array $overrides): string {
+    $params = $_GET;
+    $params['page'] = 'dashboard';
+    foreach ($overrides as $key => $value) {
+        if ($value === null) {
+            unset($params[$key]);
+        } else {
+            $params[$key] = $value;
+        }
+    }
+
+    return 'index.php?' . http_build_query($params);
+};
+
 $formatDateTime = static function (?string $value, string $format = 'd/m/Y H:i'): string {
     if ($value === null || $value === '') {
         return 'n/d';
@@ -620,10 +652,10 @@ if (is_array($currentUser)) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($providerInsights === []): ?>
+                    <?php if ($providerPageItems === []): ?>
                         <tr><td colspan="7">Nessun operatore configurato.</td></tr>
                     <?php else: ?>
-                        <?php foreach ($providerInsights as $insight): ?>
+                        <?php foreach ($providerPageItems as $insight): ?>
                             <?php $isLow = !empty($insight['below_threshold']); ?>
                             <tr class="<?= $isLow ? 'table-row--warning' : '' ?>">
                                 <td><?= htmlspecialchars((string) ($insight['provider_name'] ?? '')) ?></td>
@@ -657,6 +689,17 @@ if (is_array($currentUser)) {
                 </tbody>
             </table>
         </div>
+        <?php if ($providerPages > 1): ?>
+            <?php
+                $providerPrev = $providerPage > 1 ? $providerPage - 1 : null;
+                $providerNext = $providerPage < $providerPages ? $providerPage + 1 : null;
+            ?>
+            <div class="pagination" style="margin-top:12px;">
+                <a class="pagination__link<?= $providerPrev === null ? ' is-disabled' : '' ?>" href="<?= $providerPrev !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerPrev])) : '#' ?>">Precedente</a>
+                <span class="pagination__info">Pagina <?= $providerPage ?> di <?= $providerPages ?></span>
+                <a class="pagination__link<?= $providerNext === null ? ' is-disabled' : '' ?>" href="<?= $providerNext !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerNext])) : '#' ?>">Successiva</a>
+            </div>
+        <?php endif; ?>
         <div class="table-wrapper table-wrapper--embedded" style="margin-top:16px;">
             <table class="table table--compact">
                 <thead>
@@ -672,10 +715,10 @@ if (is_array($currentUser)) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($productInsights === []): ?>
+                    <?php if ($productPageItems === []): ?>
                         <tr><td colspan="8">Nessun prodotto attivo.</td></tr>
                     <?php else: ?>
-                        <?php foreach ($productInsights as $insight): ?>
+                        <?php foreach ($productPageItems as $insight): ?>
                             <?php $isLowProduct = !empty($insight['below_threshold']); ?>
                             <tr class="<?= $isLowProduct ? 'table-row--warning' : '' ?>">
                                 <td><?= htmlspecialchars((string) ($insight['product_name'] ?? '')) ?></td>
@@ -710,6 +753,17 @@ if (is_array($currentUser)) {
                 </tbody>
             </table>
         </div>
+        <?php if ($productPages > 1): ?>
+            <?php
+                $productPrev = $productPage > 1 ? $productPage - 1 : null;
+                $productNext = $productPage < $productPages ? $productPage + 1 : null;
+            ?>
+            <div class="pagination" style="margin-top:12px;">
+                <a class="pagination__link<?= $productPrev === null ? ' is-disabled' : '' ?>" href="<?= $productPrev !== null ? htmlspecialchars($buildDashboardUrl(['product_page' => $productPrev])) : '#' ?>">Precedente</a>
+                <span class="pagination__info">Pagina <?= $productPage ?> di <?= $productPages ?></span>
+                <a class="pagination__link<?= $productNext === null ? ' is-disabled' : '' ?>" href="<?= $productNext !== null ? htmlspecialchars($buildDashboardUrl(['product_page' => $productNext])) : '#' ?>">Successiva</a>
+            </div>
+        <?php endif; ?>
     </section>
 </div>
 
