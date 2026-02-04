@@ -64,13 +64,13 @@ $faqItems = [
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
                 <a class="landing-nav__link" href="index.php?page=landing">Home</a>
-                <a class="landing-nav__link" href="#demo">Demo</a>
-                <a class="landing-nav__link" href="#funzionalita">Funzionalità</a>
-                <a class="landing-nav__link" href="#vantaggi">Vantaggi</a>
-                <a class="landing-nav__link" href="#piani">Piani</a>
+                <a class="landing-nav__link" href="index.php?page=demo">Demo</a>
+                <a class="landing-nav__link" href="index.php?page=funzionalita">Funzionalità</a>
+                <a class="landing-nav__link" href="index.php?page=vantaggi">Vantaggi</a>
+                <a class="landing-nav__link" href="index.php?page=piani">Piani</a>
                 <a class="landing-nav__link" href="index.php?page=prezzi">Prezzi</a>
-                <a class="landing-nav__link" href="#faq">FAQ</a>
-                <a class="landing-nav__link" href="#contatto">Contatto</a>
+                <a class="landing-nav__link" href="index.php?page=faq">FAQ</a>
+                <a class="landing-nav__link" href="index.php?page=contatto">Contatto</a>
             </nav>
             <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
         </div>
