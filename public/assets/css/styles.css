@@ -126,7 +126,7 @@ html{scroll-behavior:smooth;}
 .landing-brand{display:flex;align-items:center;gap:12px;font-weight:700;color:#f8fafc;}
 .landing-brand__logo{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;}
 .landing-brand__logo img{width:100%;height:100%;display:block;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(15,23,42,.35));}
-.landing-brand__name{letter-spacing:.01em;font-size:17px;}
+.landing-brand__name{letter-spacing:.01em;font-size:25px;}
 .landing-hero__content{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;margin-top:56px;align-items:center;padding:0 6vw;}
 .landing-kicker{color:#93c5fd;text-transform:uppercase;letter-spacing:.18em;font-size:12px;font-weight:600;margin:0 0 14px;}
 .landing-hero h1{font-size:48px;line-height:1.1;margin:0 0 18px;color:#f8fafc;}
