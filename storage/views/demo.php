@@ -87,7 +87,7 @@ $demoSlides = [
                         <li>Gestione SIM e scorte con alert automatici.</li>
                         <li>Dashboard KPI per ogni punto vendita.</li>
                     </ul>
-                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Richiedi demo personalizzata</a>
+                    <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Richiedi demo personalizzata</a>
                 </div>
                 <div class="landing-demo__frame" aria-label="Anteprima demo piattaforma">
                     <div class="landing-demo__slider" data-demo-slider>
