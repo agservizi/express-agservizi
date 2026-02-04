@@ -2620,7 +2620,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const info = productIndex.byId.get(parsedId);
+    let info = productIndex.byId.get(parsedId);
     if (!info) {
       updateProductTaxLabel(row, null);
       updateProductStockLabel(row, null);
@@ -2632,6 +2632,12 @@ document.addEventListener('DOMContentLoaded', () => {
       row.classList.remove('product-row--out-of-stock');
       scheduleDiscountUpdate();
       return;
+    }
+
+    const selectedOption = select.selectedOptions && select.selectedOptions[0] ? select.selectedOptions[0] : null;
+    const selectedImei = selectedOption instanceof HTMLOptionElement ? (selectedOption.dataset.imei || '') : '';
+    if (selectedImei && (!info.imei || info.imei === '')) {
+      info = { ...info, imei: selectedImei };
     }
 
     setProductRowFromInfo(row, info, { force: true });
@@ -2646,10 +2652,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!normalized) {
       return;
     }
-    const info = productIndex.byBarcode.get(normalized);
+    let info = productIndex.byBarcode.get(normalized);
     if (!info) {
       notify.danger('Prodotto non trovato in catalogo: ' + code);
       return;
+    }
+
+    if (!info.imei || info.imei === '') {
+      const barcodeOptions = document.querySelectorAll('#products_barcodes option');
+      let foundImei = '';
+      barcodeOptions.forEach(option => {
+        const optionCode = (option.value || '').replace(/\s+/g, '');
+        if (optionCode === normalized) {
+          foundImei = option.dataset.imei || '';
+        }
+      });
+      if (foundImei) {
+        info = { ...info, imei: foundImei };
+      }
     }
 
     let row = findFirstEmptyProductRow();
