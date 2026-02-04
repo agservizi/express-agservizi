@@ -49,6 +49,10 @@ $taxNote = $GLOBALS['config']['app']['tax_note'] ?? "Operazione non soggetta a I
                             <option value="Contanti">Contanti</option>
                             <option value="Carta">Carta</option>
                             <option value="POS">POS</option>
+                            <option value="Klarna">Klarna</option>
+                            <option value="Scalapay">Scalapay</option>
+                            <option value="Finanziamento Findomestic">Finanziamento Findomestic</option>
+                            <option value="Finanziamento Compass">Finanziamento Compass</option>
                         </select>
                     </div>
                     <div class="form__group">
