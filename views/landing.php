@@ -42,9 +42,9 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
                 <p class="landing-kicker">Gestionale multi-tenant per telecomunicazioni & retail</p>
                 <h1>Il cuore operativo per SIM, vendite e servizi digitali.</h1>
                 <p class="landing-subtitle">
-                    <?= htmlspecialchars($appName) ?> è una piattaforma professionale per negozi e reti di vendita che
-                    vogliono governare magazzino SIM, attivazioni, vendite, campagne sconto e gestori energia da un unico cruscotto.
-                    È pensata per essere venduta facilmente ai clienti: onboarding rapido, flussi guidati e dati sempre sotto controllo.
+                    <?= htmlspecialchars($appName) ?> è una piattaforma professionale pensata per i titolari di negozi di telefonia e
+                    reti di vendita che vogliono governare magazzino SIM, attivazioni, vendite, campagne sconto e gestori energia da un unico cruscotto.
+                    È progettata per semplificare la gestione quotidiana: onboarding rapido del team, flussi guidati e dati sempre sotto controllo.
                 </p>
                 <div class="landing-hero__actions">
                     <a class="landing-btn landing-btn--secondary" href="#funzionalita">Scopri le funzionalità</a>
@@ -56,7 +56,7 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
                     </div>
                     <div class="landing-metric">
                         <span class="landing-metric__value">Multi-tenant</span>
-                        <span class="landing-metric__label">Controllo separato per ogni cliente</span>
+                        <span class="landing-metric__label">Controllo separato per ogni punto vendita</span>
                     </div>
                     <div class="landing-metric">
                         <span class="landing-metric__value">+40 KPI</span>
@@ -76,7 +76,7 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
                         <li>Configurazione scontrino personalizzabile per ogni tenant.</li>
                     </ul>
                     <div class="landing-card__cta">
-                        <span>Pronto a presentarlo ai clienti?</span>
+                        <span>Pronto a far crescere il tuo punto vendita?</span>
                         <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Vai al login</a>
                     </div>
                 </div>
