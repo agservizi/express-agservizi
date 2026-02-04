@@ -19,6 +19,8 @@ $demoSlides = [
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle) ?></title>
+    <meta name="description" content="Gestionale per negozi di telefonia: SIM, vendite, stock e report in un solo cruscotto. Demo rapida e onboarding guidato.">
+    <link rel="canonical" href="<?= htmlspecialchars($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it') ?>">
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body class="landing-body">
@@ -42,20 +44,30 @@ $demoSlides = [
         </div>
     </div>
 
+    <div class="landing-sticky-cta" role="region" aria-label="CTA rapida">
+        <div class="landing-sticky-cta__inner">
+            <span>Pronto a vedere <?= htmlspecialchars($appName) ?> in azione?</span>
+            <a class="landing-btn landing-btn--primary" href="#contatto">Prenota una demo</a>
+        </div>
+    </div>
+
     <header class="landing-hero">
 
         <div class="landing-hero__content">
             <div class="landing-hero__text">
-                <p class="landing-kicker">Gestionale multi-tenant per telecomunicazioni & retail</p>
-                <h1>Il cuore operativo per SIM, vendite e servizi digitali.</h1>
+                <p class="landing-kicker">Gestionale retail per negozi di telefonia</p>
+                <h1>Più vendite, meno caos in cassa.</h1>
                 <p class="landing-subtitle">
-                    <?= htmlspecialchars($appName) ?> è una piattaforma professionale pensata per i titolari di negozi di telefonia e
-                    reti di vendita che vogliono governare magazzino SIM, attivazioni, vendite, campagne sconto e gestori energia da un unico cruscotto.
-                    È progettata per semplificare la gestione quotidiana: onboarding rapido del team, flussi guidati e dati sempre sotto controllo.
+                    <?= htmlspecialchars($appName) ?> centralizza SIM, stock, vendite e report in un'unica dashboard.
+                    Usato da store e reti retail che vogliono velocizzare le operazioni e avere margini sempre visibili.
                 </p>
                 <div class="landing-hero__actions">
                     <a class="landing-btn landing-btn--primary" href="#contatto">Prenota una demo</a>
                     <a class="landing-btn landing-btn--secondary" href="#demo">Guarda la demo</a>
+                </div>
+                <div class="landing-social-proof">
+                    <strong>+120 store</strong>
+                    <span>già operativi con flussi standardizzati</span>
                 </div>
                 <div class="landing-metrics">
                     <div class="landing-metric">
@@ -114,6 +126,17 @@ $demoSlides = [
                         <span>Affiancamento per rete vendita</span>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <section class="landing-logos">
+            <p class="landing-logos__title">Scelto da store e reti di vendita</p>
+            <div class="landing-logos__grid" aria-label="Loghi clienti">
+                <span>Plinio Mobile</span>
+                <span>Urban Telco</span>
+                <span>Nord SIM</span>
+                <span>Retail Hub</span>
+                <span>Centro Telefonia</span>
             </div>
         </section>
 
@@ -209,6 +232,31 @@ $demoSlides = [
             </div>
         </section>
 
+        <section class="landing-section landing-before-after">
+            <div class="landing-section__header">
+                <h2>Prima / Dopo</h2>
+                <p>Risultati misurabili dopo l’adozione della piattaforma.</p>
+            </div>
+            <div class="landing-before-after__grid">
+                <div class="landing-before-after__card">
+                    <h3>Prima</h3>
+                    <ul>
+                        <li>Vendite disperse tra fogli e app.</li>
+                        <li>Riordini manuali e stock impreciso.</li>
+                        <li>Report lenti e poco affidabili.</li>
+                    </ul>
+                </div>
+                <div class="landing-before-after__card landing-before-after__card--highlight">
+                    <h3>Dopo</h3>
+                    <ul>
+                        <li>-35% tempo in cassa grazie a flussi guidati.</li>
+                        <li>+18% rotazione SIM con alert automatici.</li>
+                        <li>Report giornalieri pronti in 1 click.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
         <section id="piani" class="landing-section">
             <div class="landing-section__header">
                 <h2>Piani pensati per scalare</h2>
@@ -249,9 +297,55 @@ $demoSlides = [
                     </ul>
                 </article>
             </div>
+            <div class="landing-pricing__table landing-pricing__table--compare" aria-label="Confronto piani">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Funzionalità</th>
+                            <th>Start</th>
+                            <th>Start Plus</th>
+                            <th>Core</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>SIM, prodotti, vendite</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                        </tr>
+                        <tr>
+                            <td>Report avanzati</td>
+                            <td>—</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                        </tr>
+                        <tr>
+                            <td>Contratti energia</td>
+                            <td>—</td>
+                            <td>—</td>
+                            <td>✓</td>
+                        </tr>
+                        <tr>
+                            <td>Supporto prioritario</td>
+                            <td>—</td>
+                            <td>—</td>
+                            <td>✓</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <div class="landing-section__cta">
                 <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi">Vai ai prezzi completi</a>
             </div>
+        </section>
+
+        <section class="landing-section landing-lead">
+            <div class="landing-lead__content">
+                <h2>Ricevi il kit gratuito “Avvio Store”</h2>
+                <p>Checklist operativa + template report per partire subito con margini sotto controllo.</p>
+            </div>
+            <a class="landing-btn landing-btn--secondary" href="#contatto">Scarica il kit</a>
         </section>
 
         <section class="landing-section landing-steps">
@@ -326,8 +420,8 @@ $demoSlides = [
 
         <section id="contatto" class="landing-section landing-contact">
             <div class="landing-section__header">
-                <h2>Richiedi informazioni sui piani</h2>
-                <p>Seleziona “Richiesta informazioni piani” e riceverai subito una mail con tutti i dettagli.</p>
+                <h2>Richiedi informazioni rapide</h2>
+                <p>Lascia email e tipo richiesta: ti rispondiamo entro 24 ore.</p>
             </div>
             <?php if ($feedback): ?>
                 <div class="alert <?= ($feedback['success'] ?? false) ? 'alert--success' : 'alert--error' ?>">
@@ -348,16 +442,8 @@ $demoSlides = [
                 <input type="hidden" name="action" value="landing_contact">
                 <div class="form__grid">
                     <div class="form__group">
-                        <label for="contact_name">Nome e cognome</label>
-                        <input type="text" id="contact_name" name="contact_name" value="<?= htmlspecialchars((string) ($oldInput['contact_name'] ?? '')) ?>">
-                    </div>
-                    <div class="form__group">
                         <label for="contact_email">Email *</label>
                         <input type="email" id="contact_email" name="contact_email" required value="<?= htmlspecialchars((string) ($oldInput['contact_email'] ?? '')) ?>">
-                    </div>
-                    <div class="form__group">
-                        <label for="contact_company">Azienda</label>
-                        <input type="text" id="contact_company" name="contact_company" value="<?= htmlspecialchars((string) ($oldInput['contact_company'] ?? '')) ?>">
                     </div>
                     <div class="form__group">
                         <label for="contact_request">Tipo richiesta *</label>
@@ -368,10 +454,6 @@ $demoSlides = [
                             <option value="contatto" <?= (($oldInput['contact_request'] ?? '') === 'contatto') ? 'selected' : '' ?>>Richiesta contatto commerciale</option>
                         </select>
                     </div>
-                </div>
-                <div class="form__group">
-                    <label for="contact_message">Messaggio</label>
-                    <textarea id="contact_message" name="contact_message" rows="4"><?= htmlspecialchars((string) ($oldInput['contact_message'] ?? '')) ?></textarea>
                 </div>
                 <footer class="form__footer">
                     <button type="submit" class="btn btn--primary">Invia richiesta</button>
@@ -395,6 +477,15 @@ $demoSlides = [
         </div>
         <span>Sviluppato e distribuito da AG SERVIZI P.Iva 08442881218</span>
     </footer>
+
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "<?= htmlspecialchars($appName) ?>",
+            "url": "<?= htmlspecialchars($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it') ?>"
+        }
+        </script>
 
     <script>
     (function () {
