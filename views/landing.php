@@ -294,8 +294,8 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
 
         <section class="landing-section landing-cta">
             <div class="landing-cta__content">
-                <h2>Pronto a portarlo ai tuoi clienti?</h2>
-                <p>Attiva il gestionale in pochi minuti, presenta un’esperienza professionale e moderna, e scala il business con facilità.</p>
+                <h2>Pronto a potenziare il tuo negozio?</h2>
+                <p>Attiva il gestionale in pochi minuti, organizza il team con flussi guidati e fai crescere vendite e margini con dati sempre sotto controllo.</p>
             </div>
             <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi ora</a>
         </section>
