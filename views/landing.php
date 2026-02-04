@@ -24,6 +24,7 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
                 <a class="landing-nav__link" href="index.php?page=landing">Home</a>
+                <a class="landing-nav__link" href="#demo">Demo</a>
                 <a class="landing-nav__link" href="#funzionalita">Funzionalità</a>
                 <a class="landing-nav__link" href="#vantaggi">Vantaggi</a>
                 <a class="landing-nav__link" href="#piani">Piani</a>
@@ -47,7 +48,8 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
                     È progettata per semplificare la gestione quotidiana: onboarding rapido del team, flussi guidati e dati sempre sotto controllo.
                 </p>
                 <div class="landing-hero__actions">
-                    <a class="landing-btn landing-btn--secondary" href="#funzionalita">Scopri le funzionalità</a>
+                    <a class="landing-btn landing-btn--primary" href="#contatto">Prenota una demo</a>
+                    <a class="landing-btn landing-btn--secondary" href="#demo">Guarda la demo</a>
                 </div>
                 <div class="landing-metrics">
                     <div class="landing-metric">
@@ -85,6 +87,53 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
     </header>
 
     <main class="landing-main">
+        <section class="landing-proof">
+            <div class="landing-proof__inner">
+                <div class="landing-proof__badge">Piattaforma in crescita</div>
+                <div class="landing-proof__grid">
+                    <div>
+                        <strong>+40 KPI</strong>
+                        <span>Report avanzati e alert operativi</span>
+                    </div>
+                    <div>
+                        <strong>Setup rapido</strong>
+                        <span>Onboarding guidato in poche ore</span>
+                    </div>
+                    <div>
+                        <strong>Multi-sede</strong>
+                        <span>Controllo separato per ogni store</span>
+                    </div>
+                    <div>
+                        <strong>Supporto dedicato</strong>
+                        <span>Affiancamento per rete vendita</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="demo" class="landing-section landing-demo">
+            <div class="landing-demo__grid">
+                <div>
+                    <div class="landing-section__header">
+                        <h2>Guarda come funziona</h2>
+                        <p>Una demo guidata di 90 secondi mostra vendita, magazzino e report in un solo flusso.</p>
+                    </div>
+                    <ul class="landing-demo__list">
+                        <li>Flusso vendita rapido con stampa scontrino.</li>
+                        <li>Gestione SIM e scorte con alert automatici.</li>
+                        <li>Dashboard KPI per ogni punto vendita.</li>
+                    </ul>
+                    <a class="landing-btn landing-btn--primary" href="#contatto">Richiedi demo personalizzata</a>
+                </div>
+                <div class="landing-demo__frame" role="img" aria-label="Anteprima demo piattaforma">
+                    <div class="landing-demo__play">
+                        <span>▶</span>
+                        <strong>Video demo</strong>
+                        <small>Tempo stimato: 1:30</small>
+                    </div>
+                </div>
+            </div>
+        </section>
         <section id="funzionalita" class="landing-section">
             <div class="landing-section__header">
                 <h2>Un gestionale completo, pronto alla vendita</h2>
@@ -233,6 +282,27 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
                 <article class="landing-faq__item">
                     <h3>È possibile richiedere una demo?</h3>
                     <p>Certo. Compila il modulo contatti per ricevere una demo guidata.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="landing-section landing-testimonials">
+            <div class="landing-section__header">
+                <h2>Risultati concreti per i punti vendita</h2>
+                <p>Chi usa <?= htmlspecialchars($appName) ?> riduce i tempi di gestione e aumenta la visibilità sui margini.</p>
+            </div>
+            <div class="landing-testimonials__grid">
+                <article class="landing-testimonial">
+                    <p>“Abbiamo centralizzato 5 negozi in una settimana. Ora il riordino SIM è automatico.”</p>
+                    <span class="landing-testimonial__author">Responsabile retail, Napoli</span>
+                </article>
+                <article class="landing-testimonial">
+                    <p>“Report giornalieri chiari: sappiamo subito cosa performa meglio.”</p>
+                    <span class="landing-testimonial__author">Store manager, Roma</span>
+                </article>
+                <article class="landing-testimonial">
+                    <p>“La demo ha convinto tutto il team. Onboarding semplicissimo.”</p>
+                    <span class="landing-testimonial__author">Owner, Milano</span>
                 </article>
             </div>
         </section>
