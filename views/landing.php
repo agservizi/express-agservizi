@@ -326,32 +326,58 @@ $faqItems = [
                             <th>Start</th>
                             <th>Start Plus</th>
                             <th>Core</th>
+                            <th>Business</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>SIM, prodotti, vendite</td>
-                            <td>✓</td>
-                            <td>✓</td>
-                            <td>✓</td>
+                            <td>Dashboard e KPI</td>
+                            <td>✔</td>
+                            <td>✔</td>
+                            <td>✔</td>
+                            <td>✔</td>
+                        </tr>
+                        <tr>
+                            <td>Magazzino SIM e prodotti</td>
+                            <td>✔</td>
+                            <td>✔</td>
+                            <td>✔</td>
+                            <td>✔</td>
                         </tr>
                         <tr>
                             <td>Report avanzati</td>
                             <td>—</td>
-                            <td>✓</td>
-                            <td>✓</td>
+                            <td>✔</td>
+                            <td>✔</td>
+                            <td>✔</td>
+                        </tr>
+                        <tr>
+                            <td>Supporto clienti</td>
+                            <td>—</td>
+                            <td>✔</td>
+                            <td>✔</td>
+                            <td>✔</td>
                         </tr>
                         <tr>
                             <td>Contratti energia</td>
                             <td>—</td>
                             <td>—</td>
-                            <td>✓</td>
+                            <td>✔</td>
+                            <td>✔</td>
                         </tr>
                         <tr>
-                            <td>Supporto prioritario</td>
+                            <td>Report personalizzati</td>
                             <td>—</td>
                             <td>—</td>
-                            <td>✓</td>
+                            <td>—</td>
+                            <td>✔</td>
+                        </tr>
+                        <tr>
+                            <td>Prezzo</td>
+                            <td>€ 550</td>
+                            <td>€ 650</td>
+                            <td>€ 850</td>
+                            <td>€ 1200</td>
                         </tr>
                     </tbody>
                 </table>
