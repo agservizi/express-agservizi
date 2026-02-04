@@ -310,7 +310,7 @@ $formatDateTime = static function (?string $value, string $format = 'd/m/Y H:i')
             <?php endif; ?>
         </section>
 
-        <section class="dashboard-panel dashboard-panel--wide" data-draggable-card="panel-operator-monitor">
+        <section id="stock-fornitori" class="dashboard-panel dashboard-panel--wide" data-draggable-card="panel-operator-monitor">
             <header class="dashboard-panel__header">
                 <h3>Monitoraggio operatori</h3>
                 <p class="dashboard-panel__meta">Disponibilità, soglie e suggerimenti di riordino</p>
@@ -372,9 +372,9 @@ $formatDateTime = static function (?string $value, string $format = 'd/m/Y H:i')
                     $providerNext = $providerPage < $providerPages ? $providerPage + 1 : null;
                 ?>
                 <div class="pagination" style="margin-top:12px;">
-                    <a class="pagination__link<?= $providerPrev === null ? ' is-disabled' : '' ?>" href="<?= $providerPrev !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerPrev])) : '#' ?>">Precedente</a>
+                    <a class="pagination__link<?= $providerPrev === null ? ' is-disabled' : '' ?>" href="<?= $providerPrev !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerPrev])) . '#stock-fornitori' : '#' ?>">Precedente</a>
                     <span class="pagination__info">Pagina <?= $providerPage ?> di <?= $providerPages ?></span>
-                    <a class="pagination__link<?= $providerNext === null ? ' is-disabled' : '' ?>" href="<?= $providerNext !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerNext])) : '#' ?>">Successiva</a>
+                    <a class="pagination__link<?= $providerNext === null ? ' is-disabled' : '' ?>" href="<?= $providerNext !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerNext])) . '#stock-fornitori' : '#' ?>">Successiva</a>
                 </div>
             <?php endif; ?>
         </section>

@@ -520,7 +520,7 @@ if (is_array($currentUser)) {
             <?php endif; ?>
         </section>
 
-    <section class="dashboard-panel dashboard-panel--wide">
+    <section id="stock-fornitori" class="dashboard-panel dashboard-panel--wide">
             <header class="dashboard-panel__header">
                 <h3>Trend e forecast vendite</h3>
                 <p class="dashboard-panel__meta">Previsione <?= (int) ($forecast['horizon_days'] ?? 7) ?> giorni · <?= htmlspecialchars($forecastConfidenceLabel) ?> · <?= htmlspecialchars($forecastTrendLabel) ?></p>
@@ -695,9 +695,9 @@ if (is_array($currentUser)) {
                 $providerNext = $providerPage < $providerPages ? $providerPage + 1 : null;
             ?>
             <div class="pagination" style="margin-top:12px;">
-                <a class="pagination__link<?= $providerPrev === null ? ' is-disabled' : '' ?>" href="<?= $providerPrev !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerPrev])) : '#' ?>">Precedente</a>
+                <a class="pagination__link<?= $providerPrev === null ? ' is-disabled' : '' ?>" href="<?= $providerPrev !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerPrev])) . '#stock-fornitori' : '#' ?>">Precedente</a>
                 <span class="pagination__info">Pagina <?= $providerPage ?> di <?= $providerPages ?></span>
-                <a class="pagination__link<?= $providerNext === null ? ' is-disabled' : '' ?>" href="<?= $providerNext !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerNext])) : '#' ?>">Successiva</a>
+                <a class="pagination__link<?= $providerNext === null ? ' is-disabled' : '' ?>" href="<?= $providerNext !== null ? htmlspecialchars($buildDashboardUrl(['provider_page' => $providerNext])) . '#stock-fornitori' : '#' ?>">Successiva</a>
             </div>
         <?php endif; ?>
         <div class="table-wrapper table-wrapper--embedded" style="margin-top:16px;">
@@ -759,9 +759,9 @@ if (is_array($currentUser)) {
                 $productNext = $productPage < $productPages ? $productPage + 1 : null;
             ?>
             <div class="pagination" style="margin-top:12px;">
-                <a class="pagination__link<?= $productPrev === null ? ' is-disabled' : '' ?>" href="<?= $productPrev !== null ? htmlspecialchars($buildDashboardUrl(['product_page' => $productPrev])) : '#' ?>">Precedente</a>
+                <a class="pagination__link<?= $productPrev === null ? ' is-disabled' : '' ?>" href="<?= $productPrev !== null ? htmlspecialchars($buildDashboardUrl(['product_page' => $productPrev])) . '#stock-fornitori' : '#' ?>">Precedente</a>
                 <span class="pagination__info">Pagina <?= $productPage ?> di <?= $productPages ?></span>
-                <a class="pagination__link<?= $productNext === null ? ' is-disabled' : '' ?>" href="<?= $productNext !== null ? htmlspecialchars($buildDashboardUrl(['product_page' => $productNext])) : '#' ?>">Successiva</a>
+                <a class="pagination__link<?= $productNext === null ? ' is-disabled' : '' ?>" href="<?= $productNext !== null ? htmlspecialchars($buildDashboardUrl(['product_page' => $productNext])) . '#stock-fornitori' : '#' ?>">Successiva</a>
             </div>
         <?php endif; ?>
     </section>
