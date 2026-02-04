@@ -18,7 +18,9 @@ $prezziUrl = 'index.php?page=prezzi';
     <div class="landing-topbar">
         <div class="landing-topbar__inner">
             <div class="landing-brand">
-                <span class="landing-brand__dot"></span>
+                <span class="landing-brand__logo" aria-hidden="true">
+                    <img src="assets/img/logo-collapsed.svg" alt="">
+                </span>
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
