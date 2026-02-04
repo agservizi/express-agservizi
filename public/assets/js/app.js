@@ -2609,7 +2609,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    setProductRowFromInfo(row, info);
+    setProductRowFromInfo(row, info, { force: true });
     scheduleDiscountUpdate();
   }
 
