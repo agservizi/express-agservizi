@@ -47,7 +47,7 @@ $demoSlides = [
     <div class="landing-sticky-cta" role="region" aria-label="CTA rapida">
         <div class="landing-sticky-cta__inner">
             <span>Pronto a vedere <?= htmlspecialchars($appName) ?> in azione?</span>
-            <a class="landing-btn landing-btn--primary" href="#contatto">Prenota una demo</a>
+            <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Prenota una demo</a>
         </div>
     </div>
 
