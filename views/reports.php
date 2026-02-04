@@ -56,6 +56,9 @@ $energyProviders = (array) ($energy['providers'] ?? []);
 $energyTypes = (array) ($energy['types'] ?? []);
 $energyTrend = (array) ($energy['trend'] ?? []);
 $energyTrendPoints = (array) ($energyTrend['points'] ?? []);
+$comparison = (array) ($report['comparison'] ?? []);
+$comparisonDeltas = (array) ($comparison['deltas'] ?? []);
+$previousPeriodLabel = (string) (($comparison['previous_period']['label'] ?? '') ?: 'Periodo precedente');
 $maxEnergyCount = 0;
 $maxEnergyCommission = 0.0;
 foreach ($energyTrendPoints as $point) {
@@ -85,6 +88,15 @@ if ($referenceSlug === '') {
     $referenceSlug = date('Ymd');
 }
 $exportFilename = sprintf('report-%s-%s.pdf', $view, $referenceSlug);
+$exportCsvFilename = sprintf('report-%s-%s.csv', $view, $referenceSlug);
+$exportCsvUrl = 'index.php?page=reports_export&format=csv&' . http_build_query([
+    'view' => $view,
+    'date' => (string) $filters['date'],
+    'month' => (string) $filters['month'],
+    'year' => (string) $filters['year'],
+    'payment' => (string) $filters['payment'],
+    'operator_id' => (string) $filters['operator_id'],
+]);
 $viewLabels = [
     'daily' => 'Giornaliero',
     'monthly' => 'Mensile',
@@ -97,6 +109,35 @@ $viewDescriptions = [
 ];
 $formatCurrency = static function (float $value): string {
     return number_format($value, 2, ',', '.');
+};
+$formatDeltaBadge = static function (?array $delta, string $format, string $previousPeriodLabel) use ($formatCurrency): ?array {
+    if (!is_array($delta)) {
+        return null;
+    }
+    $direction = (string) ($delta['direction'] ?? 'flat');
+    $class = match ($direction) {
+        'up' => 'delta-badge--up',
+        'down' => 'delta-badge--down',
+        default => 'delta-badge--flat',
+    };
+    $absolute = (float) ($delta['absolute'] ?? 0.0);
+    $percent = $delta['percent'] ?? null;
+    if ($percent !== null) {
+        $prefix = $percent > 0 ? '+' : '';
+        $label = $prefix . number_format((float) $percent, 1, ',', '.') . '%';
+    } else {
+        $prefix = $absolute > 0 ? '+' : ($absolute < 0 ? '-' : '');
+        $value = abs($absolute);
+        $label = $format === 'currency'
+            ? $prefix . $formatCurrency($value) . '€'
+            : $prefix . number_format($value, 0, ',', '.');
+    }
+
+    return [
+        'class' => $class,
+        'label' => $label,
+        'title' => $previousPeriodLabel,
+    ];
 };
 $rangeStart = null;
 $rangeEnd = null;
@@ -137,6 +178,16 @@ $trendSummary = sprintf(
     (int) ($trend['total_count'] ?? 0),
     $formatCurrency((float) ($trend['total_net'] ?? 0.0))
 );
+$chartTrendLabels = json_encode(array_map(static fn (array $p): string => (string) ($p['label'] ?? ''), $trendPoints), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$chartTrendNet = json_encode(array_map(static fn (array $p): float => (float) ($p['net_revenue'] ?? 0.0), $trendPoints), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$chartTrendCount = json_encode(array_map(static fn (array $p): int => (int) ($p['sale_count'] ?? 0), $trendPoints), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$chartEnergyLabels = json_encode(array_map(static fn (array $p): string => (string) ($p['label'] ?? ''), $energyTrendPoints), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$chartEnergyCommission = json_encode(array_map(static fn (array $p): float => (float) ($p['total_commission'] ?? 0.0), $energyTrendPoints), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$chartEnergyCount = json_encode(array_map(static fn (array $p): int => (int) ($p['contract_count'] ?? 0), $energyTrendPoints), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$chartPaymentLabels = json_encode(array_map(static fn (array $p): string => (string) ($p['method'] ?? ''), $payments), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$chartPaymentNet = json_encode(array_map(static fn (array $p): float => (float) ($p['net_revenue'] ?? 0.0), $payments), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$chartOperatorLabels = json_encode(array_map(static fn (array $p): string => (string) ($p['operator_name'] ?? ''), $operators), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$chartOperatorNet = json_encode(array_map(static fn (array $p): float => (float) ($p['net_revenue'] ?? 0.0), $operators), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 ?>
 <section class="page">
     <header class="page__header">
@@ -190,10 +241,20 @@ $trendSummary = sprintf(
                     </select>
                 </div>
             </div>
+            <div class="filters-bar__actions filters-bar__actions--quick" data-html2canvas-ignore="true">
+                <span class="filters-bar__label">Scorciatoie:</span>
+                <button type="button" class="btn btn--chip" data-report-quick-action="today">Oggi</button>
+                <button type="button" class="btn btn--chip" data-report-quick-action="yesterday">Ieri</button>
+                <button type="button" class="btn btn--chip" data-report-quick-action="this-month">Questo mese</button>
+                <button type="button" class="btn btn--chip" data-report-quick-action="last-month">Mese scorso</button>
+                <button type="button" class="btn btn--chip" data-report-quick-action="this-year">Anno corrente</button>
+                <button type="button" class="btn btn--chip" data-report-quick-action="last-year">Anno scorso</button>
+            </div>
             <div class="filters-bar__actions">
                 <button type="submit" class="btn btn--primary">Applica filtri</button>
                 <a class="btn btn--secondary" href="index.php?page=reports&amp;view=<?= htmlspecialchars($view) ?>">Reset</a>
                 <button type="button" class="btn btn--secondary" id="btn-report-export" data-filename="<?= htmlspecialchars($exportFilename) ?>">Esporta PDF</button>
+                <a class="btn btn--secondary" href="<?= htmlspecialchars($exportCsvUrl) ?>" download="<?= htmlspecialchars($exportCsvFilename) ?>">Esporta CSV</a>
             </div>
         </form>
 
@@ -203,17 +264,32 @@ $trendSummary = sprintf(
             <article class="card" data-draggable-card="metric-net">
                 <h3>Incasso netto</h3>
                 <p class="card__value">€ <?= $formatCurrency((float) $totals['net_revenue']) ?></p>
-                <p class="card__meta">Ticket medio netto € <?= $formatCurrency((float) $totals['average_ticket_net']) ?></p>
+                <?php $delta = $formatDeltaBadge($comparisonDeltas['net_revenue'] ?? null, 'currency', $previousPeriodLabel); ?>
+                <?php if ($delta): ?>
+                    <p class="card__meta"><span class="delta-badge <?= $delta['class'] ?>" title="<?= htmlspecialchars($delta['title']) ?>"><?= htmlspecialchars($delta['label']) ?></span> vs periodo precedente</p>
+                <?php else: ?>
+                    <p class="card__meta">Ticket medio netto € <?= $formatCurrency((float) $totals['average_ticket_net']) ?></p>
+                <?php endif; ?>
             </article>
             <article class="card" data-draggable-card="metric-gross">
                 <h3>Incasso lordo</h3>
                 <p class="card__value">€ <?= $formatCurrency((float) $totals['gross_revenue']) ?></p>
-                <p class="card__meta">Ticket medio € <?= $formatCurrency((float) $totals['average_ticket']) ?></p>
+                <?php $delta = $formatDeltaBadge($comparisonDeltas['gross_revenue'] ?? null, 'currency', $previousPeriodLabel); ?>
+                <?php if ($delta): ?>
+                    <p class="card__meta"><span class="delta-badge <?= $delta['class'] ?>" title="<?= htmlspecialchars($delta['title']) ?>"><?= htmlspecialchars($delta['label']) ?></span> vs periodo precedente</p>
+                <?php else: ?>
+                    <p class="card__meta">Ticket medio € <?= $formatCurrency((float) $totals['average_ticket']) ?></p>
+                <?php endif; ?>
             </article>
             <article class="card" data-draggable-card="metric-count">
                 <h3>Vendite registrate</h3>
                 <p class="card__value"><?= (int) $totals['sales_count'] ?></p>
-                <p class="card__meta">Sconti erogati € <?= $formatCurrency((float) $totals['discount_total']) ?></p>
+                <?php $delta = $formatDeltaBadge($comparisonDeltas['sales_count'] ?? null, 'number', $previousPeriodLabel); ?>
+                <?php if ($delta): ?>
+                    <p class="card__meta"><span class="delta-badge <?= $delta['class'] ?>" title="<?= htmlspecialchars($delta['title']) ?>"><?= htmlspecialchars($delta['label']) ?></span> vs periodo precedente</p>
+                <?php else: ?>
+                    <p class="card__meta">Sconti erogati € <?= $formatCurrency((float) $totals['discount_total']) ?></p>
+                <?php endif; ?>
             </article>
             <article class="card" data-draggable-card="metric-refund">
                 <h3>Resi e crediti</h3>
@@ -226,8 +302,31 @@ $trendSummary = sprintf(
         <section class="dashboard-panel dashboard-panel--wide" data-draggable-card="panel-trend">
             <header class="dashboard-panel__header">
                 <h3>Tendenza <?= htmlspecialchars($viewLabels[$view] ?? 'Periodo') ?></h3>
-                <p class="dashboard-panel__meta"><?= htmlspecialchars($trendSummary) ?></p>
+                <div class="report-chart-tools">
+                    <p class="dashboard-panel__meta"><?= htmlspecialchars($trendSummary) ?></p>
+                    <div class="report-chart-tools__actions">
+                        <label class="report-chart-tools__label">
+                            Ultimi
+                            <select data-chart-filter="trend-range">
+                                <option value="0">Tutti</option>
+                                <option value="7">7</option>
+                                <option value="30">30</option>
+                                <option value="90">90</option>
+                            </select>
+                        </label>
+                        <button type="button" class="btn btn--chip" data-chart-download="reportTrendNet">PNG netto</button>
+                        <button type="button" class="btn btn--chip" data-chart-download="reportTrendCount">PNG vendite</button>
+                    </div>
+                </div>
             </header>
+            <div class="report-chart-grid">
+                <div class="report-chart">
+                    <canvas id="reportTrendNet" height="160" aria-label="Trend incasso netto" role="img"></canvas>
+                </div>
+                <div class="report-chart">
+                    <canvas id="reportTrendCount" height="160" aria-label="Trend vendite" role="img"></canvas>
+                </div>
+            </div>
             <?php if ($trendPoints === []): ?>
                 <p class="muted">Non ci sono vendite nel periodo selezionato.</p>
             <?php else: ?>
@@ -259,8 +358,24 @@ $trendSummary = sprintf(
         <section class="dashboard-panel" data-draggable-card="panel-payments">
             <header class="dashboard-panel__header">
                 <h3>Metodi di pagamento</h3>
-                <p class="dashboard-panel__meta">Distribuzione incassi</p>
+                <div class="report-chart-tools">
+                    <p class="dashboard-panel__meta">Distribuzione incassi</p>
+                    <div class="report-chart-tools__actions">
+                        <label class="report-chart-tools__label">
+                            Top
+                            <select data-chart-filter="payments-top">
+                                <option value="0">Tutti</option>
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                            </select>
+                        </label>
+                        <button type="button" class="btn btn--chip" data-chart-download="reportPayments">PNG</button>
+                    </div>
+                </div>
             </header>
+            <div class="report-chart">
+                <canvas id="reportPayments" height="200" aria-label="Distribuzione incassi" role="img"></canvas>
+            </div>
             <?php if ($payments === []): ?>
                 <p class="muted">Nessuna vendita disponibile per il periodo filtrato.</p>
             <?php else: ?>
@@ -296,8 +411,24 @@ $trendSummary = sprintf(
         <section class="dashboard-panel" data-draggable-card="panel-operators">
             <header class="dashboard-panel__header">
                 <h3>Top operatori</h3>
-                <p class="dashboard-panel__meta">Netto periodo selezionato</p>
+                <div class="report-chart-tools">
+                    <p class="dashboard-panel__meta">Netto periodo selezionato</p>
+                    <div class="report-chart-tools__actions">
+                        <label class="report-chart-tools__label">
+                            Top
+                            <select data-chart-filter="operators-top">
+                                <option value="0">Tutti</option>
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                            </select>
+                        </label>
+                        <button type="button" class="btn btn--chip" data-chart-download="reportOperators">PNG</button>
+                    </div>
+                </div>
             </header>
+            <div class="report-chart">
+                <canvas id="reportOperators" height="220" aria-label="Incasso netto per operatore" role="img"></canvas>
+            </div>
             <?php if ($operators === []): ?>
                 <p class="muted">Nessuna vendita registrata dagli operatori nel periodo.</p>
             <?php else: ?>
@@ -316,8 +447,31 @@ $trendSummary = sprintf(
         <section class="dashboard-panel dashboard-panel--wide" data-draggable-card="panel-energy">
             <header class="dashboard-panel__header">
                 <h3>Contratti energia</h3>
-                <p class="dashboard-panel__meta">Sintesi periodo selezionato</p>
+                <div class="report-chart-tools">
+                    <p class="dashboard-panel__meta">Sintesi periodo selezionato</p>
+                    <div class="report-chart-tools__actions">
+                        <label class="report-chart-tools__label">
+                            Ultimi
+                            <select data-chart-filter="energy-range">
+                                <option value="0">Tutti</option>
+                                <option value="7">7</option>
+                                <option value="30">30</option>
+                                <option value="90">90</option>
+                            </select>
+                        </label>
+                        <button type="button" class="btn btn--chip" data-chart-download="reportEnergyCommission">PNG provvigioni</button>
+                        <button type="button" class="btn btn--chip" data-chart-download="reportEnergyCount">PNG contratti</button>
+                    </div>
+                </div>
             </header>
+            <div class="report-chart-grid">
+                <div class="report-chart">
+                    <canvas id="reportEnergyCommission" height="160" aria-label="Trend provvigioni energia" role="img"></canvas>
+                </div>
+                <div class="report-chart">
+                    <canvas id="reportEnergyCount" height="160" aria-label="Trend contratti energia" role="img"></canvas>
+                </div>
+            </div>
             <ul class="insight-list">
                 <li class="insight-list__item">
                     <span class="insight-list__label">Contratti registrati</span>
@@ -396,6 +550,7 @@ $trendSummary = sprintf(
 </div>
 </section>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 (function () {
@@ -429,6 +584,70 @@ $trendSummary = sprintf(
     if (viewSelect) {
         viewSelect.addEventListener('change', toggleControls);
     }
+
+    const dateInput = form.querySelector('#filter-date');
+    const monthInput = form.querySelector('#filter-month');
+    const yearInput = form.querySelector('#filter-year');
+    const quickButtons = form.querySelectorAll('[data-report-quick-action]');
+
+    const toLocalDate = (date) => {
+        const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+        return local.toISOString().slice(0, 10);
+    };
+    const toLocalMonth = (date) => {
+        const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+        return local.toISOString().slice(0, 7);
+    };
+
+    const applyQuick = (action) => {
+        const today = new Date();
+        switch (action) {
+            case 'today': {
+                if (viewSelect) viewSelect.value = 'daily';
+                if (dateInput) dateInput.value = toLocalDate(today);
+                break;
+            }
+            case 'yesterday': {
+                const d = new Date(today);
+                d.setDate(d.getDate() - 1);
+                if (viewSelect) viewSelect.value = 'daily';
+                if (dateInput) dateInput.value = toLocalDate(d);
+                break;
+            }
+            case 'this-month': {
+                if (viewSelect) viewSelect.value = 'monthly';
+                if (monthInput) monthInput.value = toLocalMonth(today);
+                break;
+            }
+            case 'last-month': {
+                const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                if (viewSelect) viewSelect.value = 'monthly';
+                if (monthInput) monthInput.value = toLocalMonth(d);
+                break;
+            }
+            case 'this-year': {
+                if (viewSelect) viewSelect.value = 'yearly';
+                if (yearInput) yearInput.value = String(today.getFullYear());
+                break;
+            }
+            case 'last-year': {
+                if (viewSelect) viewSelect.value = 'yearly';
+                if (yearInput) yearInput.value = String(today.getFullYear() - 1);
+                break;
+            }
+            default:
+                return;
+        }
+        toggleControls();
+        form.submit();
+    };
+
+    quickButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const action = button.getAttribute('data-report-quick-action') || '';
+            applyQuick(action);
+        });
+    });
 
     const exportBtn = document.getElementById('btn-report-export');
     const exportTarget = document.getElementById('report-export-target');
@@ -466,5 +685,229 @@ $trendSummary = sprintf(
             }
         }
     });
+
+    if (window.Chart) {
+        const labelsTrend = <?= $chartTrendLabels ?: '[]' ?>;
+        const trendNet = <?= $chartTrendNet ?: '[]' ?>;
+        const trendCount = <?= $chartTrendCount ?: '[]' ?>;
+        const labelsEnergy = <?= $chartEnergyLabels ?: '[]' ?>;
+        const energyCommission = <?= $chartEnergyCommission ?: '[]' ?>;
+        const energyCount = <?= $chartEnergyCount ?: '[]' ?>;
+        const labelsPayments = <?= $chartPaymentLabels ?: '[]' ?>;
+        const paymentNet = <?= $chartPaymentNet ?: '[]' ?>;
+        const labelsOperators = <?= $chartOperatorLabels ?: '[]' ?>;
+        const operatorNet = <?= $chartOperatorNet ?: '[]' ?>;
+
+        const formatCurrency = (value) => new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
+        const formatNumber = (value) => new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 }).format(value || 0);
+        const tooltipCurrency = (context) => {
+            const value = context.parsed?.y ?? context.parsed ?? 0;
+            return `€ ${formatCurrency(value)}`;
+        };
+        const tooltipCount = (context) => {
+            const value = context.parsed?.y ?? context.parsed ?? 0;
+            return `${formatNumber(value)}`;
+        };
+
+        const createLine = (ctx, labels, data, label, color) => new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label,
+                    data,
+                    borderColor: color,
+                    backgroundColor: color + '33',
+                    tension: 0.35,
+                    fill: true,
+                    pointRadius: 3,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: label.toLowerCase().includes('vendite') || label.toLowerCase().includes('contratti')
+                                ? tooltipCount
+                                : tooltipCurrency,
+                        },
+                    },
+                },
+                scales: { y: { beginAtZero: true } },
+            },
+        });
+
+        const createBar = (ctx, labels, data, label) => new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label,
+                    data,
+                    backgroundColor: 'rgba(37,99,235,0.45)',
+                    borderColor: 'rgba(37,99,235,0.9)',
+                    borderWidth: 1,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: tooltipCurrency } },
+                },
+                scales: { y: { beginAtZero: true } },
+            },
+        });
+
+        const createDoughnut = (ctx, labels, data) => new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels,
+                datasets: [{
+                    data,
+                    backgroundColor: ['#2563eb', '#38bdf8', '#22c55e', '#f59e0b', '#f97316', '#ef4444'],
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const value = context.parsed ?? 0;
+                                const total = context.dataset.data.reduce((sum, item) => sum + (item || 0), 0) || 1;
+                                const pct = (value / total) * 100;
+                                return `${context.label}: € ${formatCurrency(value)} (${pct.toFixed(1)}%)`;
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        const trendNetCanvas = document.getElementById('reportTrendNet');
+        const trendCountCanvas = document.getElementById('reportTrendCount');
+        const energyCommissionCanvas = document.getElementById('reportEnergyCommission');
+        const energyCountCanvas = document.getElementById('reportEnergyCount');
+        const paymentsCanvas = document.getElementById('reportPayments');
+        const operatorsCanvas = document.getElementById('reportOperators');
+
+        const charts = {};
+
+        if (trendNetCanvas && labelsTrend.length) {
+            charts.reportTrendNet = createLine(trendNetCanvas, labelsTrend, trendNet, 'Incasso netto', '#2563eb');
+        }
+        if (trendCountCanvas && labelsTrend.length) {
+            charts.reportTrendCount = createLine(trendCountCanvas, labelsTrend, trendCount, 'Vendite', '#16a34a');
+        }
+        if (energyCommissionCanvas && labelsEnergy.length) {
+            charts.reportEnergyCommission = createLine(energyCommissionCanvas, labelsEnergy, energyCommission, 'Provvigioni', '#7c3aed');
+        }
+        if (energyCountCanvas && labelsEnergy.length) {
+            charts.reportEnergyCount = createLine(energyCountCanvas, labelsEnergy, energyCount, 'Contratti', '#0ea5e9');
+        }
+        if (paymentsCanvas && labelsPayments.length) {
+            charts.reportPayments = createDoughnut(paymentsCanvas, labelsPayments, paymentNet);
+        }
+        if (operatorsCanvas && labelsOperators.length) {
+            charts.reportOperators = createBar(operatorsCanvas, labelsOperators, operatorNet, 'Incasso netto');
+        }
+
+        const sliceLast = (labels, data, count) => {
+            if (!count || count <= 0 || labels.length <= count) {
+                return { labels, data };
+            }
+            return { labels: labels.slice(-count), data: data.slice(-count) };
+        };
+
+        const updateLine = (chartId, labels, data) => {
+            const chart = charts[chartId];
+            if (!chart) return;
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.update();
+        };
+
+        const updateDoughnut = (chartId, labels, data) => {
+            const chart = charts[chartId];
+            if (!chart) return;
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.update();
+        };
+
+        const updateBar = (chartId, labels, data) => {
+            const chart = charts[chartId];
+            if (!chart) return;
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.update();
+        };
+
+        const trendFilter = document.querySelector('[data-chart-filter="trend-range"]');
+        if (trendFilter) {
+            trendFilter.addEventListener('change', () => {
+                const count = parseInt(trendFilter.value || '0', 10);
+                const slicedNet = sliceLast(labelsTrend, trendNet, count);
+                const slicedCount = sliceLast(labelsTrend, trendCount, count);
+                updateLine('reportTrendNet', slicedNet.labels, slicedNet.data);
+                updateLine('reportTrendCount', slicedCount.labels, slicedCount.data);
+            });
+        }
+
+        const energyFilter = document.querySelector('[data-chart-filter="energy-range"]');
+        if (energyFilter) {
+            energyFilter.addEventListener('change', () => {
+                const count = parseInt(energyFilter.value || '0', 10);
+                const slicedCommission = sliceLast(labelsEnergy, energyCommission, count);
+                const slicedEnergyCount = sliceLast(labelsEnergy, energyCount, count);
+                updateLine('reportEnergyCommission', slicedCommission.labels, slicedCommission.data);
+                updateLine('reportEnergyCount', slicedEnergyCount.labels, slicedEnergyCount.data);
+            });
+        }
+
+        const paymentsFilter = document.querySelector('[data-chart-filter="payments-top"]');
+        if (paymentsFilter) {
+            paymentsFilter.addEventListener('change', () => {
+                const count = parseInt(paymentsFilter.value || '0', 10);
+                const paired = labelsPayments.map((label, idx) => ({ label, value: paymentNet[idx] || 0 }));
+                paired.sort((a, b) => b.value - a.value);
+                const filtered = count > 0 ? paired.slice(0, count) : paired;
+                updateDoughnut('reportPayments', filtered.map(item => item.label), filtered.map(item => item.value));
+            });
+        }
+
+        const operatorsFilter = document.querySelector('[data-chart-filter="operators-top"]');
+        if (operatorsFilter) {
+            operatorsFilter.addEventListener('change', () => {
+                const count = parseInt(operatorsFilter.value || '0', 10);
+                const paired = labelsOperators.map((label, idx) => ({ label, value: operatorNet[idx] || 0 }));
+                paired.sort((a, b) => b.value - a.value);
+                const filtered = count > 0 ? paired.slice(0, count) : paired;
+                updateBar('reportOperators', filtered.map(item => item.label), filtered.map(item => item.value));
+            });
+        }
+
+        document.querySelectorAll('[data-chart-download]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const chartId = button.getAttribute('data-chart-download');
+                const chart = charts[chartId];
+                if (!chart) {
+                    return;
+                }
+                const link = document.createElement('a');
+                link.href = chart.toBase64Image('image/png', 1);
+                link.download = `${chartId}.png`;
+                link.click();
+            });
+        });
+    }
 })();
 </script>

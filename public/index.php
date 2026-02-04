@@ -939,6 +939,20 @@ function resolveLicenseByLabel(PDO $pdo, string $label): ?array
     return $row !== false ? $row : null;
 }
 
+function outputCsv(string $filename, array $rows): void
+{
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    $output = fopen('php://output', 'wb');
+    if ($output === false) {
+        return;
+    }
+    foreach ($rows as $row) {
+        fputcsv($output, $row, ';');
+    }
+    fclose($output);
+}
+
 function logStripeEvent(string $message): void
 {
     $dir = dirname(__DIR__) . '/storage/logs';
@@ -2846,6 +2860,105 @@ switch ($page) {
             'pageTitle' => 'Report vendite',
         ]);
         break;
+
+    case 'reports_export':
+        if ($currentUser === null) {
+            header('Location: index.php?page=login');
+            exit;
+        }
+        $format = strtolower((string) ($_GET['format'] ?? 'csv'));
+        if ($format !== 'csv') {
+            http_response_code(400);
+            echo 'Formato non supportato.';
+            exit;
+        }
+        $reportData = $reportsController->summary($_GET['view'] ?? 'daily', $_GET);
+        $totals = (array) ($reportData['totals'] ?? []);
+        $payments = (array) ($reportData['payments'] ?? []);
+        $operators = (array) ($reportData['operators'] ?? []);
+        $trend = (array) ($reportData['trend']['points'] ?? []);
+        $energy = (array) ($reportData['energy'] ?? []);
+        $energyTotals = (array) ($energy['totals'] ?? []);
+        $energyProviders = (array) ($energy['providers'] ?? []);
+        $energyTypes = (array) ($energy['types'] ?? []);
+        $period = (array) ($reportData['period'] ?? []);
+        $reference = (string) ($period['reference'] ?? date('Y-m-d'));
+        $filename = 'report-' . ($reportData['granularity'] ?? 'daily') . '-' . preg_replace('/[^0-9\-]/', '', $reference) . '.csv';
+
+        $rows = [];
+        $rows[] = ['Report vendite', (string) ($period['label'] ?? '')];
+        $rows[] = [];
+        $rows[] = ['Totali'];
+        $rows[] = ['Vendite', (string) ($totals['sales_count'] ?? 0)];
+        $rows[] = ['Incasso lordo', (string) ($totals['gross_revenue'] ?? 0)];
+        $rows[] = ['Incasso netto', (string) ($totals['net_revenue'] ?? 0)];
+        $rows[] = ['Sconti', (string) ($totals['discount_total'] ?? 0)];
+        $rows[] = ['Resi', (string) ($totals['refund_total'] ?? 0)];
+        $rows[] = ['Crediti', (string) ($totals['credit_total'] ?? 0)];
+        $rows[] = [];
+        $rows[] = ['Metodi di pagamento'];
+        $rows[] = ['Metodo', 'Vendite', 'Incasso lordo', 'Incasso netto', 'Sconti', 'Resi'];
+        foreach ($payments as $row) {
+            $rows[] = [
+                (string) ($row['method'] ?? ''),
+                (string) ($row['sales_count'] ?? 0),
+                (string) ($row['gross_revenue'] ?? 0),
+                (string) ($row['net_revenue'] ?? 0),
+                (string) ($row['discount_total'] ?? 0),
+                (string) ($row['refund_total'] ?? 0),
+            ];
+        }
+        $rows[] = [];
+        $rows[] = ['Operatori'];
+        $rows[] = ['Operatore', 'Vendite', 'Incasso lordo', 'Incasso netto', 'Sconti', 'Resi'];
+        foreach ($operators as $row) {
+            $rows[] = [
+                (string) ($row['operator_name'] ?? ''),
+                (string) ($row['sales_count'] ?? 0),
+                (string) ($row['gross_revenue'] ?? 0),
+                (string) ($row['net_revenue'] ?? 0),
+                (string) ($row['discount_total'] ?? 0),
+                (string) ($row['refund_total'] ?? 0),
+            ];
+        }
+        $rows[] = [];
+        $rows[] = ['Trend'];
+        $rows[] = ['Periodo', 'Vendite', 'Netto'];
+        foreach ($trend as $row) {
+            $rows[] = [
+                (string) ($row['label'] ?? ''),
+                (string) ($row['sale_count'] ?? 0),
+                (string) ($row['net_revenue'] ?? 0),
+            ];
+        }
+        $rows[] = [];
+        $rows[] = ['Energia'];
+        $rows[] = ['Contratti', (string) ($energyTotals['contracts'] ?? 0)];
+        $rows[] = ['Provvigioni totali', (string) ($energyTotals['total_commission'] ?? 0)];
+        $rows[] = ['Provvigione media', (string) ($energyTotals['average_commission'] ?? 0)];
+        $rows[] = [];
+        $rows[] = ['Gestori energia'];
+        $rows[] = ['Gestore', 'Contratti', 'Provvigioni'];
+        foreach ($energyProviders as $row) {
+            $rows[] = [
+                (string) ($row['name'] ?? ''),
+                (string) ($row['contracts'] ?? 0),
+                (string) ($row['total_commission'] ?? 0),
+            ];
+        }
+        $rows[] = [];
+        $rows[] = ['Tipologie contratto'];
+        $rows[] = ['Tipo', 'Contratti', 'Provvigioni'];
+        foreach ($energyTypes as $row) {
+            $rows[] = [
+                (string) ($row['type'] ?? ''),
+                (string) ($row['contracts'] ?? 0),
+                (string) ($row['total_commission'] ?? 0),
+            ];
+        }
+
+        outputCsv($filename, $rows);
+        exit;
 
     case 'sim_stock':
         $feedback = $_SESSION['sim_stock_feedback'] ?? null;

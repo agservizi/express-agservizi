@@ -29,8 +29,11 @@ final class ReportsService
     {
         $mode = $this->normalizeGranularity($granularity);
         [$start, $end] = $this->resolveWindow($mode, $referenceDate);
+        $previousReference = $this->resolvePreviousReference($mode, $referenceDate);
+        [$prevStart, $prevEnd] = $this->resolveWindow($mode, $previousReference);
         $selectedFilters = $this->sanitizeFilters($filters);
         $totals = $this->fetchTotals($start, $end, $selectedFilters);
+        $previousTotals = $this->fetchTotals($prevStart, $prevEnd, $selectedFilters);
         $payments = $this->fetchPaymentBreakdown($start, $end, $selectedFilters);
         $operators = $this->fetchOperatorBreakdown($start, $end, $selectedFilters);
         $trend = $this->fetchTrend($mode, $referenceDate, $selectedFilters);
@@ -48,6 +51,21 @@ final class ReportsService
                 'reference' => $referenceDate->format('Y-m-d'),
             ],
             'totals' => $totals,
+            'comparison' => [
+                'previous_period' => [
+                    'start' => $prevStart->format('Y-m-d'),
+                    'end' => $prevEnd->format('Y-m-d'),
+                    'label' => $this->formatPeriodLabel($mode, $prevStart, $prevEnd),
+                ],
+                'totals' => $previousTotals,
+                'deltas' => [
+                    'sales_count' => $this->buildDelta((float) $totals['sales_count'], (float) $previousTotals['sales_count']),
+                    'gross_revenue' => $this->buildDelta((float) $totals['gross_revenue'], (float) $previousTotals['gross_revenue']),
+                    'net_revenue' => $this->buildDelta((float) $totals['net_revenue'], (float) $previousTotals['net_revenue']),
+                    'average_ticket' => $this->buildDelta((float) $totals['average_ticket'], (float) $previousTotals['average_ticket']),
+                    'average_ticket_net' => $this->buildDelta((float) $totals['average_ticket_net'], (float) $previousTotals['average_ticket_net']),
+                ],
+            ],
             'payments' => $payments,
             'operators' => $operators,
             'trend' => $trend,
@@ -274,6 +292,36 @@ final class ReportsService
                 $start->add(new DateInterval('P1D')),
             ],
         };
+    }
+
+    private function resolvePreviousReference(string $granularity, DateTimeImmutable $reference): DateTimeImmutable
+    {
+        return match ($granularity) {
+            'monthly' => $reference->modify('first day of last month')->setTime(0, 0, 0),
+            'yearly' => $reference->modify('-1 year')->setDate((int) $reference->format('Y') - 1, 1, 1)->setTime(0, 0, 0),
+            default => $reference->modify('-1 day')->setTime(0, 0, 0),
+        };
+    }
+
+    /**
+     * @return array{absolute:float,percent:?float,direction:string}
+     */
+    private function buildDelta(float $current, float $previous): array
+    {
+        $absolute = $current - $previous;
+        $percent = $previous !== 0.0 ? ($absolute / $previous) * 100 : null;
+        $direction = 'flat';
+        if ($absolute > 0.0001) {
+            $direction = 'up';
+        } elseif ($absolute < -0.0001) {
+            $direction = 'down';
+        }
+
+        return [
+            'absolute' => $absolute,
+            'percent' => $percent,
+            'direction' => $direction,
+        ];
     }
 
     private function formatPeriodLabel(string $granularity, DateTimeImmutable $start, DateTimeImmutable $end): string
