@@ -2982,7 +2982,15 @@ switch ($page) {
             if ($stockSearch === '') {
                 $stockSearch = null;
             }
-            $stockList = $iccidController->listPaginated($stockPage, $stockPerPage, null, $stockSearch);
+            $stockStatus = isset($_GET['status']) ? trim((string) $_GET['status']) : null;
+            if ($stockStatus === '') {
+                $stockStatus = null;
+            }
+            $stockProviderId = isset($_GET['provider_id']) ? (int) $_GET['provider_id'] : null;
+            if ($stockProviderId !== null && $stockProviderId <= 0) {
+                $stockProviderId = null;
+            }
+            $stockList = $iccidController->listPaginated($stockPage, $stockPerPage, $stockStatus, $stockSearch, $stockProviderId);
             jsonResponse([
                 'success' => true,
                 'payload' => [
@@ -2999,7 +3007,19 @@ switch ($page) {
                 $status = $result['success'] ? 200 : 422;
                 $stockPage = isset($_POST['page_no']) ? max((int) $_POST['page_no'], 1) : 1;
                 $stockPerPage = isset($_POST['per_page']) ? max(1, min((int) $_POST['per_page'], 50)) : 7;
-                $stockList = $iccidController->listPaginated($stockPage, $stockPerPage);
+                $stockSearch = isset($_POST['search']) ? trim((string) $_POST['search']) : null;
+                if ($stockSearch === '') {
+                    $stockSearch = null;
+                }
+                $stockStatus = isset($_POST['status']) ? trim((string) $_POST['status']) : null;
+                if ($stockStatus === '') {
+                    $stockStatus = null;
+                }
+                $stockProviderId = isset($_POST['filter_provider_id']) ? (int) $_POST['filter_provider_id'] : null;
+                if ($stockProviderId !== null && $stockProviderId <= 0) {
+                    $stockProviderId = null;
+                }
+                $stockList = $iccidController->listPaginated($stockPage, $stockPerPage, $stockStatus, $stockSearch, $stockProviderId);
                 jsonResponse([
                     'success' => $result['success'],
                     'message' => $result['message'],
@@ -3016,18 +3036,30 @@ switch ($page) {
             exit;
         }
         $stockPage = isset($_GET['page_no']) ? max((int) $_GET['page_no'], 1) : 1;
-        $stockPerPage = 7;
+        $stockPerPage = isset($_GET['per_page']) ? max(1, min((int) $_GET['per_page'], 50)) : 7;
         $stockSearch = isset($_GET['search']) ? trim((string) $_GET['search']) : null;
         if ($stockSearch === '') {
             $stockSearch = null;
         }
-        $stockList = $iccidController->listPaginated($stockPage, $stockPerPage, null, $stockSearch);
+        $stockStatus = isset($_GET['status']) ? trim((string) $_GET['status']) : null;
+        if ($stockStatus === '') {
+            $stockStatus = null;
+        }
+        $stockProviderId = isset($_GET['provider_id']) ? (int) $_GET['provider_id'] : null;
+        if ($stockProviderId !== null && $stockProviderId <= 0) {
+            $stockProviderId = null;
+        }
+        $stockList = $iccidController->listPaginated($stockPage, $stockPerPage, $stockStatus, $stockSearch, $stockProviderId);
         render('sim_stock', [
             'providers' => $iccidController->providers(),
+            'statusOptions' => $iccidController->statuses(),
             'stock' => $stockList['rows'],
             'pagination' => $stockList['pagination'],
             'currentUser' => $currentUser,
             'searchTerm' => $stockSearch ?? '',
+            'statusFilter' => $stockStatus ?? '',
+            'providerFilter' => $stockProviderId ?? 0,
+            'perPage' => $stockPerPage,
             'initialToasts' => $initialToasts,
         ]);
         break;

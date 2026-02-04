@@ -6,20 +6,65 @@ declare(strict_types=1);
  * @var array<int, array<string, mixed>> $stock
  * @var array{success:bool, message:string, error?:string}|null $feedback
  * @var array{page:int, per_page:int, total:int, pages:int}|null $pagination
+ * @var string $searchTerm
+ * @var string $statusFilter
+ * @var int $providerFilter
+ * @var array<int, string> $statusOptions
+ * @var int $perPage
  */
 $pageTitle = 'Magazzino SIM';
+$searchTerm = $searchTerm ?? '';
+$statusFilter = $statusFilter ?? '';
+$providerFilter = (int) ($providerFilter ?? 0);
+$statusOptions = $statusOptions ?? [];
 $pagination = $pagination ?? ['page' => 1, 'per_page' => 7, 'total' => count($stock), 'pages' => 1];
-$buildStockPageUrl = static function (int $pageNo): string {
-    return 'index.php?' . http_build_query([
+$perPage = isset($perPage) ? (int) $perPage : (int) ($pagination['per_page'] ?? 7);
+$statusLabels = [
+    'InStock' => 'Disponibili',
+    'Assigned' => 'Assegnate',
+    'Reserved' => 'Riservate',
+    'Sold' => 'Vendute',
+    'Cancelled' => 'Annullate',
+];
+$refreshParams = [
+    'page' => 'sim_stock',
+    'action' => 'refresh',
+    'per_page' => $perPage,
+];
+if ($searchTerm !== '') {
+    $refreshParams['search'] = $searchTerm;
+}
+if ($statusFilter !== '') {
+    $refreshParams['status'] = $statusFilter;
+}
+if ($providerFilter > 0) {
+    $refreshParams['provider_id'] = $providerFilter;
+}
+$refreshUrl = 'index.php?' . http_build_query($refreshParams);
+$buildStockPageUrl = static function (int $pageNo) use ($searchTerm, $statusFilter, $providerFilter, $perPage): string {
+    $params = [
         'page' => 'sim_stock',
         'page_no' => $pageNo,
-    ]);
+    ];
+    if ($searchTerm !== '') {
+        $params['search'] = $searchTerm;
+    }
+    if ($statusFilter !== '') {
+        $params['status'] = $statusFilter;
+    }
+    if ($providerFilter > 0) {
+        $params['provider_id'] = $providerFilter;
+    }
+    if ($perPage > 0) {
+        $params['per_page'] = $perPage;
+    }
+    return 'index.php?' . http_build_query($params);
 };
 ?>
 <section
     class="page"
     data-live-refresh="sim_stock"
-    data-refresh-url="index.php?page=sim_stock&amp;action=refresh"
+    data-refresh-url="<?= htmlspecialchars($refreshUrl) ?>"
     data-refresh-interval="15000"
     data-refresh-page="<?= (int) $pagination['page'] ?>"
     data-refresh-per-page="<?= (int) $pagination['per_page'] ?>"
@@ -48,6 +93,9 @@ $buildStockPageUrl = static function (int $pageNo): string {
             <input type="hidden" name="action" value="add_sim">
             <input type="hidden" name="page_no" value="<?= (int) $pagination['page'] ?>">
             <input type="hidden" name="per_page" value="<?= (int) $pagination['per_page'] ?>">
+            <input type="hidden" name="search" value="<?= htmlspecialchars($searchTerm) ?>">
+            <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+            <input type="hidden" name="filter_provider_id" value="<?= (int) $providerFilter ?>">
             <div class="form__grid">
                 <div class="form__group">
                     <label for="iccid">ICCID</label>
@@ -74,8 +122,42 @@ $buildStockPageUrl = static function (int $pageNo): string {
     </section>
 
     <section class="page__section">
-        <h3>SIM a magazzino</h3>
-        <p class="muted" data-live-slot="status">Ultimo aggiornamento: <span data-live-slot="timestamp">--:--</span></p>
+        <div class="section__header">
+            <div>
+                <h3>SIM a magazzino</h3>
+                <p class="muted" data-live-slot="status">Ultimo aggiornamento: <span data-live-slot="timestamp">--:--</span></p>
+            </div>
+            <form method="get" class="search-field" id="sim-stock-filter-form" data-live-form>
+                <input type="hidden" name="page" value="sim_stock">
+                <span class="search-field__icon" aria-hidden="true">🔎</span>
+                <input
+                    type="text"
+                    name="search"
+                    class="search-field__control"
+                    placeholder="Cerca ICCID o operatore"
+                    value="<?= htmlspecialchars($searchTerm) ?>"
+                    data-auto-search
+                >
+                <select name="status" class="search-field__control search-field__control--compact" data-auto-submit>
+                    <option value="">Tutti gli stati</option>
+                    <?php foreach ($statusOptions as $status): ?>
+                        <?php $label = $statusLabels[$status] ?? $status; ?>
+                        <option value="<?= htmlspecialchars($status) ?>" <?= $statusFilter === $status ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <select name="provider_id" class="search-field__control search-field__control--compact" data-auto-submit>
+                    <option value="">Tutti gli operatori</option>
+                    <?php foreach ($providers as $provider): ?>
+                        <option value="<?= (int) $provider['id'] ?>" <?= $providerFilter === (int) $provider['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $provider['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <select name="per_page" class="search-field__control search-field__control--compact" data-auto-submit>
+                    <?php foreach ([7, 14, 25, 50] as $size): ?>
+                        <option value="<?= $size ?>" <?= $perPage === $size ? 'selected' : '' ?>><?= $size ?> / pagina</option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+        </div>
         <div class="table-wrapper">
             <table class="table" data-live-slot="table">
                 <thead>
@@ -118,3 +200,48 @@ $buildStockPageUrl = static function (int $pageNo): string {
         <?php endif; ?>
     </section>
 </section>
+
+<script>
+(function () {
+    const container = document.querySelector('[data-live-refresh="sim_stock"]');
+    const form = document.getElementById('sim-stock-filter-form');
+    if (!container || !form) {
+        return;
+    }
+
+    const submitForm = () => {
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+    };
+
+    let debounceId = 0;
+    const searchInput = form.querySelector('[data-auto-search]');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            window.clearTimeout(debounceId);
+            debounceId = window.setTimeout(submitForm, 350);
+        });
+    }
+
+    form.querySelectorAll('[data-auto-submit]').forEach((field) => {
+        field.addEventListener('change', submitForm);
+    });
+
+    form.addEventListener('submit', () => {
+        const url = new URL(form.getAttribute('action') || window.location.href, window.location.href);
+        const data = new FormData(form);
+        data.forEach((value, key) => {
+            url.searchParams.set(key, String(value));
+        });
+        if (!url.searchParams.has('page')) {
+            url.searchParams.set('page', 'sim_stock');
+        }
+        url.searchParams.set('action', 'refresh');
+        url.searchParams.delete('page_no');
+        container.dataset.refreshUrl = url.toString();
+    });
+})();
+</script>

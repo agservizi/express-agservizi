@@ -25,9 +25,9 @@ final class ICCIDController
      *   pagination: array{page:int, per_page:int, total:int, pages:int}
      * }
      */
-    public function listPaginated(int $page, int $perPage, ?string $status = null): array
+    public function listPaginated(int $page, int $perPage, ?string $status = null, ?string $search = null, ?int $providerId = null): array
     {
-        return $this->iccidService->paginateStock($page, $perPage, $status);
+        return $this->iccidService->paginateStock($page, $perPage, $status, $search, $providerId);
     }
 
     /**
@@ -36,6 +36,14 @@ final class ICCIDController
     public function providers(): array
     {
         return $this->iccidService->listProviders();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function statuses(): array
+    {
+        return $this->iccidService->listStatuses();
     }
 
     /**

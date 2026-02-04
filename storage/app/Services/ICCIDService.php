@@ -42,7 +42,7 @@ final class ICCIDService
      *   pagination: array{page:int, per_page:int, total:int, pages:int}
      * }
      */
-    public function paginateStock(int $page, int $perPage, ?string $status = null): array
+    public function paginateStock(int $page, int $perPage, ?string $status = null, ?string $search = null, ?int $providerId = null): array
     {
         $page = max($page, 1);
         $perPage = max($perPage, 1);
@@ -55,9 +55,29 @@ final class ICCIDService
             $params[':status'] = $status;
         }
 
+        if ($providerId !== null && $providerId > 0) {
+            $conditions[] = 'iccid_stock.provider_id = :provider_id';
+            $params[':provider_id'] = $providerId;
+        }
+
+        $searchTerm = null;
+        if ($search !== null) {
+            $searchTerm = trim($search);
+            if ($searchTerm === '') {
+                $searchTerm = null;
+            }
+        }
+
+        if ($searchTerm !== null) {
+            $conditions[] = '(iccid_stock.iccid LIKE :search_iccid OR providers.name LIKE :search_provider)';
+            $likeValue = '%' . $searchTerm . '%';
+            $params[':search_iccid'] = $likeValue;
+            $params[':search_provider'] = $likeValue;
+        }
+
         $where = $conditions === [] ? '' : ('WHERE ' . implode(' AND ', $conditions));
 
-        $countSql = 'SELECT COUNT(*) FROM iccid_stock ' . $where;
+        $countSql = 'SELECT COUNT(*) FROM iccid_stock JOIN providers ON providers.id = iccid_stock.provider_id ' . $where;
         $stmtCount = $this->pdo->prepare($countSql);
         foreach ($params as $key => $value) {
             $stmtCount->bindValue($key, $value);
@@ -103,6 +123,15 @@ final class ICCIDService
     {
         $stmt = $this->pdo->query('SELECT id, name, reorder_threshold FROM providers ORDER BY name');
         return $stmt->fetchAll();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function listStatuses(): array
+    {
+        $stmt = $this->pdo->query('SELECT DISTINCT status FROM iccid_stock ORDER BY status');
+        return array_values(array_filter(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN))));
     }
 
     /**

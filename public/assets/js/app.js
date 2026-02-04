@@ -1885,7 +1885,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const nav = container.querySelector('[data-live-slot="pagination"]');
       if (nav instanceof HTMLElement) {
-        updateSimStockPagination(nav, pagination);
+        updateSimStockPagination(nav, pagination, container.dataset.refreshUrl || '');
       }
     },
     iccid_list(container, payload) {
@@ -1937,10 +1937,11 @@ document.addEventListener('DOMContentLoaded', () => {
     },
   };
 
-  function updateSimStockPagination(nav, pagination) {
+  function updateSimStockPagination(nav, pagination, refreshUrl) {
     const totalPages = Number.isInteger(pagination.pages) ? pagination.pages : 1;
     const current = Number.isInteger(pagination.page) ? pagination.page : 1;
     const total = Number.isInteger(pagination.total) ? pagination.total : 0;
+    const perPage = Number.isInteger(pagination.per_page) ? pagination.per_page : 7;
 
     if (totalPages <= 1) {
       nav.hidden = true;
@@ -1952,9 +1953,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const prevDisabled = current <= 1;
     const nextDisabled = current >= totalPages;
 
+    const buildHref = page => {
+      if (!refreshUrl) {
+        return 'index.php?page=sim_stock&page_no=' + page + '&per_page=' + perPage;
+      }
+      try {
+        const url = new URL(refreshUrl, window.location.href);
+        url.searchParams.set('page', 'sim_stock');
+        url.searchParams.delete('action');
+        url.searchParams.set('page_no', String(page));
+        url.searchParams.set('per_page', String(perPage));
+        return url.pathname + '?' + url.searchParams.toString();
+      } catch (_error) {
+        return 'index.php?page=sim_stock&page_no=' + page + '&per_page=' + perPage;
+      }
+    };
+
     const link = (page, label, disabled) => {
       const cls = 'pagination__link' + (disabled ? ' is-disabled' : '');
-      const href = disabled ? '#' : 'index.php?page=sim_stock&page_no=' + page;
+      const href = disabled ? '#' : buildHref(page);
       return '<a class="' + cls + '" href="' + href + '">' + label + '</a>';
     };
 

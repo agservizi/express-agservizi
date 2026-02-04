@@ -47,7 +47,7 @@ final class ICCIDService
      *   pagination: array{page:int, per_page:int, total:int, pages:int}
      * }
      */
-    public function paginateStock(int $page, int $perPage, ?string $status = null, ?string $search = null): array
+    public function paginateStock(int $page, int $perPage, ?string $status = null, ?string $search = null, ?int $providerId = null): array
     {
         $page = max($page, 1);
         $perPage = max($perPage, 1);
@@ -61,6 +61,11 @@ final class ICCIDService
         if ($status !== null) {
             $conditions[] = 'status = :status';
             $params[':status'] = $status;
+        }
+
+        if ($providerId !== null && $providerId > 0) {
+            $conditions[] = 'iccid_stock.provider_id = :provider_id';
+            $params[':provider_id'] = $providerId;
         }
 
         $searchTerm = null;
@@ -128,6 +133,17 @@ final class ICCIDService
         $stmt = $this->pdo->prepare('SELECT id, name, reorder_threshold FROM providers WHERE tenant_id = :tenant_id ORDER BY name');
         $stmt->execute([':tenant_id' => $tenantId]);
         return $stmt->fetchAll();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function listStatuses(): array
+    {
+        $tenantId = TenantContext::id();
+        $stmt = $this->pdo->prepare('SELECT DISTINCT status FROM iccid_stock WHERE tenant_id = :tenant_id ORDER BY status');
+        $stmt->execute([':tenant_id' => $tenantId]);
+        return array_values(array_filter(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN))));
     }
 
     /**
