@@ -1725,8 +1725,8 @@ document.addEventListener('DOMContentLoaded', () => {
       perPage = 7;
     }
 
-    const minInterval = 5000;
-    let interval = parseInt(container.dataset.refreshInterval || '15000', 10);
+    const minInterval = 60000;
+    let interval = parseInt(container.dataset.refreshInterval || '60000', 10);
     if (Number.isNaN(interval) || interval < minInterval) {
       interval = minInterval;
     }
