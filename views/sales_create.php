@@ -488,6 +488,7 @@ $previewHasErrors = $previewErrors !== [];
                                 data-name="<?= htmlspecialchars((string) ($product['name'] ?? '')) ?>"
                                 data-price="<?= htmlspecialchars(number_format((float) ($product['price'] ?? 0.0), 2, '.', '')) ?>"
                                 data-tax="<?= htmlspecialchars(number_format((float) ($product['tax_rate'] ?? 0.0), 2, '.', '')) ?>"
+                                data-imei="<?= htmlspecialchars((string) ($product['imei'] ?? '')) ?>"
                                 data-sku="<?= htmlspecialchars((string) ($product['sku'] ?? '')) ?>"
                                 <?php if ($stockData !== null): ?> data-stock="<?= $stockData ?>"<?php endif; ?>
                             ><?= htmlspecialchars((string) ($product['name'] ?? '')) ?></option>
@@ -531,6 +532,7 @@ $previewHasErrors = $previewErrors !== [];
                                                         value="<?= $productId ?>"
                                                         data-price="<?= htmlspecialchars(number_format((float) ($product['price'] ?? 0.0), 2, '.', '')) ?>"
                                                         data-tax="<?= htmlspecialchars(number_format((float) ($product['tax_rate'] ?? 0.0), 2, '.', '')) ?>"
+                                                        data-imei="<?= htmlspecialchars((string) ($product['imei'] ?? '')) ?>"
                                                         data-barcode="<?= htmlspecialchars((string) ($product['barcode'] ?? '')) ?>"
                                                         data-name="<?= htmlspecialchars((string) ($product['name'] ?? '')) ?>"
                                                         data-sku="<?= htmlspecialchars((string) ($product['sku'] ?? '')) ?>"

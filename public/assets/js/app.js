@@ -2350,6 +2350,7 @@ document.addEventListener('DOMContentLoaded', () => {
           name: option.dataset.name || option.textContent.trim(),
           price: parseFloat(option.dataset.price || '0') || 0,
           taxRate: parseFloat(option.dataset.tax || '0') || 0,
+          imei: option.dataset.imei || '',
           barcode: (option.dataset.barcode || '').replace(/\s+/g, ''),
           sku: option.dataset.sku || '',
           stock: parseStockValue(option.dataset.stock),
@@ -2377,6 +2378,7 @@ document.addEventListener('DOMContentLoaded', () => {
           name: option.dataset.name || option.textContent.trim(),
           price: parseFloat(option.dataset.price || '0') || 0,
           taxRate: parseFloat(option.dataset.tax || '0') || 0,
+          imei: option.dataset.imei || '',
           barcode: rawCode,
             sku: option.dataset.sku || '',
             stock: parseStockValue(option.dataset.stock),
@@ -2561,8 +2563,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const imeiInput = row.querySelector('input[name="product_imei[]"]');
-    if (imeiInput instanceof HTMLInputElement && settings.force) {
-      imeiInput.value = '';
+    if (imeiInput instanceof HTMLInputElement) {
+      if (settings.force || !imeiInput.value) {
+        imeiInput.value = info.imei ? String(info.imei) : '';
+      }
     }
 
     if (info.barcode) {

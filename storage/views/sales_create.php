@@ -218,6 +218,7 @@ $taxNote = $GLOBALS['config']['app']['tax_note'] ?? "Operazione non soggetta a I
                                 data-name="<?= htmlspecialchars((string) ($product['name'] ?? '')) ?>"
                                 data-price="<?= htmlspecialchars(number_format((float) ($product['price'] ?? 0.0), 2, '.', '')) ?>"
                                 data-tax="<?= htmlspecialchars(number_format((float) ($product['tax_rate'] ?? 0.0), 2, '.', '')) ?>"
+                                data-imei="<?= htmlspecialchars((string) ($product['imei'] ?? '')) ?>"
                                 data-sku="<?= htmlspecialchars((string) ($product['sku'] ?? '')) ?>"
                             ><?= htmlspecialchars((string) ($product['name'] ?? '')) ?></option>
                         <?php endforeach; ?>
@@ -255,6 +256,7 @@ $taxNote = $GLOBALS['config']['app']['tax_note'] ?? "Operazione non soggetta a I
                                                         value="<?= $productId ?>"
                                                         data-price="<?= htmlspecialchars(number_format((float) ($product['price'] ?? 0.0), 2, '.', '')) ?>"
                                                         data-tax="<?= htmlspecialchars(number_format((float) ($product['tax_rate'] ?? 0.0), 2, '.', '')) ?>"
+                                                        data-imei="<?= htmlspecialchars((string) ($product['imei'] ?? '')) ?>"
                                                         data-barcode="<?= htmlspecialchars((string) ($product['barcode'] ?? '')) ?>"
                                                         data-name="<?= htmlspecialchars((string) ($product['name'] ?? '')) ?>"
                                                         data-sku="<?= htmlspecialchars((string) ($product['sku'] ?? '')) ?>"
