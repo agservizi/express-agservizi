@@ -74,111 +74,80 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
     <main class="landing-main">
         <section class="landing-section" id="piani">
             <div class="landing-section__header">
-                <h2>Confronto rapido</h2>
-                <p>Le opzioni principali per avviare o potenziare il tuo negozio.</p>
+                <h2>Dettaglio completo dei piani</h2>
+                <p>Di seguito trovi, punto per punto, tutto ciò che è incluso in ogni livello di servizio.</p>
             </div>
-            <div class="landing-pricing__grid landing-pricing__grid--compact">
-                <article class="landing-pricing__card">
-                    <header>
-                        <h3>Start</h3>
-                        <p>12 mesi · max 1 cassiere</p>
-                        <span class="landing-pricing__price">€ 550</span>
-                        <span class="muted">€ 45,83 / mese</span>
-                    </header>
-                    <ul>
-                        <li>Dashboard, SIM, prodotti e vendite.</li>
-                        <li>Guida operativa completa.</li>
-                    </ul>
-                </article>
-                <article class="landing-pricing__card landing-pricing__card--highlight">
-                    <header>
-                        <h3>Start Plus</h3>
-                        <p>12 mesi · max 1 cassiere</p>
-                        <span class="landing-pricing__price">€ 650</span>
-                        <span class="muted">€ 54,17 / mese</span>
-                    </header>
-                    <ul>
-                        <li>Tutto del Start.</li>
-                        <li>Report e richieste supporto.</li>
-                    </ul>
-                </article>
-                <article class="landing-pricing__card">
-                    <header>
-                        <h3>Core</h3>
-                        <p>24 mesi · max 2 cassieri</p>
-                        <span class="landing-pricing__price">€ 850</span>
-                        <span class="muted">€ 35,42 / mese</span>
-                    </header>
-                    <ul>
-                        <li>Contratti energia e KPI avanzati.</li>
-                        <li>Supporto prioritario.</li>
-                    </ul>
-                </article>
-            </div>
-            <div class="landing-pricing__table landing-pricing__table--compare" aria-label="Confronto piani">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Funzionalità</th>
-                            <th>Start</th>
-                            <th>Start Plus</th>
-                            <th>Core</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Prezzo</td>
-                            <td>€ 550 · € 45,83/mese</td>
-                            <td>€ 650 · € 54,17/mese</td>
-                            <td>€ 850 · € 35,42/mese</td>
-                        </tr>
-                        <tr>
-                            <td>SIM, prodotti, vendite</td>
-                            <td>✓</td>
-                            <td>✓</td>
-                            <td>✓</td>
-                        </tr>
-                        <tr>
-                            <td>Report avanzati</td>
-                            <td>—</td>
-                            <td>✓</td>
-                            <td>✓</td>
-                        </tr>
-                        <tr>
-                            <td>Contratti energia</td>
-                            <td>—</td>
-                            <td>—</td>
-                            <td>✓</td>
-                        </tr>
-                        <tr>
-                            <td>Supporto prioritario</td>
-                            <td>—</td>
-                            <td>—</td>
-                            <td>✓</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="landing-section__cta">
-                <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi">Vai ai prezzi completi</a>
-            </div>
-        </section>
-        <section class="landing-section landing-lead">
-            <div class="landing-lead__content">
-                <h2>Ricevi il kit gratuito “Avvio Store”</h2>
-                <p>Checklist operativa + template report per partire subito con margini sotto controllo.</p>
-            </div>
-            <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Scarica il kit</a>
+
+            <article class="landing-pricing__card">
+                <header>
+                    <h3>Piano Start</h3>
+                    <p>12 mesi · max 1 cassiere · € 550 (oppure € 45,83/mese)</p>
+                </header>
+                <ul>
+                    <li><strong>Dashboard operativa:</strong> panoramica giornaliera su vendite, incassi e performance.</li>
+                    <li><strong>Magazzino SIM:</strong> stato SIM, provider, note e storicità movimenti.</li>
+                    <li><strong>Catalogo prodotti:</strong> anagrafiche, prezzi, IVA, barcode e scorte.</li>
+                    <li><strong>Clienti:</strong> rubrica, dati fiscali, note e storico acquisti.</li>
+                    <li><strong>Listini e offerte:</strong> gestione offerte base e prezzi predefiniti.</li>
+                    <li><strong>Nuova vendita:</strong> workflow guidato, scontrino e stampa rapida.</li>
+                    <li><strong>Storico vendite:</strong> ricerca e filtri principali per controllo cassa.</li>
+                    <li><strong>Guida operativa:</strong> manuale completo per l’uso quotidiano.</li>
+                    <li><strong>Impostazioni:</strong> configurazioni essenziali dello store.</li>
+                </ul>
+            </article>
+
+            <article class="landing-pricing__card landing-pricing__card--highlight">
+                <header>
+                    <h3>Piano Start Plus</h3>
+                    <p>12 mesi · max 1 cassiere · € 650 (oppure € 54,17/mese)</p>
+                </header>
+                <ul>
+                    <li><strong>Tutto del Piano Start</strong> incluso senza limitazioni aggiuntive.</li>
+                    <li><strong>Report avanzati:</strong> KPI di vendita, margini e performance periodiche.</li>
+                    <li><strong>Richieste supporto clienti:</strong> gestione ticket e tracciamento richieste.</li>
+                    <li><strong>Ordini store:</strong> gestione richieste prodotti e riordini interni.</li>
+                    <li><strong>Notifiche operative:</strong> alert su eventi chiave e priorità.</li>
+                </ul>
+            </article>
+
+            <article class="landing-pricing__card">
+                <header>
+                    <h3>Piano Core</h3>
+                    <p>24 mesi · max 2 cassieri · € 850 (oppure € 35,42/mese)</p>
+                </header>
+                <ul>
+                    <li><strong>Tutto del Piano Start Plus</strong> incluso.</li>
+                    <li><strong>Contratti energia:</strong> gestione pratiche luce & gas e simulazioni.</li>
+                    <li><strong>Report KPI avanzati:</strong> analisi dettagliate per prodotti, canali e operatori.</li>
+                    <li><strong>Supporto prioritario:</strong> canale dedicato con tempi di risposta accelerati.</li>
+                    <li><strong>Accessi estesi:</strong> fino a 2 cassieri attivi.</li>
+                </ul>
+            </article>
+
+            <article class="landing-pricing__card">
+                <header>
+                    <h3>Piano Business</h3>
+                    <p>36 mesi · max 4 cassieri · € 1200 (oppure € 33,33/mese)</p>
+                </header>
+                <ul>
+                    <li><strong>Tutto del Piano Core</strong> incluso.</li>
+                    <li><strong>Report personalizzati:</strong> cruscotti su misura per la direzione.</li>
+                    <li><strong>SLA dedicato:</strong> livelli di servizio concordati e monitorati.</li>
+                    <li><strong>Onboarding e training:</strong> affiancamento operativo iniziale.</li>
+                    <li><strong>Integrazioni avanzate:</strong> collegamenti custom con sistemi esterni.</li>
+                    <li><strong>Accessi estesi:</strong> fino a 4 cassieri attivi.</li>
+                </ul>
+            </article>
         </section>
 
         <section class="landing-section landing-section--accent">
             <div class="landing-section__header">
-                <h2>Vuoi una consulenza rapida?</h2>
-                <p>Ti aiutiamo a scegliere il piano in base ai volumi e al team.</p>
+                <h2>Serve un piano su misura?</h2>
+                <p>Descrivici i volumi, le sedi e i processi: prepariamo una proposta personalizzata.</p>
             </div>
             <div class="landing-hero__actions">
                 <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Parla con un consulente</a>
-                <a class="landing-btn landing-btn--secondary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
+                <a class="landing-btn landing-btn--secondary" href="index.php?page=prezzi">Vai ai prezzi</a>
             </div>
         </section>
     </main>

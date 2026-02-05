@@ -151,7 +151,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                             <li>Licenza assegnata con quota adesione pagata.</li>
                             <li>Credenziali inviate via email.</li>
                             <?php if ($isMonthly): ?>
-                                <li>Addebito mensile ricorrente fino a disdetta.</li>
+                                <li>Addebito mensile per tutta la durata della licenza selezionata.</li>
                             <?php endif; ?>
                         </ul>
                     <?php else: ?>

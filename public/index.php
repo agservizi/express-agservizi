@@ -2563,6 +2563,17 @@ switch ($page) {
                 Stripe::setApiKey($stripeSecretKey);
                 $unitAmount = (int) round(((float) ($plan['billing_price_eur'] ?? $plan['price_eur'] ?? 0)) * 100);
                 $sessionMode = $billingCycle === 'monthly' ? 'subscription' : 'payment';
+                $subscriptionData = null;
+                if ($billingCycle === 'monthly') {
+                    $termMonths = (int) ($plan['term_months'] ?? 12);
+                    $termMonths = $termMonths > 0 ? $termMonths : 12;
+                    $cancelAt = (new DateTimeImmutable('now'))
+                        ->modify('+' . $termMonths . ' months')
+                        ->getTimestamp();
+                    $subscriptionData = [
+                        'cancel_at' => $cancelAt,
+                    ];
+                }
                 $lineItem = [
                     'quantity' => 1,
                     'price_data' => [
@@ -2582,6 +2593,7 @@ switch ($page) {
                     'payment_method_types' => ['card'],
                     'customer_email' => $tenantEmail,
                     'line_items' => [$lineItem],
+                    'subscription_data' => $subscriptionData,
                     'success_url' => $successUrl,
                     'cancel_url' => $cancelUrl,
                     'metadata' => [
