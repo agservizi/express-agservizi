@@ -1339,6 +1339,7 @@ use App\Services\TenantContext;
 use Stripe\Stripe;
 use Stripe\Webhook;
 use Stripe\Checkout\Session;
+use Stripe\Subscription;
 
 $pdo = Database::getConnection();
 
@@ -2477,6 +2478,22 @@ switch ($page) {
                 'tenant_id' => $tenantId,
                 'license_id' => (int) ($license['id'] ?? 0),
             ]);
+
+            $billingCycle = normalizeCheckoutBillingCycle($request['billing_cycle'] ?? '');
+            if ($billingCycle === 'monthly' && !empty($subscriptionId)) {
+                $termMonths = (int) ($plan['term_months'] ?? 12);
+                $termMonths = $termMonths > 0 ? $termMonths : 12;
+                try {
+                    $cancelAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))
+                        ->modify('+' . $termMonths . ' months')
+                        ->getTimestamp();
+                    Subscription::update((string) $subscriptionId, [
+                        'cancel_at' => $cancelAt,
+                    ]);
+                } catch (\Throwable $exception) {
+                    logStripeEvent('Errore impostazione cancel_at: ' . get_class($exception) . ' - ' . $exception->getMessage());
+                }
+            }
         }
 
         http_response_code(200);
@@ -2732,11 +2749,10 @@ switch ($page) {
                 if ($billingCycle === 'monthly') {
                     $termMonths = (int) ($plan['term_months'] ?? 12);
                     $termMonths = $termMonths > 0 ? $termMonths : 12;
-                    $cancelAt = (new DateTimeImmutable('now'))
-                        ->modify('+' . $termMonths . ' months')
-                        ->getTimestamp();
                     $subscriptionData = [
-                        'cancel_at' => $cancelAt,
+                        'metadata' => [
+                            'term_months' => (string) $termMonths,
+                        ],
                     ];
                 }
                 $lineItem = [
@@ -2782,7 +2798,7 @@ switch ($page) {
                     'mode' => (string) $sessionMode,
                     'currency' => (string) $currency,
                     'unit_amount' => (int) $unitAmount,
-                    'cancel_at' => $subscriptionData['cancel_at'] ?? null,
+                    'term_months' => $subscriptionData['metadata']['term_months'] ?? null,
                 ], JSON_UNESCAPED_UNICODE));
                 markCheckoutRequestFailed($pdo, $requestId, 'Errore Stripe: ' . $exception->getMessage());
                 $errorMessages = ['Riprova tra qualche minuto.'];

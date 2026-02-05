@@ -429,6 +429,21 @@ body[data-sidebar-collapsed="true"] .topbar{padding-left:24px;padding-right:24px
 .modal__loader-label{font-weight:600;}
 .modal__dialog iframe{flex:1;border:none;border-radius:0;background:#fff;}
 .modal[data-open="true"] .modal__loader[hidden]{display:none;}
+.checkout-confirm__dialog{width:min(560px,calc(100vw - 48px));height:auto;min-height:0;}
+.checkout-confirm__content{display:flex;flex-direction:column;gap:20px;padding:28px;background:#fff;}
+.checkout-confirm__body{display:flex;flex-direction:column;gap:16px;}
+.checkout-confirm__summary{display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;}
+.checkout-confirm__summary strong{font-size:18px;color:#0f172a;}
+.checkout-confirm__summary span{font-size:14px;color:#475569;}
+.checkout-confirm__price{font-size:20px;font-weight:700;color:#0f172a;}
+.checkout-confirm__field{display:flex;flex-direction:column;gap:8px;font-weight:600;color:#0f172a;}
+.checkout-confirm__field select{max-width:260px;}
+.checkout-confirm__list{margin:0;padding-left:18px;color:#475569;font-size:14px;line-height:1.6;}
+.checkout-confirm__footer{display:flex;gap:12px;justify-content:flex-end;flex-wrap:wrap;}
+.checkout-confirm__tenant{padding:16px;border-radius:14px;border:1px solid #e2e8f0;background:#fff;}
+.checkout-confirm__tenant h3{margin:0 0 10px;font-size:16px;color:#0f172a;}
+.checkout-confirm__tenant ul{margin:0;padding-left:18px;color:#475569;font-size:14px;line-height:1.6;}
+.checkout-confirm__tenant strong{color:#0f172a;}
 .topbar__action{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:12px;border:1px solid #dbeafe;background:#eef2ff;color:#1d4ed8;font-size:13px;font-weight:600;line-height:1;transition:background .2s ease,border-color .2s ease,transform .2s ease,box-shadow .2s ease;text-decoration:none;white-space:nowrap;}
 .topbar__action:hover{background:#dbeafe;border-color:#bfdbfe;transform:translateY(-1px);}
 .topbar__action:focus-visible{outline:2px solid rgba(59,130,246,.4);outline-offset:2px;}

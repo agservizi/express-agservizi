@@ -194,6 +194,59 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
         </section>
     </main>
 
+    <?php if ($plan !== null): ?>
+        <div class="modal" id="checkout-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-confirm-title" data-open="false">
+            <div class="modal__dialog checkout-confirm__dialog">
+                <button type="button" class="modal__close" data-checkout-confirm-close aria-label="Chiudi">×</button>
+                <div class="checkout-confirm__content">
+                    <div class="checkout-confirm__body">
+                        <p class="landing-kicker">Conferma pagamento</p>
+                        <h2 id="checkout-confirm-title">Riepilogo prima di procedere</h2>
+                        <p>Puoi modificare la frequenza di pagamento prima di continuare su Stripe.</p>
+
+                        <div class="checkout-confirm__summary" data-checkout-confirm-summary>
+                            <strong data-checkout-confirm-name></strong>
+                            <span data-checkout-confirm-desc></span>
+                            <div class="checkout-confirm__price" data-checkout-confirm-price></div>
+                        </div>
+
+                        <div class="checkout-confirm__tenant" data-checkout-confirm-tenant>
+                            <h3>Dettagli tenant</h3>
+                            <ul>
+                                <li><strong>Nome:</strong> <span data-checkout-tenant-name></span></li>
+                                <li><strong>Slug:</strong> <span data-checkout-tenant-slug></span></li>
+                                <li><strong>Email:</strong> <span data-checkout-tenant-email></span></li>
+                                <li><strong>Telefono:</strong> <span data-checkout-tenant-phone></span></li>
+                                <li><strong>P.IVA:</strong> <span data-checkout-tenant-vat></span></li>
+                                <li><strong>Paese:</strong> <span data-checkout-tenant-country></span></li>
+                                <li><strong>Ragione sociale:</strong> <span data-checkout-tenant-company></span></li>
+                                <li><strong>Indirizzo sede:</strong> <span data-checkout-tenant-address></span></li>
+                            </ul>
+                        </div>
+
+                        <label class="checkout-confirm__field">
+                            Frequenza pagamento
+                            <select data-checkout-confirm-billing>
+                                <option value="annual">Pagamento unico</option>
+                                <option value="monthly">Abbonamento mensile</option>
+                            </select>
+                        </label>
+
+                        <ul class="checkout-confirm__list">
+                            <li>Pagamento gestito da Stripe in modalità sicura.</li>
+                            <li>Le credenziali saranno inviate dopo la conferma.</li>
+                            <li>Puoi tornare indietro in qualunque momento.</li>
+                        </ul>
+                    </div>
+                    <div class="checkout-confirm__footer">
+                        <button type="button" class="landing-btn landing-btn--secondary" data-checkout-confirm-close>Annulla</button>
+                        <button type="button" class="landing-btn landing-btn--primary" data-checkout-confirm-submit>Conferma e vai al pagamento</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
     <footer class="landing-footer">
         <div>
             <strong><?= htmlspecialchars($appName) ?></strong>
@@ -274,25 +327,134 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
             const descEl = document.querySelector('[data-checkout-plan-desc]');
             const priceEl = document.querySelector('[data-checkout-plan-price]');
 
+            const confirmModal = document.querySelector('#checkout-confirm-modal');
+            const confirmName = document.querySelector('[data-checkout-confirm-name]');
+            const confirmDesc = document.querySelector('[data-checkout-confirm-desc]');
+            const confirmPrice = document.querySelector('[data-checkout-confirm-price]');
+            const confirmBilling = document.querySelector('[data-checkout-confirm-billing]');
+            const confirmCloseButtons = document.querySelectorAll('[data-checkout-confirm-close]');
+            const confirmSubmit = document.querySelector('[data-checkout-confirm-submit]');
+            const form = document.querySelector('form.landing-form');
+
+            const tenantNameEl = document.querySelector('[data-checkout-tenant-name]');
+            const tenantSlugEl = document.querySelector('[data-checkout-tenant-slug]');
+            const tenantEmailEl = document.querySelector('[data-checkout-tenant-email]');
+            const tenantPhoneEl = document.querySelector('[data-checkout-tenant-phone]');
+            const tenantVatEl = document.querySelector('[data-checkout-tenant-vat]');
+            const tenantCountryEl = document.querySelector('[data-checkout-tenant-country]');
+            const tenantCompanyEl = document.querySelector('[data-checkout-tenant-company]');
+            const tenantAddressEl = document.querySelector('[data-checkout-tenant-address]');
+
+            const tenantNameInput = document.querySelector('input[name="tenant_name"]');
+            const tenantSlugInput = document.querySelector('input[name="tenant_slug"]');
+            const tenantEmailInput = document.querySelector('input[name="tenant_email"]');
+            const tenantPhoneInput = document.querySelector('input[name="tenant_phone"]');
+            const tenantVatInput = document.querySelector('input[name="vat_number"]');
+            const tenantCountryInput = document.querySelector('input[name="company_country"]');
+            const tenantCompanyInput = document.querySelector('input[name="company_name"]');
+            const tenantAddressInput = document.querySelector('textarea[name="company_address"]');
+
+            let allowSubmit = false;
+
             if (!billingSelect || !planCard || !nameEl || !descEl || !priceEl) {
                 return;
             }
 
-            const updateSummary = () => {
-                const isMonthly = billingSelect.value === 'monthly';
-                const priceValue = parseFloat(isMonthly ? planCard.dataset.monthlyPrice : planCard.dataset.annualPrice);
+            const formatPrice = (value, isMonthly) => {
                 const formatter = new Intl.NumberFormat('it-IT', {
                     minimumFractionDigits: isMonthly ? 2 : 0,
                     maximumFractionDigits: isMonthly ? 2 : 0,
                 });
+                const suffix = isMonthly ? ' / mese' : '';
+                return `€ ${formatter.format(Number.isFinite(value) ? value : 0)}${suffix}`;
+            };
+
+            const updateTenantSummary = () => {
+                const setText = (el, value, fallback = '—') => {
+                    if (!el) {
+                        return;
+                    }
+                    const text = (value || '').toString().trim();
+                    el.textContent = text !== '' ? text : fallback;
+                };
+
+                setText(tenantNameEl, tenantNameInput?.value);
+                setText(tenantSlugEl, tenantSlugInput?.value);
+                setText(tenantEmailEl, tenantEmailInput?.value);
+                setText(tenantPhoneEl, tenantPhoneInput?.value);
+                setText(tenantVatEl, tenantVatInput?.value);
+                setText(tenantCountryEl, tenantCountryInput?.value);
+                setText(tenantCompanyEl, tenantCompanyInput?.value);
+                setText(tenantAddressEl, tenantAddressInput?.value);
+            };
+
+            const updateSummary = () => {
+                const isMonthly = billingSelect.value === 'monthly';
+                const priceValue = parseFloat(isMonthly ? planCard.dataset.monthlyPrice : planCard.dataset.annualPrice);
                 nameEl.textContent = isMonthly ? (planCard.dataset.monthlyName || '') : (planCard.dataset.annualName || '');
                 descEl.textContent = isMonthly ? (planCard.dataset.monthlyDesc || '') : (planCard.dataset.annualDesc || '');
-                const suffix = isMonthly ? ' / mese' : '';
-                priceEl.textContent = `€ ${formatter.format(Number.isFinite(priceValue) ? priceValue : 0)}${suffix}`;
+                priceEl.textContent = formatPrice(priceValue, isMonthly);
+                if (confirmName && confirmDesc && confirmPrice) {
+                    confirmName.textContent = nameEl.textContent;
+                    confirmDesc.textContent = descEl.textContent;
+                    confirmPrice.textContent = formatPrice(priceValue, isMonthly);
+                }
+                if (confirmBilling && confirmBilling.value !== billingSelect.value) {
+                    confirmBilling.value = billingSelect.value;
+                }
+                updateTenantSummary();
             };
 
             billingSelect.addEventListener('change', updateSummary);
             updateSummary();
+
+            if (!confirmModal || !confirmBilling || !confirmSubmit || !form) {
+                return;
+            }
+
+            const openModal = () => {
+                confirmModal.setAttribute('data-open', 'true');
+                updateSummary();
+            };
+
+            const closeModal = () => {
+                confirmModal.setAttribute('data-open', 'false');
+            };
+
+            confirmCloseButtons.forEach((button) => {
+                button.addEventListener('click', closeModal);
+            });
+
+            confirmModal.addEventListener('click', (event) => {
+                if (event.target === confirmModal) {
+                    closeModal();
+                }
+            });
+
+            form.addEventListener('submit', (event) => {
+                if (allowSubmit) {
+                    return;
+                }
+                event.preventDefault();
+                openModal();
+            });
+
+            confirmBilling.addEventListener('change', () => {
+                billingSelect.value = confirmBilling.value;
+                updateSummary();
+            });
+
+            [tenantNameInput, tenantSlugInput, tenantEmailInput, tenantPhoneInput, tenantVatInput, tenantCountryInput, tenantCompanyInput, tenantAddressInput]
+                .filter(Boolean)
+                .forEach((input) => {
+                    input.addEventListener('input', updateTenantSummary);
+                });
+
+            confirmSubmit.addEventListener('click', () => {
+                allowSubmit = true;
+                closeModal();
+                form.submit();
+            });
         })();
     </script>
     <script>
