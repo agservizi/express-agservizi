@@ -69,7 +69,7 @@ def paragraph(x, y, txt, max_width, size=12, leading=16, font='F1', color=COLOR_
 # Header
 rgb_fill(*COLOR_HEADER)
 rect(0, PAGE_H - 140, PAGE_W, 140, fill=True)
-text(MARGIN_X, PAGE_H - 70, 'Kit gratuito “Avvio Store”', size=22, font='F2', color=(1, 1, 1))
+text(MARGIN_X, PAGE_H - 70, 'Kit gratuito "Avvio Store"', size=22, font='F2', color=(1, 1, 1))
 text(MARGIN_X, PAGE_H - 95, 'Checklist operativa + template report', size=12, font='F1', color=(0.82, 0.86, 0.93))
 text(MARGIN_X, PAGE_H - 115, f'Aggiornato al {date.today().strftime("%d/%m/%Y")}', size=10, font='F1', color=(0.64, 0.67, 0.74))
 
