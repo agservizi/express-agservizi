@@ -116,7 +116,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                                 </label>
                                 <label>
                                     P.IVA
-                                    <div class="landing-form__inline">
+                                    <div class="landing-form__inline landing-form__inline--inside">
                                         <input type="text" name="vat_number" value="<?= htmlspecialchars($tenantVatNumber) ?>" placeholder="IT12345678901">
                                         <button type="button" class="landing-btn landing-btn--secondary landing-btn--small" data-vies-button>Verifica VIES</button>
                                     </div>
