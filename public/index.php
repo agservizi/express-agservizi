@@ -901,6 +901,47 @@ function updateCheckoutSession(PDO $pdo, int $requestId, string $sessionId): voi
 }
 
 /**
+ * @param array{plan_key:string,billing_cycle:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string,vat_number:?string,company_country:?string,company_name:?string,company_address:?string} $payload
+ */
+function updateCheckoutRequest(PDO $pdo, int $requestId, array $payload): void
+{
+    $stmt = $pdo->prepare(
+        'UPDATE tenant_checkout_requests
+         SET plan_key = :plan_key,
+             billing_cycle = :billing_cycle,
+             tenant_name = :tenant_name,
+             tenant_slug = :tenant_slug,
+             tenant_email = :tenant_email,
+             tenant_phone = :tenant_phone,
+             vat_number = :vat_number,
+             company_country = :company_country,
+             company_name = :company_name,
+             company_address = :company_address,
+             status = "pending",
+             stripe_session_id = NULL,
+             stripe_payment_intent_id = NULL,
+             stripe_subscription_id = NULL,
+             error_message = NULL,
+             paid_at = NULL,
+             updated_at = NOW()
+         WHERE id = :id'
+    );
+    $stmt->execute([
+        ':plan_key' => $payload['plan_key'],
+        ':billing_cycle' => $payload['billing_cycle'],
+        ':tenant_name' => $payload['tenant_name'],
+        ':tenant_slug' => $payload['tenant_slug'],
+        ':tenant_email' => $payload['tenant_email'],
+        ':tenant_phone' => $payload['tenant_phone'] !== '' ? $payload['tenant_phone'] : null,
+        ':vat_number' => $payload['vat_number'] !== '' ? $payload['vat_number'] : null,
+        ':company_country' => $payload['company_country'] !== '' ? $payload['company_country'] : null,
+        ':company_name' => $payload['company_name'] !== '' ? $payload['company_name'] : null,
+        ':company_address' => $payload['company_address'] !== '' ? $payload['company_address'] : null,
+        ':id' => $requestId,
+    ]);
+}
+
+/**
  * @return array<string, mixed>|null
  */
 function getCheckoutRequestById(PDO $pdo, int $requestId): ?array
@@ -2532,7 +2573,13 @@ switch ($page) {
             if ($tenantEmail !== '' && userEmailExists($pdo, $tenantEmail)) {
                 $errors[] = 'L’email è già associata a un account esistente.';
             }
-            if ($tenantSlug !== '' && $tenantEmail !== '' && pendingCheckoutExists($pdo, $tenantSlug, $tenantEmail)) {
+            $resumeRequestId = (int) ($_SESSION['checkout_resume_request_id'] ?? 0);
+            $resumeRequest = $resumeRequestId > 0 ? getCheckoutRequestById($pdo, $resumeRequestId) : null;
+            $resumeIsValid = $resumeRequest
+                && in_array((string) ($resumeRequest['status'] ?? ''), ['pending', 'processing'], true)
+                && (string) ($resumeRequest['tenant_slug'] ?? '') === $tenantSlug
+                && (string) ($resumeRequest['tenant_email'] ?? '') === $tenantEmail;
+            if ($tenantSlug !== '' && $tenantEmail !== '' && pendingCheckoutExists($pdo, $tenantSlug, $tenantEmail) && !$resumeIsValid) {
                 $errors[] = 'Esiste già una richiesta di attivazione in corso per questi dati.';
                 $pending = getPendingCheckoutRequest($pdo, $tenantSlug, $tenantEmail);
                 if ($pending) {
@@ -2596,18 +2643,34 @@ switch ($page) {
                 exit;
             }
 
-            $requestId = createCheckoutRequest($pdo, [
-                'plan_key' => $planKey,
-                'billing_cycle' => $billingCycle,
-                'tenant_name' => $tenantName,
-                'tenant_slug' => $tenantSlug,
-                'tenant_email' => $tenantEmail,
-                'tenant_phone' => $tenantPhone,
-                'vat_number' => $vatNumber,
-                'company_country' => $companyCountry,
-                'company_name' => $companyName,
-                'company_address' => $companyAddress,
-            ]);
+            if ($resumeIsValid) {
+                $requestId = $resumeRequestId;
+                updateCheckoutRequest($pdo, $requestId, [
+                    'plan_key' => $planKey,
+                    'billing_cycle' => $billingCycle,
+                    'tenant_name' => $tenantName,
+                    'tenant_slug' => $tenantSlug,
+                    'tenant_email' => $tenantEmail,
+                    'tenant_phone' => $tenantPhone,
+                    'vat_number' => $vatNumber,
+                    'company_country' => $companyCountry,
+                    'company_name' => $companyName,
+                    'company_address' => $companyAddress,
+                ]);
+            } else {
+                $requestId = createCheckoutRequest($pdo, [
+                    'plan_key' => $planKey,
+                    'billing_cycle' => $billingCycle,
+                    'tenant_name' => $tenantName,
+                    'tenant_slug' => $tenantSlug,
+                    'tenant_email' => $tenantEmail,
+                    'tenant_phone' => $tenantPhone,
+                    'vat_number' => $vatNumber,
+                    'company_country' => $companyCountry,
+                    'company_name' => $companyName,
+                    'company_address' => $companyAddress,
+                ]);
+            }
 
             $successUrl = $stripeConfig['success_url'] ?? null;
             if ($successUrl === null || $successUrl === '') {
