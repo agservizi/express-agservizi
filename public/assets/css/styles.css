@@ -432,12 +432,15 @@ body[data-sidebar-collapsed="true"] .topbar{padding-left:24px;padding-right:24px
 .checkout-confirm__dialog{width:min(560px,calc(100vw - 48px));height:auto;min-height:0;}
 .checkout-confirm__content{display:flex;flex-direction:column;gap:20px;padding:28px;background:#fff;}
 .checkout-confirm__body{display:flex;flex-direction:column;gap:16px;}
+.checkout-confirm__body h2{color:#0f172a;}
+.checkout-confirm__body p{color:#334155;}
 .checkout-confirm__summary{display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;}
 .checkout-confirm__summary strong{font-size:18px;color:#0f172a;}
 .checkout-confirm__summary span{font-size:14px;color:#475569;}
 .checkout-confirm__price{font-size:20px;font-weight:700;color:#0f172a;}
 .checkout-confirm__field{display:flex;flex-direction:column;gap:8px;font-weight:600;color:#0f172a;}
-.checkout-confirm__field select{max-width:260px;}
+.checkout-confirm__field select{max-width:260px;padding:12px 38px 12px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;color:#0f172a;background:#fff;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px;}
+.checkout-confirm__field select:focus{outline:2px solid rgba(37,99,235,.25);border-color:#93c5fd;}
 .checkout-confirm__list{margin:0;padding-left:18px;color:#475569;font-size:14px;line-height:1.6;}
 .checkout-confirm__footer{display:flex;gap:12px;justify-content:flex-end;flex-wrap:wrap;}
 .checkout-confirm__tenant{padding:16px;border-radius:14px;border:1px solid #e2e8f0;background:#fff;}
