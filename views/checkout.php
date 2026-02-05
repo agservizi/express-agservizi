@@ -5,6 +5,7 @@ $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ('Attiva piano - ' . $appName);
 $planKey = $planKey ?? 'start';
 $plan = isset($plan) && is_array($plan) ? $plan : null;
+$billingCycle = isset($billingCycle) && is_string($billingCycle) ? $billingCycle : 'annual';
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
 $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
 $landingUrl = 'index.php?page=landing';
@@ -92,6 +93,13 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                                     <input type="email" name="tenant_email" value="<?= htmlspecialchars($tenantEmail) ?>" required>
                                 </label>
                                 <label>
+                                    Frequenza pagamento *
+                                    <select name="billing_cycle" required>
+                                        <option value="annual" <?= $billingCycle === 'monthly' ? '' : 'selected' ?>>Pagamento unico</option>
+                                        <option value="monthly" <?= $billingCycle === 'monthly' ? 'selected' : '' ?>>Abbonamento mensile</option>
+                                    </select>
+                                </label>
+                                <label>
                                     Telefono contatto
                                     <input type="text" name="tenant_phone" value="<?= htmlspecialchars($tenantPhone) ?>">
                                 </label>
@@ -127,15 +135,24 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                 <aside class="landing-checkout__summary">
                     <h3>Piano selezionato</h3>
                     <?php if ($plan !== null): ?>
+                        <?php
+                            $priceValue = (float) ($plan['billing_price_eur'] ?? $plan['price_eur'] ?? 0);
+                            $isMonthly = ($plan['billing_cycle'] ?? '') === 'monthly';
+                            $priceDecimals = $isMonthly ? 2 : 0;
+                            $priceSuffix = $isMonthly ? ' / mese' : '';
+                        ?>
                         <div class="landing-checkout__plan">
                             <strong><?= htmlspecialchars((string) $plan['stripe_name']) ?></strong>
                             <span><?= htmlspecialchars((string) $plan['stripe_description']) ?></span>
-                            <div class="landing-checkout__price">€ <?= number_format((float) $plan['price_eur'], 0, ',', '.') ?></div>
+                            <div class="landing-checkout__price">€ <?= number_format($priceValue, $priceDecimals, ',', '.') ?><?= $priceSuffix ?></div>
                         </div>
                         <ul>
                             <li>Attivazione immediata dopo il pagamento.</li>
                             <li>Licenza assegnata con quota adesione pagata.</li>
                             <li>Credenziali inviate via email.</li>
+                            <?php if ($isMonthly): ?>
+                                <li>Addebito mensile ricorrente fino a disdetta.</li>
+                            <?php endif; ?>
                         </ul>
                     <?php else: ?>
                         <p>Seleziona un piano valido dalla pagina prezzi.</p>

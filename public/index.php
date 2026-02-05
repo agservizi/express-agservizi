@@ -665,6 +665,12 @@ function getCheckoutPlanCatalog(): array
     ];
 }
 
+function normalizeCheckoutBillingCycle(?string $value): string
+{
+    $normalized = strtolower(trim((string) $value));
+    return $normalized === 'monthly' || $normalized === 'mensile' ? 'monthly' : 'annual';
+}
+
 /**
  * @return array<string, mixed>|null
  */
@@ -672,6 +678,33 @@ function resolveCheckoutPlan(string $planKey): ?array
 {
     $catalog = getCheckoutPlanCatalog();
     return $catalog[$planKey] ?? null;
+}
+
+/**
+ * @param array<string, mixed> $plan
+ * @return array<string, mixed>
+ */
+function buildCheckoutPlanForBilling(array $plan, string $billingCycle): array
+{
+    $termMonths = (int) ($plan['term_months'] ?? 12);
+    $termMonths = $termMonths > 0 ? $termMonths : 12;
+    $priceEur = (float) ($plan['price_eur'] ?? 0);
+    $monthlyPrice = $termMonths > 0 ? round($priceEur / $termMonths, 2) : $priceEur;
+
+    $output = $plan;
+    $output['billing_cycle'] = $billingCycle;
+    if ($billingCycle === 'monthly') {
+        $output['billing_price_eur'] = $monthlyPrice;
+        $output['billing_label'] = 'Mensile';
+        $output['stripe_name'] = trim((string) ($plan['stripe_name'] ?? $plan['label'] ?? 'Piano')) . ' (mensile)';
+        $baseDescription = trim((string) ($plan['stripe_description'] ?? ''));
+        $output['stripe_description'] = 'Abbonamento mensile' . ($baseDescription !== '' ? ' · ' . $baseDescription : '');
+    } else {
+        $output['billing_price_eur'] = $priceEur;
+        $output['billing_label'] = 'Una tantum';
+    }
+
+    return $output;
 }
 
 function tenantSlugExists(PDO $pdo, string $slug): bool
@@ -808,18 +841,19 @@ function fetchViesVat(string $country, string $vatNumber): array
 }
 
 /**
- * @param array{plan_key:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string,vat_number:?string,company_country:?string,company_name:?string,company_address:?string} $payload
+ * @param array{plan_key:string,billing_cycle:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string,vat_number:?string,company_country:?string,company_name:?string,company_address:?string} $payload
  */
 function createCheckoutRequest(PDO $pdo, array $payload): int
 {
     $stmt = $pdo->prepare(
         'INSERT INTO tenant_checkout_requests
-            (plan_key, tenant_name, tenant_slug, tenant_email, tenant_phone, vat_number, company_country, company_name, company_address, status)
+            (plan_key, billing_cycle, tenant_name, tenant_slug, tenant_email, tenant_phone, vat_number, company_country, company_name, company_address, status)
          VALUES
-            (:plan_key, :tenant_name, :tenant_slug, :tenant_email, :tenant_phone, :vat_number, :company_country, :company_name, :company_address, "pending")'
+            (:plan_key, :billing_cycle, :tenant_name, :tenant_slug, :tenant_email, :tenant_phone, :vat_number, :company_country, :company_name, :company_address, "pending")'
     );
     $stmt->execute([
         ':plan_key' => $payload['plan_key'],
+        ':billing_cycle' => $payload['billing_cycle'],
         ':tenant_name' => $payload['tenant_name'],
         ':tenant_slug' => $payload['tenant_slug'],
         ':tenant_email' => $payload['tenant_email'],
@@ -890,6 +924,7 @@ function markCheckoutRequestPaid(PDO $pdo, int $requestId, array $data): void
         'UPDATE tenant_checkout_requests
          SET status = "paid",
              stripe_payment_intent_id = :payment_intent,
+             stripe_subscription_id = :subscription_id,
              stripe_customer_email = :customer_email,
              tenant_id = :tenant_id,
              license_id = :license_id,
@@ -900,6 +935,7 @@ function markCheckoutRequestPaid(PDO $pdo, int $requestId, array $data): void
     );
     $stmt->execute([
         ':payment_intent' => $data['payment_intent'] ?? null,
+        ':subscription_id' => $data['subscription_id'] ?? null,
         ':customer_email' => $data['customer_email'] ?? null,
         ':tenant_id' => $data['tenant_id'] ?? null,
         ':license_id' => $data['license_id'] ?? null,
@@ -2353,8 +2389,10 @@ switch ($page) {
 
             $paymentIntent = null;
             $customerEmail = null;
+            $subscriptionId = null;
             if (is_object($session)) {
                 $paymentIntent = $session->payment_intent ?? null;
+                $subscriptionId = $session->subscription ?? null;
                 $customerDetails = $session->customer_details ?? null;
                 if (is_object($customerDetails)) {
                     $customerEmail = $customerDetails->email ?? null;
@@ -2363,6 +2401,7 @@ switch ($page) {
 
             markCheckoutRequestPaid($pdo, $requestId, [
                 'payment_intent' => $paymentIntent,
+                'subscription_id' => $subscriptionId,
                 'customer_email' => $customerEmail,
                 'tenant_id' => $tenantId,
                 'license_id' => (int) ($license['id'] ?? 0),
@@ -2380,7 +2419,11 @@ switch ($page) {
         }
 
         $planKey = normalizeDemoPlanKey((string) ($_GET['plan'] ?? 'start'));
+        $billingCycle = normalizeCheckoutBillingCycle($_GET['billing'] ?? '');
         $plan = resolveCheckoutPlan($planKey);
+        if ($plan !== null) {
+            $plan = buildCheckoutPlanForBilling($plan, $billingCycle);
+        }
         $checkoutFeedback = $_SESSION['checkout_feedback'] ?? null;
         unset($_SESSION['checkout_feedback']);
         $checkoutOldInput = $_SESSION['checkout_old_input'] ?? null;
@@ -2388,7 +2431,11 @@ switch ($page) {
 
         if ($method === 'POST' && (($_POST['action'] ?? '') === 'checkout_start')) {
             $planKey = normalizeDemoPlanKey((string) ($_POST['plan_key'] ?? 'start'));
+            $billingCycle = normalizeCheckoutBillingCycle($_POST['billing_cycle'] ?? $_POST['billing'] ?? $_GET['billing'] ?? '');
             $plan = resolveCheckoutPlan($planKey);
+            if ($plan !== null) {
+                $plan = buildCheckoutPlanForBilling($plan, $billingCycle);
+            }
             $tenantName = trim((string) ($_POST['tenant_name'] ?? ''));
             $tenantSlug = trim((string) ($_POST['tenant_slug'] ?? ''));
             $tenantSlug = function_exists('mb_strtolower') ? mb_strtolower($tenantSlug, 'UTF-8') : strtolower($tenantSlug);
@@ -2460,7 +2507,8 @@ switch ($page) {
                     'company_name' => $companyName,
                     'company_address' => $companyAddress,
                 ];
-                header('Location: index.php?page=checkout&plan=' . urlencode($planKey));
+                $billingParam = $billingCycle === 'monthly' ? '&billing=monthly' : '';
+                header('Location: index.php?page=checkout&plan=' . urlencode($planKey) . $billingParam);
                 exit;
             }
 
@@ -2482,12 +2530,14 @@ switch ($page) {
                     'company_name' => $companyName,
                     'company_address' => $companyAddress,
                 ];
-                header('Location: index.php?page=checkout&plan=' . urlencode($planKey));
+                $billingParam = $billingCycle === 'monthly' ? '&billing=monthly' : '';
+                header('Location: index.php?page=checkout&plan=' . urlencode($planKey) . $billingParam);
                 exit;
             }
 
             $requestId = createCheckoutRequest($pdo, [
                 'plan_key' => $planKey,
+                'billing_cycle' => $billingCycle,
                 'tenant_name' => $tenantName,
                 'tenant_slug' => $tenantSlug,
                 'tenant_email' => $tenantEmail,
@@ -2504,32 +2554,40 @@ switch ($page) {
             }
             $cancelUrl = $stripeConfig['cancel_url'] ?? null;
             if ($cancelUrl === null || $cancelUrl === '') {
-                $cancelUrl = buildPublicUrl('page=checkout_cancel&plan=' . urlencode($planKey));
+                $billingParam = $billingCycle === 'monthly' ? '&billing=monthly' : '';
+                $cancelUrl = buildPublicUrl('page=checkout_cancel&plan=' . urlencode($planKey) . $billingParam);
             }
             $currency = $stripeConfig['currency'] ?? 'eur';
 
             try {
                 Stripe::setApiKey($stripeSecretKey);
+                $unitAmount = (int) round(((float) ($plan['billing_price_eur'] ?? $plan['price_eur'] ?? 0)) * 100);
+                $sessionMode = $billingCycle === 'monthly' ? 'subscription' : 'payment';
+                $lineItem = [
+                    'quantity' => 1,
+                    'price_data' => [
+                        'currency' => $currency,
+                        'unit_amount' => $unitAmount,
+                        'product_data' => [
+                            'name' => (string) $plan['stripe_name'],
+                            'description' => (string) $plan['stripe_description'],
+                        ],
+                    ],
+                ];
+                if ($billingCycle === 'monthly') {
+                    $lineItem['price_data']['recurring'] = ['interval' => 'month'];
+                }
                 $session = Session::create([
-                    'mode' => 'payment',
+                    'mode' => $sessionMode,
                     'payment_method_types' => ['card'],
                     'customer_email' => $tenantEmail,
-                    'line_items' => [[
-                        'quantity' => 1,
-                        'price_data' => [
-                            'currency' => $currency,
-                            'unit_amount' => (int) ((float) $plan['price_eur'] * 100),
-                            'product_data' => [
-                                'name' => (string) $plan['stripe_name'],
-                                'description' => (string) $plan['stripe_description'],
-                            ],
-                        ],
-                    ]],
+                    'line_items' => [$lineItem],
                     'success_url' => $successUrl,
                     'cancel_url' => $cancelUrl,
                     'metadata' => [
                         'request_id' => (string) $requestId,
                         'plan_key' => (string) $planKey,
+                        'billing_cycle' => (string) $billingCycle,
                     ],
                 ]);
                 updateCheckoutSession($pdo, $requestId, (string) $session->id);
@@ -2562,6 +2620,7 @@ switch ($page) {
             'pageTitle' => 'Attiva il piano',
             'planKey' => $planKey,
             'plan' => $plan,
+            'billingCycle' => $billingCycle,
             'feedback' => is_array($checkoutFeedback) ? $checkoutFeedback : null,
             'oldInput' => is_array($checkoutOldInput) ? $checkoutOldInput : null,
         ], false);
@@ -2588,9 +2647,11 @@ switch ($page) {
         }
 
         $planKey = normalizeDemoPlanKey((string) ($_GET['plan'] ?? 'start'));
+        $billingCycle = normalizeCheckoutBillingCycle($_GET['billing'] ?? '');
         render('checkout_cancel', [
             'pageTitle' => 'Pagamento annullato',
             'planKey' => $planKey,
+            'billingCycle' => $billingCycle,
         ], false);
         break;
 

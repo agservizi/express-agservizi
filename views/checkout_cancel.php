@@ -4,7 +4,9 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ('Pagamento annullato - ' . $appName);
 $planKey = $planKey ?? 'start';
+$billingCycle = isset($billingCycle) && is_string($billingCycle) ? $billingCycle : 'annual';
 $prezziUrl = 'index.php?page=prezzi';
+$billingParam = $billingCycle === 'monthly' ? '&billing=monthly' : '';
 ?>
 <!doctype html>
 <html lang="it">
@@ -36,7 +38,7 @@ $prezziUrl = 'index.php?page=prezzi';
                 <h1>Vuoi riprovare?</h1>
                 <p class="landing-subtitle">Nessun addebito è stato effettuato. Puoi tornare al checkout quando vuoi.</p>
                 <div class="landing-hero__actions">
-                    <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=<?= htmlspecialchars($planKey) ?>">Torna al checkout</a>
+                    <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=<?= htmlspecialchars($planKey) ?><?= htmlspecialchars($billingParam) ?>">Torna al checkout</a>
                     <a class="landing-btn landing-btn--secondary" href="<?= htmlspecialchars($prezziUrl) ?>">Vai ai prezzi</a>
                 </div>
             </div>

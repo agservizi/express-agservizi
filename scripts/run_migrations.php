@@ -22,6 +22,7 @@ $migrations = [
     __DIR__ . '/../migrations/20260205_add_license_terms_and_renewal_notices.sql',
     __DIR__ . '/../migrations/20260206_add_tenant_checkout_requests.sql',
     __DIR__ . '/../migrations/20260207_add_tenant_vat_details.sql',
+    __DIR__ . '/../migrations/20260208_add_checkout_billing_cycle.sql',
 ];
 
 $ignorableErrors = [1060, 1061, 1091, 1050];

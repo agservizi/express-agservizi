@@ -66,6 +66,7 @@ $currentPage = 'prezzi';
                         <h3>Piano Start</h3>
                         <p>12 mesi · max 1 cassiere</p>
                         <span class="landing-pricing__price">€ 550</span>
+                        <span class="muted">€ 45,83 / mese</span>
                     </header>
                     <ul>
                         <li>Dashboard e KPI essenziali.</li>
@@ -75,6 +76,7 @@ $currentPage = 'prezzi';
                     </ul>
                     <footer class="landing-pricing__cta">
                         <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=start">Acquista</a>
+                        <a class="landing-btn landing-btn--secondary" href="index.php?page=checkout&amp;plan=start&amp;billing=monthly">Mensile</a>
                     </footer>
                 </article>
                 <article class="landing-pricing__card landing-pricing__card--highlight">
@@ -82,6 +84,7 @@ $currentPage = 'prezzi';
                         <h3>Piano Start Plus</h3>
                         <p>12 mesi · max 1 cassiere</p>
                         <span class="landing-pricing__price">€ 650</span>
+                        <span class="muted">€ 54,17 / mese</span>
                     </header>
                     <ul>
                         <li>Tutto del Start.</li>
@@ -91,6 +94,7 @@ $currentPage = 'prezzi';
                     </ul>
                     <footer class="landing-pricing__cta">
                         <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=start_plus">Acquista</a>
+                        <a class="landing-btn landing-btn--secondary" href="index.php?page=checkout&amp;plan=start_plus&amp;billing=monthly">Mensile</a>
                     </footer>
                 </article>
                 <article class="landing-pricing__card">
@@ -98,6 +102,7 @@ $currentPage = 'prezzi';
                         <h3>Piano Core</h3>
                         <p>24 mesi · max 2 cassieri</p>
                         <span class="landing-pricing__price">€ 850</span>
+                        <span class="muted">€ 35,42 / mese</span>
                     </header>
                     <ul>
                         <li>Tutto del Start Plus.</li>
@@ -107,6 +112,7 @@ $currentPage = 'prezzi';
                     </ul>
                     <footer class="landing-pricing__cta">
                         <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=core">Acquista</a>
+                        <a class="landing-btn landing-btn--secondary" href="index.php?page=checkout&amp;plan=core&amp;billing=monthly">Mensile</a>
                     </footer>
                 </article>
                 <article class="landing-pricing__card">
@@ -114,6 +120,7 @@ $currentPage = 'prezzi';
                         <h3>Piano Business</h3>
                         <p>36 mesi · max 4 cassieri</p>
                         <span class="landing-pricing__price">€ 1200</span>
+                        <span class="muted">€ 33,33 / mese</span>
                     </header>
                     <ul>
                         <li>Tutto del Core.</li>
@@ -123,6 +130,7 @@ $currentPage = 'prezzi';
                     </ul>
                     <footer class="landing-pricing__cta">
                         <a class="landing-btn landing-btn--primary" href="index.php?page=checkout&amp;plan=business">Acquista</a>
+                        <a class="landing-btn landing-btn--secondary" href="index.php?page=checkout&amp;plan=business&amp;billing=monthly">Mensile</a>
                     </footer>
                 </article>
             </div>
