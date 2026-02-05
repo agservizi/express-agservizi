@@ -6,6 +6,7 @@ $pageTitle = $pageTitle ?? ('Attiva piano - ' . $appName);
 $planKey = $planKey ?? 'start';
 $plan = isset($plan) && is_array($plan) ? $plan : null;
 $billingCycle = isset($billingCycle) && is_string($billingCycle) ? $billingCycle : 'annual';
+$resumeRequestId = isset($resumeRequestId) ? (int) $resumeRequestId : 0;
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
 $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
 $landingUrl = 'index.php?page=landing';
@@ -89,6 +90,9 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                         <form method="post" class="landing-form">
                             <input type="hidden" name="action" value="checkout_start">
                             <input type="hidden" name="plan_key" value="<?= htmlspecialchars($planKey) ?>">
+                            <?php if ($resumeRequestId > 0): ?>
+                                <input type="hidden" name="resume_request_id" value="<?= (int) $resumeRequestId ?>">
+                            <?php endif; ?>
                             <div class="landing-form__grid">
                                 <label>
                                     Nome tenant *

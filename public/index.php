@@ -2490,28 +2490,27 @@ switch ($page) {
         $checkoutOldInput = $_SESSION['checkout_old_input'] ?? null;
         unset($_SESSION['checkout_old_input']);
 
-        if (($_GET['resume'] ?? '') === '1') {
-            $resumeId = (int) ($_SESSION['checkout_resume_request_id'] ?? 0);
-            if ($resumeId > 0) {
-                $resumeRequest = getCheckoutRequestById($pdo, $resumeId);
-                if ($resumeRequest && in_array((string) ($resumeRequest['status'] ?? ''), ['pending', 'processing'], true)) {
-                    $planKey = normalizeDemoPlanKey((string) ($resumeRequest['plan_key'] ?? 'start'));
-                    $billingCycle = normalizeCheckoutBillingCycle($resumeRequest['billing_cycle'] ?? '');
-                    $plan = resolveCheckoutPlan($planKey);
-                    if ($plan !== null) {
-                        $plan = buildCheckoutPlanForBilling($plan, $billingCycle);
-                    }
-                    $checkoutOldInput = [
-                        'tenant_name' => (string) ($resumeRequest['tenant_name'] ?? ''),
-                        'tenant_slug' => (string) ($resumeRequest['tenant_slug'] ?? ''),
-                        'tenant_email' => (string) ($resumeRequest['tenant_email'] ?? ''),
-                        'tenant_phone' => (string) ($resumeRequest['tenant_phone'] ?? ''),
-                        'vat_number' => (string) ($resumeRequest['vat_number'] ?? ''),
-                        'company_country' => (string) ($resumeRequest['company_country'] ?? ''),
-                        'company_name' => (string) ($resumeRequest['company_name'] ?? ''),
-                        'company_address' => (string) ($resumeRequest['company_address'] ?? ''),
-                    ];
+        $resumeId = (int) ($_GET['resume_id'] ?? ($_SESSION['checkout_resume_request_id'] ?? 0));
+        if (($_GET['resume'] ?? '') === '1' && $resumeId > 0) {
+            $resumeRequest = getCheckoutRequestById($pdo, $resumeId);
+            if ($resumeRequest && in_array((string) ($resumeRequest['status'] ?? ''), ['pending', 'processing'], true)) {
+                $_SESSION['checkout_resume_request_id'] = $resumeId;
+                $planKey = normalizeDemoPlanKey((string) ($resumeRequest['plan_key'] ?? 'start'));
+                $billingCycle = normalizeCheckoutBillingCycle($resumeRequest['billing_cycle'] ?? '');
+                $plan = resolveCheckoutPlan($planKey);
+                if ($plan !== null) {
+                    $plan = buildCheckoutPlanForBilling($plan, $billingCycle);
                 }
+                $checkoutOldInput = [
+                    'tenant_name' => (string) ($resumeRequest['tenant_name'] ?? ''),
+                    'tenant_slug' => (string) ($resumeRequest['tenant_slug'] ?? ''),
+                    'tenant_email' => (string) ($resumeRequest['tenant_email'] ?? ''),
+                    'tenant_phone' => (string) ($resumeRequest['tenant_phone'] ?? ''),
+                    'vat_number' => (string) ($resumeRequest['vat_number'] ?? ''),
+                    'company_country' => (string) ($resumeRequest['company_country'] ?? ''),
+                    'company_name' => (string) ($resumeRequest['company_name'] ?? ''),
+                    'company_address' => (string) ($resumeRequest['company_address'] ?? ''),
+                ];
             }
         }
 
@@ -2573,7 +2572,7 @@ switch ($page) {
             if ($tenantEmail !== '' && userEmailExists($pdo, $tenantEmail)) {
                 $errors[] = 'L’email è già associata a un account esistente.';
             }
-            $resumeRequestId = (int) ($_SESSION['checkout_resume_request_id'] ?? 0);
+            $resumeRequestId = (int) ($_POST['resume_request_id'] ?? ($_SESSION['checkout_resume_request_id'] ?? 0));
             $resumeRequest = $resumeRequestId > 0 ? getCheckoutRequestById($pdo, $resumeRequestId) : null;
             $resumeIsValid = $resumeRequest
                 && in_array((string) ($resumeRequest['status'] ?? ''), ['pending', 'processing'], true)
@@ -2591,7 +2590,7 @@ switch ($page) {
                         'success' => false,
                         'message' => 'Controlla i dati inseriti.',
                         'errors' => $errors,
-                        'recovery_url' => 'index.php?page=checkout&plan=' . urlencode($resumePlanKey) . $billingParam . '&resume=1',
+                        'recovery_url' => 'index.php?page=checkout&plan=' . urlencode($resumePlanKey) . $billingParam . '&resume=1&resume_id=' . urlencode((string) ($pending['id'] ?? '')),
                         'recovery_label' => 'Riprendi l’attivazione precedente',
                     ];
                 }
@@ -2757,6 +2756,7 @@ switch ($page) {
             'planKey' => $planKey,
             'plan' => $plan,
             'billingCycle' => $billingCycle,
+            'resumeRequestId' => $resumeId > 0 ? $resumeId : (int) ($_SESSION['checkout_resume_request_id'] ?? 0),
             'feedback' => is_array($checkoutFeedback) ? $checkoutFeedback : null,
             'oldInput' => is_array($checkoutOldInput) ? $checkoutOldInput : null,
         ], false);
