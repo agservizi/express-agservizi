@@ -114,6 +114,7 @@ if ($currentPage === '') {
 $pageAliases = [
     'product_request' => 'product_requests',
     'support_request' => 'support_requests',
+    'feature_request' => 'feature_requests',
 ];
 $currentPage = $pageAliases[$currentPage] ?? $currentPage;
 $isActiveSidebar = static function (string $page) use ($currentPage): string {
@@ -171,6 +172,9 @@ $isActiveSidebar = static function (string $page) use ($currentPage): string {
             <?php endif; ?>
             <?php if ($moduleEnabled('support_requests')): ?>
                 <a href="index.php?page=support_requests" class="sidebar__link<?= $isActiveSidebar('support_requests') ?>" data-tooltip="Supporto clienti">💬 <span>Richieste supporto</span></a>
+            <?php endif; ?>
+            <?php if ($moduleEnabled('feature_requests')): ?>
+                <a href="index.php?page=feature_requests" class="sidebar__link<?= $isActiveSidebar('feature_requests') ?>" data-tooltip="Suggerisci funzionalità">✨ <span>Suggerisci feature</span></a>
             <?php endif; ?>
             <?php if ($moduleEnabled('reports')): ?>
                 <a href="index.php?page=reports" class="sidebar__link<?= $isActiveSidebar('reports') ?>" data-tooltip="Report vendite">📈 <span>Report</span></a>

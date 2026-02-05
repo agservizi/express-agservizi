@@ -429,6 +429,7 @@ function buildPlanModuleMap(): array
         'offers',
         'sales_create',
         'sales_list',
+        'feature_requests',
         'guide',
         'settings',
     ];
@@ -1140,6 +1141,8 @@ function buildPageModuleMap(): array
         'product_request' => 'product_requests',
         'support_requests' => 'support_requests',
         'support_request' => 'support_requests',
+        'feature_requests' => 'feature_requests',
+        'feature_request' => 'feature_requests',
         'reports' => 'reports',
         'guide' => 'guide',
         'settings' => 'settings',
@@ -4135,6 +4138,149 @@ switch ($page) {
             'currentUser' => $currentUser,
             'pageTitle' => 'Guida completa',
             'feedback' => $guideFeedback,
+        ]);
+        break;
+
+    case 'feature_requests':
+        if ($currentUser === null) {
+            header('Location: index.php?page=login');
+            exit;
+        }
+
+        $featureFeedback = $_SESSION['feature_request_feedback'] ?? null;
+        unset($_SESSION['feature_request_feedback']);
+        $featureOldInput = $_SESSION['feature_request_old_input'] ?? null;
+        unset($_SESSION['feature_request_old_input']);
+
+        if ($method === 'POST' && (($_POST['action'] ?? '') === 'send_feature_request')) {
+            $title = trim((string) ($_POST['feature_title'] ?? ''));
+            $area = trim((string) ($_POST['feature_area'] ?? ''));
+            $priority = trim((string) ($_POST['feature_priority'] ?? ''));
+            $impact = trim((string) ($_POST['feature_impact'] ?? ''));
+            $description = trim((string) ($_POST['feature_description'] ?? ''));
+            $benefit = trim((string) ($_POST['feature_benefit'] ?? ''));
+            $workaround = trim((string) ($_POST['feature_workaround'] ?? ''));
+            $contactName = trim((string) ($_POST['feature_contact_name'] ?? ''));
+            $contactEmail = trim((string) ($_POST['feature_contact_email'] ?? ''));
+
+            $errors = [];
+            if ($title === '') {
+                $errors[] = 'Inserisci un titolo per la richiesta.';
+            }
+            if ($area === '') {
+                $errors[] = 'Seleziona l’area interessata.';
+            }
+            if ($description === '') {
+                $errors[] = 'Descrivi la funzionalità desiderata.';
+            }
+            if ($contactEmail !== '' && !filter_var($contactEmail, FILTER_VALIDATE_EMAIL)) {
+                $errors[] = 'Inserisci un indirizzo email valido.';
+            }
+
+            if ($errors !== []) {
+                $_SESSION['feature_request_feedback'] = [
+                    'success' => false,
+                    'message' => 'Controlla i campi richiesti prima di inviare la richiesta.',
+                    'error' => implode(' ', $errors),
+                ];
+                $_SESSION['feature_request_old_input'] = [
+                    'feature_title' => $title,
+                    'feature_area' => $area,
+                    'feature_priority' => $priority,
+                    'feature_impact' => $impact,
+                    'feature_description' => $description,
+                    'feature_benefit' => $benefit,
+                    'feature_workaround' => $workaround,
+                    'feature_contact_name' => $contactName,
+                    'feature_contact_email' => $contactEmail,
+                ];
+                header('Location: index.php?page=feature_requests');
+                exit;
+            }
+
+            $priorityLabels = [
+                'bassa' => 'Bassa',
+                'media' => 'Media',
+                'alta' => 'Alta',
+                'critica' => 'Critica',
+            ];
+            $impactLabels = [
+                'vendite' => 'Vendite e fatturato',
+                'operativo' => 'Operatività quotidiana',
+                'report' => 'Report e analisi',
+                'clienti' => 'Esperienza cliente',
+                'compliance' => 'Compliance / sicurezza',
+                'altro' => 'Altro',
+            ];
+
+            $username = (string) ($currentUser['username'] ?? 'utente');
+            $fullName = trim((string) ($currentUser['fullname'] ?? ''));
+            $tenantId = (int) ($currentUser['tenant_id'] ?? 0);
+            $userEmail = trim((string) ($currentUser['email'] ?? ''));
+            $contactName = $contactName !== '' ? $contactName : ($fullName !== '' ? $fullName : $username);
+            $contactEmail = $contactEmail !== '' ? $contactEmail : $userEmail;
+
+            $supportRecipient = $alertEmail;
+            if (!is_string($supportRecipient) || !filter_var($supportRecipient, FILTER_VALIDATE_EMAIL)) {
+                $supportRecipient = 'ag.servizi16@gmail.com';
+            }
+
+            $priorityLabel = $priorityLabels[$priority] ?? ($priority !== '' ? $priority : 'Non indicata');
+            $impactLabel = $impactLabels[$impact] ?? ($impact !== '' ? $impact : 'Non indicato');
+
+            $subject = 'Suggerimento funzionalità · ' . $title;
+            $lines = [];
+            $lines[] = 'Titolo: ' . $title;
+            $lines[] = 'Area: ' . $area;
+            $lines[] = 'Priorità: ' . $priorityLabel;
+            $lines[] = 'Impatto: ' . $impactLabel;
+            $lines[] = 'Tenant ID: ' . $tenantId;
+            $lines[] = 'Richiedente: ' . $contactName;
+            if ($contactEmail !== '') {
+                $lines[] = 'Email contatto: ' . $contactEmail;
+            }
+            $lines[] = '';
+            $lines[] = 'Descrizione:';
+            $lines[] = $description;
+            if ($benefit !== '') {
+                $lines[] = '';
+                $lines[] = 'Beneficio atteso:';
+                $lines[] = $benefit;
+            }
+            if ($workaround !== '') {
+                $lines[] = '';
+                $lines[] = 'Soluzione temporanea:';
+                $lines[] = $workaround;
+            }
+
+            $sent = sendGuideSupportEmail(
+                $supportRecipient,
+                $subject,
+                implode("\n", $lines),
+                $resendApiKey,
+                $resendFrom,
+                $resendFromName
+            );
+
+            $_SESSION['feature_request_feedback'] = $sent
+                ? [
+                    'success' => true,
+                    'message' => 'Grazie! La tua proposta è stata inviata al team.',
+                ]
+                : [
+                    'success' => false,
+                    'message' => 'Invio non riuscito. Riprova tra qualche minuto.',
+                ];
+
+            header('Location: index.php?page=feature_requests');
+            exit;
+        }
+
+        render('feature_requests', [
+            'currentUser' => $currentUser,
+            'pageTitle' => 'Suggerisci una funzionalità',
+            'feedback' => is_array($featureFeedback) ? $featureFeedback : null,
+            'oldInput' => is_array($featureOldInput) ? $featureOldInput : null,
         ]);
         break;
 
