@@ -150,11 +150,29 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                             $isMonthly = ($plan['billing_cycle'] ?? '') === 'monthly';
                             $priceDecimals = $isMonthly ? 2 : 0;
                             $priceSuffix = $isMonthly ? ' / mese' : '';
+                            $termMonths = (int) ($plan['term_months'] ?? 12);
+                            $termMonths = $termMonths > 0 ? $termMonths : 12;
+                            $annualPrice = (float) ($plan['price_eur'] ?? 0);
+                            $monthlyPrice = $termMonths > 0 ? round($annualPrice / $termMonths, 2) : $annualPrice;
+                            $rawName = (string) ($plan['stripe_name'] ?? '');
+                            $baseName = str_replace(' (mensile)', '', $rawName);
+                            $rawDesc = (string) ($plan['stripe_description'] ?? '');
+                            $baseDesc = str_starts_with($rawDesc, 'Abbonamento mensile')
+                                ? trim(str_replace('Abbonamento mensile ·', '', $rawDesc))
+                                : $rawDesc;
+                            $annualDesc = $baseDesc;
+                            $monthlyDesc = 'Abbonamento mensile' . ($baseDesc !== '' ? ' · ' . $baseDesc : '');
                         ?>
-                        <div class="landing-checkout__plan">
-                            <strong><?= htmlspecialchars((string) $plan['stripe_name']) ?></strong>
-                            <span><?= htmlspecialchars((string) $plan['stripe_description']) ?></span>
-                            <div class="landing-checkout__price">€ <?= number_format($priceValue, $priceDecimals, ',', '.') ?><?= $priceSuffix ?></div>
+                        <div class="landing-checkout__plan" data-checkout-plan
+                            data-annual-name="<?= htmlspecialchars($baseName) ?>"
+                            data-monthly-name="<?= htmlspecialchars($baseName . ' (mensile)') ?>"
+                            data-annual-desc="<?= htmlspecialchars($annualDesc) ?>"
+                            data-monthly-desc="<?= htmlspecialchars($monthlyDesc) ?>"
+                            data-annual-price="<?= number_format($annualPrice, 2, '.', '') ?>"
+                            data-monthly-price="<?= number_format($monthlyPrice, 2, '.', '') ?>">
+                            <strong data-checkout-plan-name><?= htmlspecialchars((string) $plan['stripe_name']) ?></strong>
+                            <span data-checkout-plan-desc><?= htmlspecialchars((string) $plan['stripe_description']) ?></span>
+                            <div class="landing-checkout__price" data-checkout-plan-price>€ <?= number_format($priceValue, $priceDecimals, ',', '.') ?><?= $priceSuffix ?></div>
                         </div>
                         <ul>
                             <li>Attivazione immediata dopo il pagamento.</li>
@@ -243,6 +261,34 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                     setStatus('Impossibile contattare VIES.', 'error');
                 }
             });
+        })();
+
+        (() => {
+            const billingSelect = document.querySelector('select[name="billing_cycle"]');
+            const planCard = document.querySelector('[data-checkout-plan]');
+            const nameEl = document.querySelector('[data-checkout-plan-name]');
+            const descEl = document.querySelector('[data-checkout-plan-desc]');
+            const priceEl = document.querySelector('[data-checkout-plan-price]');
+
+            if (!billingSelect || !planCard || !nameEl || !descEl || !priceEl) {
+                return;
+            }
+
+            const updateSummary = () => {
+                const isMonthly = billingSelect.value === 'monthly';
+                const priceValue = parseFloat(isMonthly ? planCard.dataset.monthlyPrice : planCard.dataset.annualPrice);
+                const formatter = new Intl.NumberFormat('it-IT', {
+                    minimumFractionDigits: isMonthly ? 2 : 0,
+                    maximumFractionDigits: isMonthly ? 2 : 0,
+                });
+                nameEl.textContent = isMonthly ? (planCard.dataset.monthlyName || '') : (planCard.dataset.annualName || '');
+                descEl.textContent = isMonthly ? (planCard.dataset.monthlyDesc || '') : (planCard.dataset.annualDesc || '');
+                const suffix = isMonthly ? ' / mese' : '';
+                priceEl.textContent = `€ ${formatter.format(Number.isFinite(priceValue) ? priceValue : 0)}${suffix}`;
+            };
+
+            billingSelect.addEventListener('change', updateSummary);
+            updateSummary();
         })();
     </script>
     <script>
