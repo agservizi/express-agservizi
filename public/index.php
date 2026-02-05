@@ -2578,9 +2578,20 @@ switch ($page) {
                 && in_array((string) ($resumeRequest['status'] ?? ''), ['pending', 'processing'], true)
                 && (string) ($resumeRequest['tenant_slug'] ?? '') === $tenantSlug
                 && (string) ($resumeRequest['tenant_email'] ?? '') === $tenantEmail;
+
+            $pending = ($tenantSlug !== '' && $tenantEmail !== '')
+                ? getPendingCheckoutRequest($pdo, $tenantSlug, $tenantEmail)
+                : null;
+
+            if (!$resumeIsValid && $pending) {
+                $resumeRequestId = (int) ($pending['id'] ?? 0);
+                $resumeRequest = $pending;
+                $resumeIsValid = true;
+                $_SESSION['checkout_resume_request_id'] = $resumeRequestId;
+            }
+
             if ($tenantSlug !== '' && $tenantEmail !== '' && pendingCheckoutExists($pdo, $tenantSlug, $tenantEmail) && !$resumeIsValid) {
                 $errors[] = 'Esiste già una richiesta di attivazione in corso per questi dati.';
-                $pending = getPendingCheckoutRequest($pdo, $tenantSlug, $tenantEmail);
                 if ($pending) {
                     $_SESSION['checkout_resume_request_id'] = (int) ($pending['id'] ?? 0);
                     $resumePlanKey = normalizeDemoPlanKey((string) ($pending['plan_key'] ?? 'start'));
