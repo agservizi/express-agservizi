@@ -2722,12 +2722,11 @@ switch ($page) {
                 if ($billingCycle === 'monthly') {
                     $lineItem['price_data']['recurring'] = ['interval' => 'month'];
                 }
-                $session = Session::create([
+                $sessionPayload = [
                     'mode' => $sessionMode,
                     'payment_method_types' => ['card'],
                     'customer_email' => $tenantEmail,
                     'line_items' => [$lineItem],
-                    'subscription_data' => $subscriptionData,
                     'success_url' => $successUrl,
                     'cancel_url' => $cancelUrl,
                     'metadata' => [
@@ -2735,7 +2734,11 @@ switch ($page) {
                         'plan_key' => (string) $planKey,
                         'billing_cycle' => (string) $billingCycle,
                     ],
-                ]);
+                ];
+                if ($subscriptionData !== null) {
+                    $sessionPayload['subscription_data'] = $subscriptionData;
+                }
+                $session = Session::create($sessionPayload);
                 updateCheckoutSession($pdo, $requestId, (string) $session->id);
                 header('Location: ' . $session->url);
                 exit;
