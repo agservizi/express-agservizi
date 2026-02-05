@@ -117,7 +117,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                                     Paese P.IVA
                                     <input type="text" name="company_country" value="<?= htmlspecialchars($tenantCompanyCountry !== '' ? $tenantCompanyCountry : 'IT') ?>" maxlength="2" placeholder="IT">
                                 </label>
-                                <label>
+                                <label class="landing-form__span">
                                     P.IVA
                                     <div class="landing-form__inline landing-form__inline--inside">
                                         <input type="text" name="vat_number" value="<?= htmlspecialchars($tenantVatNumber) ?>" placeholder="IT12345678901">
@@ -125,11 +125,11 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                                     </div>
                                     <span class="landing-form__status" data-vies-status></span>
                                 </label>
-                                <label>
-                                    Ragione sociale
-                                    <input type="text" name="company_name" value="<?= htmlspecialchars($tenantCompanyName) ?>">
-                                </label>
                             </div>
+                            <label>
+                                Ragione sociale
+                                <input type="text" name="company_name" value="<?= htmlspecialchars($tenantCompanyName) ?>">
+                            </label>
                             <label>
                                 Indirizzo sede
                                 <textarea name="company_address" rows="3"><?= htmlspecialchars($tenantCompanyAddress) ?></textarea>

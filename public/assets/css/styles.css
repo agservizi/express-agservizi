@@ -269,6 +269,7 @@ html{scroll-behavior:smooth;}
 .landing-checkout__panel p{margin:0 0 18px;color:#475569;} 
 .landing-form{display:flex;flex-direction:column;gap:16px;} 
 .landing-form__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;} 
+.landing-form__span{grid-column:1/-1;} 
 .landing-form label{display:flex;flex-direction:column;gap:8px;font-size:13px;color:#475569;} 
 .landing-form input{padding:12px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;color:#0f172a;background:#fff;} 
 .landing-form select{padding:12px 14px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;color:#0f172a;background:#fff;appearance:none;} 
