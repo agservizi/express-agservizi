@@ -72,82 +72,129 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
     </header>
 
     <main class="landing-main">
-        <section class="landing-section" id="piani">
-            <div class="landing-section__header">
-                <h2>Dettaglio completo dei piani</h2>
-                <p>Di seguito trovi, punto per punto, tutto ciò che è incluso in ogni livello di servizio.</p>
+        <section class="premium-section" id="piani">
+            <div class="premium-header">
+                <div>
+                    <p class="premium-kicker">Panoramica completa</p>
+                    <h2>Piani con dettagli operativi</h2>
+                    <p>Ogni piano è pensato per crescere con il tuo punto vendita. Qui trovi cosa include davvero, senza scorciatoie.</p>
+                </div>
+                <div class="premium-badges">
+                    <span>Attivazione rapida</span>
+                    <span>Assistenza dedicata</span>
+                    <span>Multi-tenant pronto</span>
+                </div>
             </div>
 
-            <article class="landing-pricing__card">
-                <header>
-                    <h3>Piano Start</h3>
-                    <p>12 mesi · max 1 cassiere · € 550 (oppure € 45,83/mese)</p>
-                </header>
-                <ul>
-                    <li><strong>Dashboard operativa:</strong> panoramica giornaliera su vendite, incassi e performance.</li>
-                    <li><strong>Magazzino SIM:</strong> stato SIM, provider, note e storicità movimenti.</li>
-                    <li><strong>Catalogo prodotti:</strong> anagrafiche, prezzi, IVA, barcode e scorte.</li>
-                    <li><strong>Clienti:</strong> rubrica, dati fiscali, note e storico acquisti.</li>
-                    <li><strong>Listini e offerte:</strong> gestione offerte base e prezzi predefiniti.</li>
-                    <li><strong>Nuova vendita:</strong> workflow guidato, scontrino e stampa rapida.</li>
-                    <li><strong>Storico vendite:</strong> ricerca e filtri principali per controllo cassa.</li>
-                    <li><strong>Guida operativa:</strong> manuale completo per l’uso quotidiano.</li>
-                    <li><strong>Impostazioni:</strong> configurazioni essenziali dello store.</li>
-                </ul>
-            </article>
+            <div class="premium-grid">
+                <article class="premium-card">
+                    <header class="premium-card__header">
+                        <div>
+                            <h3>Start</h3>
+                            <p>12 mesi · max 1 cassiere</p>
+                        </div>
+                        <div class="premium-card__price">
+                            <strong>€ 550</strong>
+                            <span>€ 45,83/mese</span>
+                        </div>
+                    </header>
+                    <div class="premium-card__body">
+                        <p class="premium-card__intro">Il set essenziale per partire in modo ordinato e controllare ogni vendita.</p>
+                        <ul class="premium-list">
+                            <li>Dashboard con KPI base, incassi e trend giornalieri.</li>
+                            <li>Magazzino SIM con stati, provider, note e storico.</li>
+                            <li>Catalogo prodotti con prezzi, IVA, barcode e stock.</li>
+                            <li>Clienti con anagrafica, dati fiscali e storico acquisti.</li>
+                            <li>Listini e offerte base per velocizzare la vendita.</li>
+                            <li>Nuova vendita guidata e stampa scontrino.</li>
+                            <li>Storico vendite con filtri principali.</li>
+                            <li>Guida operativa e impostazioni fondamentali.</li>
+                        </ul>
+                    </div>
+                </article>
 
-            <article class="landing-pricing__card landing-pricing__card--highlight">
-                <header>
-                    <h3>Piano Start Plus</h3>
-                    <p>12 mesi · max 1 cassiere · € 650 (oppure € 54,17/mese)</p>
-                </header>
-                <ul>
-                    <li><strong>Tutto del Piano Start</strong> incluso senza limitazioni aggiuntive.</li>
-                    <li><strong>Report avanzati:</strong> KPI di vendita, margini e performance periodiche.</li>
-                    <li><strong>Richieste supporto clienti:</strong> gestione ticket e tracciamento richieste.</li>
-                    <li><strong>Ordini store:</strong> gestione richieste prodotti e riordini interni.</li>
-                    <li><strong>Notifiche operative:</strong> alert su eventi chiave e priorità.</li>
-                </ul>
-            </article>
+                <article class="premium-card premium-card--featured">
+                    <header class="premium-card__header">
+                        <div>
+                            <h3>Start Plus</h3>
+                            <p>12 mesi · max 1 cassiere</p>
+                        </div>
+                        <div class="premium-card__price">
+                            <strong>€ 650</strong>
+                            <span>€ 54,17/mese</span>
+                        </div>
+                    </header>
+                    <div class="premium-card__body">
+                        <p class="premium-card__intro">Per chi vuole misurare performance e gestire le richieste in modo evoluto.</p>
+                        <ul class="premium-list">
+                            <li>Tutto il piano Start incluso.</li>
+                            <li>Report avanzati su vendite, margini e rotazione.</li>
+                            <li>Gestione richieste supporto e tracciamento ticket.</li>
+                            <li>Ordini store integrati con monitoraggio stato.</li>
+                            <li>Notifiche operative per eventi chiave e priorità.</li>
+                        </ul>
+                    </div>
+                </article>
 
-            <article class="landing-pricing__card">
-                <header>
-                    <h3>Piano Core</h3>
-                    <p>24 mesi · max 2 cassieri · € 850 (oppure € 35,42/mese)</p>
-                </header>
-                <ul>
-                    <li><strong>Tutto del Piano Start Plus</strong> incluso.</li>
-                    <li><strong>Contratti energia:</strong> gestione pratiche luce & gas e simulazioni.</li>
-                    <li><strong>Report KPI avanzati:</strong> analisi dettagliate per prodotti, canali e operatori.</li>
-                    <li><strong>Supporto prioritario:</strong> canale dedicato con tempi di risposta accelerati.</li>
-                    <li><strong>Accessi estesi:</strong> fino a 2 cassieri attivi.</li>
-                </ul>
-            </article>
+                <article class="premium-card">
+                    <header class="premium-card__header">
+                        <div>
+                            <h3>Core</h3>
+                            <p>24 mesi · max 2 cassieri</p>
+                        </div>
+                        <div class="premium-card__price">
+                            <strong>€ 850</strong>
+                            <span>€ 35,42/mese</span>
+                        </div>
+                    </header>
+                    <div class="premium-card__body">
+                        <p class="premium-card__intro">Il piano per reti vendita attive che vogliono servizi energia e KPI evoluti.</p>
+                        <ul class="premium-list">
+                            <li>Tutto il piano Start Plus incluso.</li>
+                            <li>Gestione contratti energia luce & gas con simulazioni.</li>
+                            <li>Report KPI avanzati per canali, operatori e prodotti.</li>
+                            <li>Supporto prioritario con tempi di risposta accelerati.</li>
+                            <li>Fino a 2 cassieri attivi con controllo accessi.</li>
+                        </ul>
+                    </div>
+                </article>
 
-            <article class="landing-pricing__card">
-                <header>
-                    <h3>Piano Business</h3>
-                    <p>36 mesi · max 4 cassieri · € 1200 (oppure € 33,33/mese)</p>
-                </header>
-                <ul>
-                    <li><strong>Tutto del Piano Core</strong> incluso.</li>
-                    <li><strong>Report personalizzati:</strong> cruscotti su misura per la direzione.</li>
-                    <li><strong>SLA dedicato:</strong> livelli di servizio concordati e monitorati.</li>
-                    <li><strong>Onboarding e training:</strong> affiancamento operativo iniziale.</li>
-                    <li><strong>Integrazioni avanzate:</strong> collegamenti custom con sistemi esterni.</li>
-                    <li><strong>Accessi estesi:</strong> fino a 4 cassieri attivi.</li>
-                </ul>
-            </article>
+                <article class="premium-card">
+                    <header class="premium-card__header">
+                        <div>
+                            <h3>Business</h3>
+                            <p>36 mesi · max 4 cassieri</p>
+                        </div>
+                        <div class="premium-card__price">
+                            <strong>€ 1200</strong>
+                            <span>€ 33,33/mese</span>
+                        </div>
+                    </header>
+                    <div class="premium-card__body">
+                        <p class="premium-card__intro">Per chi vuole personalizzazione, SLA dedicato e onboarding completo.</p>
+                        <ul class="premium-list">
+                            <li>Tutto il piano Core incluso.</li>
+                            <li>Report personalizzati con dashboard su misura.</li>
+                            <li>SLA dedicato e monitoraggio livelli di servizio.</li>
+                            <li>Onboarding operativo e training del team.</li>
+                            <li>Integrazioni avanzate con sistemi esterni.</li>
+                            <li>Fino a 4 cassieri attivi con ruoli e permessi.</li>
+                        </ul>
+                    </div>
+                </article>
+            </div>
         </section>
 
-        <section class="landing-section landing-section--accent">
-            <div class="landing-section__header">
-                <h2>Serve un piano su misura?</h2>
-                <p>Descrivici i volumi, le sedi e i processi: prepariamo una proposta personalizzata.</p>
-            </div>
-            <div class="landing-hero__actions">
-                <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Parla con un consulente</a>
-                <a class="landing-btn landing-btn--secondary" href="index.php?page=prezzi">Vai ai prezzi</a>
+        <section class="premium-section premium-section--cta">
+            <div class="premium-cta">
+                <div>
+                    <h2>Hai bisogno di una consulenza guidata?</h2>
+                    <p>Raccontaci volumi, sedi e servizi: ti prepariamo una proposta precisa, senza margini nascosti.</p>
+                </div>
+                <div class="premium-cta__actions">
+                    <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Parla con un consulente</a>
+                    <a class="landing-btn landing-btn--secondary" href="index.php?page=prezzi">Vai ai prezzi</a>
+                </div>
             </div>
         </section>
     </main>
