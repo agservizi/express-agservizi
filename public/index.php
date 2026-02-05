@@ -1052,13 +1052,23 @@ function outputCsv(string $filename, array $rows): void
 
 function logStripeEvent(string $message): void
 {
+    $line = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $message);
     $dir = dirname(__DIR__) . '/storage/logs';
+    $written = false;
+
     if (!is_dir($dir)) {
         @mkdir($dir, 0775, true);
     }
-    $line = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $message);
-    $written = @file_put_contents($dir . '/stripe.log', $line, FILE_APPEND);
-    if ($written === false) {
+    if (is_dir($dir) && is_writable($dir)) {
+        $written = @file_put_contents($dir . '/stripe.log', $line, FILE_APPEND) !== false;
+    }
+
+    if (!$written) {
+        $fallback = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'stripe.log';
+        $written = @file_put_contents($fallback, $line, FILE_APPEND) !== false;
+    }
+
+    if (!$written) {
         error_log('[stripe] ' . trim($line));
     }
 }
@@ -2743,7 +2753,16 @@ switch ($page) {
                 header('Location: ' . $session->url);
                 exit;
             } catch (\Throwable $exception) {
-                logStripeEvent('Errore creazione checkout: ' . $exception->getMessage());
+                logStripeEvent('Errore creazione checkout: ' . get_class($exception) . ' - ' . $exception->getMessage());
+                logStripeEvent('Checkout payload: ' . json_encode([
+                    'request_id' => (int) $requestId,
+                    'plan_key' => (string) $planKey,
+                    'billing_cycle' => (string) $billingCycle,
+                    'mode' => (string) $sessionMode,
+                    'currency' => (string) $currency,
+                    'unit_amount' => (int) $unitAmount,
+                    'cancel_at' => $subscriptionData['cancel_at'] ?? null,
+                ], JSON_UNESCAPED_UNICODE));
                 markCheckoutRequestFailed($pdo, $requestId, 'Errore Stripe: ' . $exception->getMessage());
                 $_SESSION['checkout_feedback'] = [
                     'success' => false,
