@@ -83,6 +83,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                         <h3>Start</h3>
                         <p>12 mesi · max 1 cassiere</p>
                         <span class="landing-pricing__price">€ 550</span>
+                        <span class="muted">€ 45,83 / mese</span>
                     </header>
                     <ul>
                         <li>Dashboard, SIM, prodotti e vendite.</li>
@@ -94,6 +95,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                         <h3>Start Plus</h3>
                         <p>12 mesi · max 1 cassiere</p>
                         <span class="landing-pricing__price">€ 650</span>
+                        <span class="muted">€ 54,17 / mese</span>
                     </header>
                     <ul>
                         <li>Tutto del Start.</li>
@@ -105,6 +107,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                         <h3>Core</h3>
                         <p>24 mesi · max 2 cassieri</p>
                         <span class="landing-pricing__price">€ 850</span>
+                        <span class="muted">€ 35,42 / mese</span>
                     </header>
                     <ul>
                         <li>Contratti energia e KPI avanzati.</li>
@@ -123,6 +126,12 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                         </tr>
                     </thead>
                     <tbody>
+                        <tr>
+                            <td>Prezzo</td>
+                            <td>€ 550 · € 45,83/mese</td>
+                            <td>€ 650 · € 54,17/mese</td>
+                            <td>€ 850 · € 35,42/mese</td>
+                        </tr>
                         <tr>
                             <td>SIM, prodotti, vendite</td>
                             <td>✓</td>

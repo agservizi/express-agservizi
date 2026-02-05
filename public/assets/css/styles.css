@@ -138,8 +138,8 @@ html{scroll-behavior:smooth;}
 .landing-btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 20px;border-radius:12px;border:1px solid transparent;font-weight:600;text-decoration:none;transition:all .2s ease;}
 .landing-btn--primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;box-shadow:0 15px 35px rgba(37,99,235,.3);} 
 .landing-btn--primary:hover{transform:translateY(-1px);box-shadow:0 18px 40px rgba(37,99,235,.4);} 
-.landing-btn--secondary{background:rgba(148,163,184,.12);color:#e2e8f0;border-color:rgba(148,163,184,.3);} 
-.landing-btn--secondary:hover{border-color:rgba(148,163,184,.6);} 
+.landing-btn--secondary{background:#f1f5f9;color:#0f172a;border-color:#cbd5e1;} 
+.landing-btn--secondary:hover{border-color:#94a3b8;background:#e2e8f0;} 
 .landing-btn--ghost{background:transparent;color:#e2e8f0;border-color:rgba(148,163,184,.3);} 
 .landing-btn--ghost:hover{border-color:#94a3b8;} 
 .landing-checkout .landing-btn--secondary,
@@ -192,7 +192,7 @@ html{scroll-behavior:smooth;}
 .landing-pricing__price{display:inline-flex;align-items:center;gap:8px;margin-top:10px;font-size:22px;font-weight:700;color:#0f172a;background:#eff6ff;border:1px solid #dbeafe;border-radius:999px;padding:6px 14px;} 
 .landing-pricing__card ul{margin:0;padding-left:18px;color:#475569;display:grid;gap:8px;} 
 .landing-pricing__card--highlight{border-color:#93c5fd;box-shadow:0 28px 54px rgba(37,99,235,.22);} 
-.landing-pricing__cta{margin-top:auto;display:flex;justify-content:flex-start;} 
+.landing-pricing__cta{margin-top:auto;display:flex;justify-content:flex-start;gap:10px;flex-wrap:wrap;} 
 .landing-pricing__table{margin-top:28px;overflow-x:auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 16px 28px rgba(15,23,42,.06);} 
 .landing-pricing__table table{width:100%;border-collapse:collapse;min-width:640px;} 
 .landing-pricing__table th,.landing-pricing__table td{padding:14px 16px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:14px;color:#334155;} 

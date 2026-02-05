@@ -197,10 +197,10 @@ $currentPage = 'prezzi';
                         </tr>
                         <tr>
                             <td>Prezzo</td>
-                            <td>€ 550</td>
-                            <td>€ 650</td>
-                            <td>€ 850</td>
-                            <td>€ 1200</td>
+                            <td>€ 550 · € 45,83/mese</td>
+                            <td>€ 650 · € 54,17/mese</td>
+                            <td>€ 850 · € 35,42/mese</td>
+                            <td>€ 1200 · € 33,33/mese</td>
                         </tr>
                     </tbody>
                 </table>
