@@ -110,7 +110,7 @@ check_items = [
 
 item_y = cursor - 36
 for item in check_items:
-    text(MARGIN_X + 18, item_y, '•', size=12, font='F2', color=COLOR_ACCENT)
+    text(MARGIN_X + 18, item_y, '-', size=12, font='F2', color=COLOR_ACCENT)
     item_y = paragraph(MARGIN_X + 30, item_y, item, PAGE_W - 2 * MARGIN_X - 40, size=11, leading=15, font='F1', color=COLOR_TEXT)
 
 cursor = box_y - 30
@@ -138,7 +138,7 @@ rgb_stroke(*COLOR_BORDER)
 rect(MARGIN_X, csv_box_y, PAGE_W - 2 * MARGIN_X, 110, fill=False, stroke=True)
 
 csv_lines = [
-    'Data,Punto vendita,Vendite totali,Incasso lordo,Incasso netto,Sconti,Resi,Nuovi clienti,Stock SIM,Stock prodotti,Note',
+    'Data,Punto vendita,Vendite totali,Incasso lordo,Incasso netto,Sconti,Resi,Nuovi clienti,Stock SIM',
     '2026-02-05,Store Milano,0,0,0,0,0,0,0,0,',
 ]
 
