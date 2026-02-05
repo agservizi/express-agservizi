@@ -763,6 +763,26 @@ function pendingCheckoutExists(PDO $pdo, string $slug, string $email): bool
     return $stmt->fetchColumn() !== false;
 }
 
+/**
+ * @return array<string, mixed>|null
+ */
+function getPendingCheckoutRequest(PDO $pdo, string $slug, string $email): ?array
+{
+    $stmt = $pdo->prepare(
+        'SELECT * FROM tenant_checkout_requests
+         WHERE (tenant_slug = :slug OR tenant_email = :email)
+           AND status IN ("pending", "processing")
+         ORDER BY created_at DESC
+         LIMIT 1'
+    );
+    $stmt->execute([
+        ':slug' => $slug,
+        ':email' => $email,
+    ]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row !== false ? $row : null;
+}
+
 function normalizeVatCountry(string $country): string
 {
     $country = strtoupper(trim($country));
@@ -2429,6 +2449,31 @@ switch ($page) {
         $checkoutOldInput = $_SESSION['checkout_old_input'] ?? null;
         unset($_SESSION['checkout_old_input']);
 
+        if (($_GET['resume'] ?? '') === '1') {
+            $resumeId = (int) ($_SESSION['checkout_resume_request_id'] ?? 0);
+            if ($resumeId > 0) {
+                $resumeRequest = getCheckoutRequestById($pdo, $resumeId);
+                if ($resumeRequest && in_array((string) ($resumeRequest['status'] ?? ''), ['pending', 'processing'], true)) {
+                    $planKey = normalizeDemoPlanKey((string) ($resumeRequest['plan_key'] ?? 'start'));
+                    $billingCycle = normalizeCheckoutBillingCycle($resumeRequest['billing_cycle'] ?? '');
+                    $plan = resolveCheckoutPlan($planKey);
+                    if ($plan !== null) {
+                        $plan = buildCheckoutPlanForBilling($plan, $billingCycle);
+                    }
+                    $checkoutOldInput = [
+                        'tenant_name' => (string) ($resumeRequest['tenant_name'] ?? ''),
+                        'tenant_slug' => (string) ($resumeRequest['tenant_slug'] ?? ''),
+                        'tenant_email' => (string) ($resumeRequest['tenant_email'] ?? ''),
+                        'tenant_phone' => (string) ($resumeRequest['tenant_phone'] ?? ''),
+                        'vat_number' => (string) ($resumeRequest['vat_number'] ?? ''),
+                        'company_country' => (string) ($resumeRequest['company_country'] ?? ''),
+                        'company_name' => (string) ($resumeRequest['company_name'] ?? ''),
+                        'company_address' => (string) ($resumeRequest['company_address'] ?? ''),
+                    ];
+                }
+            }
+        }
+
         if ($method === 'POST' && (($_POST['action'] ?? '') === 'checkout_start')) {
             $planKey = normalizeDemoPlanKey((string) ($_POST['plan_key'] ?? 'start'));
             $billingCycle = normalizeCheckoutBillingCycle($_POST['billing_cycle'] ?? $_POST['billing'] ?? $_GET['billing'] ?? '');
@@ -2489,14 +2534,30 @@ switch ($page) {
             }
             if ($tenantSlug !== '' && $tenantEmail !== '' && pendingCheckoutExists($pdo, $tenantSlug, $tenantEmail)) {
                 $errors[] = 'Esiste già una richiesta di attivazione in corso per questi dati.';
+                $pending = getPendingCheckoutRequest($pdo, $tenantSlug, $tenantEmail);
+                if ($pending) {
+                    $_SESSION['checkout_resume_request_id'] = (int) ($pending['id'] ?? 0);
+                    $resumePlanKey = normalizeDemoPlanKey((string) ($pending['plan_key'] ?? 'start'));
+                    $resumeBilling = normalizeCheckoutBillingCycle($pending['billing_cycle'] ?? '');
+                    $billingParam = $resumeBilling === 'monthly' ? '&billing=monthly' : '';
+                    $checkoutFeedback = [
+                        'success' => false,
+                        'message' => 'Controlla i dati inseriti.',
+                        'errors' => $errors,
+                        'recovery_url' => 'index.php?page=checkout&plan=' . urlencode($resumePlanKey) . $billingParam . '&resume=1',
+                        'recovery_label' => 'Riprendi l’attivazione precedente',
+                    ];
+                }
             }
 
             if ($errors !== []) {
-                $_SESSION['checkout_feedback'] = [
-                    'success' => false,
-                    'message' => 'Controlla i dati inseriti.',
-                    'errors' => $errors,
-                ];
+                $_SESSION['checkout_feedback'] = is_array($checkoutFeedback)
+                    ? $checkoutFeedback
+                    : [
+                        'success' => false,
+                        'message' => 'Controlla i dati inseriti.',
+                        'errors' => $errors,
+                    ];
                 $_SESSION['checkout_old_input'] = [
                     'tenant_name' => $tenantName,
                     'tenant_slug' => $tenantSlug,

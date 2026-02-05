@@ -74,6 +74,9 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                             <?php foreach (($feedback['errors'] ?? []) as $error): ?>
                                 <p><?= htmlspecialchars((string) $error) ?></p>
                             <?php endforeach; ?>
+                            <?php if (!empty($feedback['recovery_url'])): ?>
+                                <p><a class="landing-btn landing-btn--secondary landing-btn--small" href="<?= htmlspecialchars((string) $feedback['recovery_url']) ?>"><?= htmlspecialchars((string) ($feedback['recovery_label'] ?? 'Riprendi attivazione')) ?></a></p>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
 
@@ -126,11 +129,11 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                                     Ragione sociale
                                     <input type="text" name="company_name" value="<?= htmlspecialchars($tenantCompanyName) ?>">
                                 </label>
-                                <label>
-                                    Indirizzo sede
-                                    <textarea name="company_address" rows="3"><?= htmlspecialchars($tenantCompanyAddress) ?></textarea>
-                                </label>
                             </div>
+                            <label>
+                                Indirizzo sede
+                                <textarea name="company_address" rows="3"><?= htmlspecialchars($tenantCompanyAddress) ?></textarea>
+                            </label>
                             <div class="landing-form__footer">
                                 <button type="submit" class="landing-btn landing-btn--primary">Procedi al pagamento</button>
                                 <a class="landing-btn landing-btn--secondary" href="<?= htmlspecialchars($prezziUrl) ?>">Torna ai prezzi</a>
