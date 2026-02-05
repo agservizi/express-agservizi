@@ -18,7 +18,7 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Courier >>
 endobj
 7 0 obj
-<< /Length 2914 >>
+<< /Length 2971 >>
 stream
 0.060 0.090 0.160 rg
 0.00 702.00 595.00 140.00 re f
@@ -131,15 +131,19 @@ BT
 (punto vendita.) Tj
 ET
 1.000 1.000 1.000 rg
-56.00 176.00 483.00 110.00 re f
+56.00 156.00 483.00 140.00 re f
 0.890 0.910 0.940 RG
-56.00 176.00 483.00 110.00 re S
+56.00 156.00 483.00 140.00 re S
 BT
-/F3 9 Tf 0.060 0.090 0.160 rg 68.00 278.00 Td
-(Data,Punto vendita,Vendite totali,Incasso lordo,Incasso netto,Sconti,Resi,Nuovi clienti,Stock SIM) Tj
+/F3 8 Tf 0.060 0.090 0.160 rg 68.00 278.00 Td
+(Data,Punto vendita,Vendite totali,Incasso lordo,Incasso netto,Sconti,Resi,Nuovi clienti,Stock) Tj
 ET
 BT
-/F3 9 Tf 0.060 0.090 0.160 rg 68.00 264.00 Td
+/F3 8 Tf 0.060 0.090 0.160 rg 68.00 266.00 Td
+(SIM) Tj
+ET
+BT
+/F3 8 Tf 0.060 0.090 0.160 rg 68.00 246.00 Td
 (2026-02-05,Store Milano,0,0,0,0,0,0,0,0,) Tj
 ET
 BT
@@ -165,5 +169,5 @@ xref
 trailer
 << /Size 8 /Root 1 0 R >>
 startxref
-3440
+3497
 %%EOF

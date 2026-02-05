@@ -131,11 +131,12 @@ cursor = paragraph(
 
 # CSV box
 cursor -= 10
-csv_box_y = cursor - 120
+csv_box_height = 140
+csv_box_y = cursor - csv_box_height
 rgb_fill(1, 1, 1)
-rect(MARGIN_X, csv_box_y, PAGE_W - 2 * MARGIN_X, 110, fill=True)
+rect(MARGIN_X, csv_box_y, PAGE_W - 2 * MARGIN_X, csv_box_height, fill=True)
 rgb_stroke(*COLOR_BORDER)
-rect(MARGIN_X, csv_box_y, PAGE_W - 2 * MARGIN_X, 110, fill=False, stroke=True)
+rect(MARGIN_X, csv_box_y, PAGE_W - 2 * MARGIN_X, csv_box_height, fill=False, stroke=True)
 
 csv_lines = [
     'Data,Punto vendita,Vendite totali,Incasso lordo,Incasso netto,Sconti,Resi,Nuovi clienti,Stock SIM',
@@ -143,9 +144,19 @@ csv_lines = [
 ]
 
 csv_y = cursor - 18
+csv_text_width = PAGE_W - 2 * MARGIN_X - 24
 for line in csv_lines:
-    text(MARGIN_X + 12, csv_y, line, size=9, font='F3', color=COLOR_TEXT)
-    csv_y -= 14
+    csv_y = paragraph(
+        MARGIN_X + 12,
+        csv_y,
+        line,
+        csv_text_width,
+        size=8,
+        leading=12,
+        font='F3',
+        color=COLOR_TEXT,
+    )
+    csv_y -= 8
 
 # Footer
 text(MARGIN_X, 40, 'Coresuite Express · Kit Avvio Store', size=9, font='F1', color=COLOR_MUTED)
