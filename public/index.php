@@ -2703,6 +2703,27 @@ switch ($page) {
             }
             $currency = $stripeConfig['currency'] ?? 'eur';
 
+            if ($stripeSecretKey === null || trim((string) $stripeSecretKey) === '') {
+                logStripeEvent('Configurazione Stripe mancante: STRIPE_SECRET_KEY non impostata.');
+                $_SESSION['checkout_feedback'] = [
+                    'success' => false,
+                    'message' => 'Impossibile avviare il checkout.',
+                    'errors' => ['Configurazione Stripe non valida. Contatta l’amministratore.'],
+                ];
+                $_SESSION['checkout_old_input'] = [
+                    'tenant_name' => $tenantName,
+                    'tenant_slug' => $tenantSlug,
+                    'tenant_email' => $tenantEmail,
+                    'tenant_phone' => $tenantPhone,
+                    'company_country' => $companyCountry,
+                    'vat_number' => $vatNumber,
+                    'company_name' => $companyName,
+                    'company_address' => $companyAddress,
+                ];
+                header('Location: index.php?page=checkout&plan=' . urlencode($planKey));
+                exit;
+            }
+
             try {
                 Stripe::setApiKey($stripeSecretKey);
                 $unitAmount = (int) round(((float) ($plan['billing_price_eur'] ?? $plan['price_eur'] ?? 0)) * 100);
@@ -2764,10 +2785,14 @@ switch ($page) {
                     'cancel_at' => $subscriptionData['cancel_at'] ?? null,
                 ], JSON_UNESCAPED_UNICODE));
                 markCheckoutRequestFailed($pdo, $requestId, 'Errore Stripe: ' . $exception->getMessage());
+                $errorMessages = ['Riprova tra qualche minuto.'];
+                if (!empty($debugEnabled)) {
+                    $errorMessages[] = $exception->getMessage();
+                }
                 $_SESSION['checkout_feedback'] = [
                     'success' => false,
                     'message' => 'Impossibile avviare il checkout.',
-                    'errors' => ['Riprova tra qualche minuto.'],
+                    'errors' => $errorMessages,
                 ];
                 $_SESSION['checkout_old_input'] = [
                     'tenant_name' => $tenantName,
