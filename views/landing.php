@@ -454,7 +454,7 @@ $faqStructuredData = [
                 <h2>Ricevi il kit gratuito “Avvio Store”</h2>
                 <p>Checklist operativa + template report per partire subito con margini sotto controllo.</p>
             </div>
-            <a class="landing-btn landing-btn--secondary" href="#contatto">Scarica il kit</a>
+            <a class="landing-btn landing-btn--secondary" href="assets/kits/avvio-store-kit.pdf" download>Scarica il kit</a>
         </section>
 
         <section class="landing-section landing-steps">
