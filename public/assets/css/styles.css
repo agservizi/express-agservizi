@@ -1071,3 +1071,140 @@ body[data-sidebar-collapsed="true"] .topbar{padding-left:24px;padding-right:24px
   .report-chart-grid{grid-template-columns:1fr;}
   .report-chart-tools{align-items:flex-start;}
 }
+
+body{-webkit-text-size-adjust:100%;}
+
+@supports not (backdrop-filter: blur(6px)){
+  .landing-topbar{background:rgba(11,16,32,.92);}
+}
+
+@supports not (mix-blend-mode: difference){
+  .landing-topbar{mix-blend-mode:normal;}
+}
+
+@supports not (gap: 12px){
+  .toast-stack > * + *{margin-top:12px;}
+  .sidebar__nav > * + *{margin-top:4px;}
+  .sidebar__user > * + *{margin-left:12px;}
+  .footer__content > * + *{margin-top:10px;}
+  .footer__links > * + *{margin-left:10px;}
+  .landing-nav > * + *{margin-left:16px;}
+  .landing-hero__actions > * + *{margin-left:12px;}
+  .landing-demo__dots > * + *{margin-left:8px;}
+  .landing-pricing__cta > * + *{margin-left:10px;}
+  .premium-badges > * + *{margin-left:10px;}
+  .premium-cta__actions > * + *{margin-left:12px;}
+  .report-chart-tools > * + *{margin-left:10px;}
+  .report-chart-tools__actions > * + *{margin-left:8px;}
+  .topbar > * + *{margin-left:12px;}
+  .topbar__actions > * + *{margin-left:8px;}
+}
+
+@supports not (display: grid){
+  .landing-hero__content,
+  .landing-metrics,
+  .landing-card ul,
+  .landing-proof__grid,
+  .landing-demo__grid,
+  .landing-demo__list,
+  .landing-before-after__grid,
+  .landing-before-after__card ul,
+  .landing-pricing__grid,
+  .landing-pricing__card ul,
+  .premium-grid,
+  .landing-steps__grid,
+  .landing-step,
+  .landing-faq__grid,
+  .landing-testimonials__grid,
+  .landing-grid,
+  .landing-checkout__grid,
+  .landing-form__grid,
+  .landing-form__inline--inside,
+  .landing-checkout__summary,
+  .landing-checkout__plan,
+  .landing-checkout__summary ul,
+  .landing-columns,
+  .landing-columns ul,
+  .energy-sim__options,
+  .energy-sim__grid,
+  .energy-sim__results-cards,
+  .energy-sim__results-list,
+  .energy-sim__benefits ul,
+  .page--guide .guide-hero,
+  .guide-grid,
+  .guide-support-form__grid,
+  .sales-layout,
+  .customers-layout,
+  .support-detail,
+  .support-detail__meta,
+  .filters-bar__row,
+  .recovery-codes,
+  .setup-grid,
+  .security-actions,
+  .cards,
+  .profile-summary,
+  .profile-shortcuts,
+  .dashboard-grid,
+  .dashboard-header-grid,
+  .design-layout,
+  .theme-grid,
+  .trend-grid,
+  .status-chips,
+  .insight-grid,
+  .insight-split,
+  .settings-operators,
+  .settings-form__grid,
+  .form__grid,
+  .alert-list,
+  .report-chart-grid{display:flex;flex-wrap:wrap;}
+
+  .landing-hero__content > *,
+  .landing-metrics > *,
+  .landing-proof__grid > *,
+  .landing-demo__grid > *,
+  .landing-before-after__grid > *,
+  .landing-pricing__grid > *,
+  .premium-grid > *,
+  .landing-steps__grid > *,
+  .landing-faq__grid > *,
+  .landing-testimonials__grid > *,
+  .landing-grid > *,
+  .landing-checkout__grid > *,
+  .landing-form__grid > *,
+  .landing-columns > *,
+  .energy-sim__options > *,
+  .energy-sim__grid > *,
+  .energy-sim__results-cards > *,
+  .energy-sim__results-list > *,
+  .energy-sim__benefits ul > li,
+  .guide-grid > *,
+  .guide-support-form__grid > *,
+  .filters-bar__row > *,
+  .recovery-codes > *,
+  .setup-grid > *,
+  .security-actions > *,
+  .cards > *,
+  .profile-summary > *,
+  .profile-shortcuts > *,
+  .dashboard-grid > *,
+  .dashboard-header-grid > *,
+  .theme-grid > *,
+  .trend-grid > *,
+  .status-chips > *,
+  .insight-grid > *,
+  .insight-split > *,
+  .settings-operators > *,
+  .settings-form__grid > *,
+  .form__grid > *,
+  .alert-list > *,
+  .report-chart-grid > *{flex:1 1 260px;}
+
+  .sales-layout,
+  .customers-layout,
+  .support-detail,
+  .design-layout{flex-direction:column;}
+
+  .landing-form__inline--inside{flex-direction:row;align-items:center;}
+}
+
+.checkbox input{-webkit-appearance:none;-moz-appearance:none;appearance:none;}

@@ -430,6 +430,7 @@ function buildPlanModuleMap(): array
         'sales_create',
         'sales_list',
         'feature_requests',
+        'support_auto',
         'guide',
         'settings',
     ];
@@ -1143,6 +1144,7 @@ function buildPageModuleMap(): array
         'support_request' => 'support_requests',
         'feature_requests' => 'feature_requests',
         'feature_request' => 'feature_requests',
+        'support_auto' => 'support_auto',
         'reports' => 'reports',
         'guide' => 'guide',
         'settings' => 'settings',
@@ -4281,6 +4283,241 @@ switch ($page) {
             'pageTitle' => 'Suggerisci una funzionalità',
             'feedback' => is_array($featureFeedback) ? $featureFeedback : null,
             'oldInput' => is_array($featureOldInput) ? $featureOldInput : null,
+        ]);
+        break;
+
+    case 'support_auto':
+        if ($currentUser === null) {
+            header('Location: index.php?page=login');
+            exit;
+        }
+
+        $supportFeedback = $_SESSION['support_auto_feedback'] ?? null;
+        unset($_SESSION['support_auto_feedback']);
+        $supportOldInput = $_SESSION['support_auto_old_input'] ?? null;
+        unset($_SESSION['support_auto_old_input']);
+
+        $supportCatalog = [
+            'login_access' => [
+                'title' => 'Accesso e credenziali',
+                'area' => 'Accesso',
+                'steps' => [
+                    'Verifica che username e password siano corretti (maiuscole/minuscole).',
+                    'Usa il reset password dalla schermata di login se necessario.',
+                    'Controlla che il tenant sia attivo e non scaduto nelle Impostazioni.',
+                ],
+            ],
+            'sales_flow' => [
+                'title' => 'Vendite e stampa scontrino',
+                'area' => 'Vendite',
+                'steps' => [
+                    'Controlla che stampante e cassa siano selezionate nelle Impostazioni scontrino.',
+                    'Verifica che il prodotto abbia prezzo e IVA assegnati.',
+                    'Ripeti la vendita con un importo minimo per testare il flusso.',
+                ],
+            ],
+            'sim_stock' => [
+                'title' => 'Magazzino SIM e scorte',
+                'area' => 'Magazzino SIM',
+                'steps' => [
+                    'Aggiorna i listini e verifica lo stato della SIM (Disponibile/Assegnata).',
+                    'Controlla le soglie di riordino e gli alert in Impostazioni.',
+                    'Riprova l’operazione dopo l’aggiornamento pagina.',
+                ],
+            ],
+            'products_pricing' => [
+                'title' => 'Prodotti, listini e prezzi',
+                'area' => 'Prodotti',
+                'steps' => [
+                    'Verifica che il prodotto sia attivo e abbia un prezzo valido.',
+                    'Controlla il listino selezionato e gli eventuali sconti applicati.',
+                    'Assicurati che l’IVA sia configurata correttamente.',
+                ],
+            ],
+            'reports_kpi' => [
+                'title' => 'Report e KPI',
+                'area' => 'Report',
+                'steps' => [
+                    'Seleziona il periodo corretto e aggiorna i filtri.',
+                    'Verifica che siano state registrate vendite nel periodo scelto.',
+                    'Prova a esportare il report in CSV per controllo dati.',
+                ],
+            ],
+            'performance' => [
+                'title' => 'Lentezza o errori di caricamento',
+                'area' => 'Prestazioni',
+                'steps' => [
+                    'Ricarica la pagina e svuota la cache del browser.',
+                    'Prova con un browser alternativo o una finestra anonima.',
+                    'Verifica la connessione di rete e riprova.',
+                ],
+            ],
+            'permissions' => [
+                'title' => 'Ruoli e permessi',
+                'area' => 'Impostazioni',
+                'steps' => [
+                    'Controlla che l’utente abbia il ruolo corretto in Impostazioni.',
+                    'Verifica il limite utenti della licenza attiva.',
+                    'Esci e rientra per applicare le modifiche.',
+                ],
+            ],
+        ];
+
+        if ($method === 'POST' && (($_POST['action'] ?? '') === 'support_auto_send')) {
+            $issueKey = trim((string) ($_POST['support_issue'] ?? ''));
+            $supportArea = trim((string) ($_POST['support_area'] ?? ''));
+            $details = trim((string) ($_POST['support_details'] ?? ''));
+            $contactEmail = trim((string) ($_POST['support_email'] ?? ($currentUser['email'] ?? '')));
+            $needsEscalation = isset($_POST['support_escalate']) && (string) $_POST['support_escalate'] === '1';
+
+            $errors = [];
+            if ($issueKey === '' || !array_key_exists($issueKey, $supportCatalog)) {
+                $errors[] = 'Seleziona un problema valido.';
+            }
+            if ($contactEmail === '' || !filter_var($contactEmail, FILTER_VALIDATE_EMAIL)) {
+                $errors[] = 'Inserisci un indirizzo email valido.';
+            }
+
+            if ($errors !== []) {
+                $_SESSION['support_auto_feedback'] = [
+                    'success' => false,
+                    'message' => 'Controlla i campi prima di inviare.',
+                    'error' => implode(' ', $errors),
+                ];
+                $_SESSION['support_auto_old_input'] = [
+                    'support_issue' => $issueKey,
+                    'support_area' => $supportArea,
+                    'support_details' => $details,
+                    'support_email' => $contactEmail,
+                    'support_escalate' => $needsEscalation ? '1' : '0',
+                ];
+                header('Location: index.php?page=support_auto');
+                exit;
+            }
+
+            $issue = $supportCatalog[$issueKey];
+            $guideUrl = buildPublicUrl('page=guide');
+            $instructions = $issue['steps'] ?? [];
+            $subject = 'Supporto automatico 24/7 · ' . $issue['title'];
+
+            $lines = [];
+            $lines[] = 'Ciao, ecco le istruzioni rapide per risolvere il problema:';
+            $lines[] = 'Problema: ' . $issue['title'];
+            if ($supportArea !== '') {
+                $lines[] = 'Area: ' . $supportArea;
+            }
+            $lines[] = '';
+            foreach ($instructions as $step) {
+                $lines[] = '- ' . $step;
+            }
+            if ($details !== '') {
+                $lines[] = '';
+                $lines[] = 'Dettagli forniti:';
+                $lines[] = $details;
+            }
+            $lines[] = '';
+            $lines[] = 'Guida completa: ' . $guideUrl;
+            $lines[] = 'Se non risolvi, puoi richiedere l’assistenza tecnica dal gestionale.';
+
+            $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+            $htmlMessage = '<!doctype html><html lang="it"><head><meta charset="utf-8"></head><body style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a;background:#f8fafc;padding:24px;">';
+            $htmlMessage .= '<h2 style="margin:0 0 12px;">Supporto automatico 24/7</h2>';
+            $htmlMessage .= '<p><strong>Problema:</strong> ' . $escape($issue['title']) . '</p>';
+            if ($supportArea !== '') {
+                $htmlMessage .= '<p><strong>Area:</strong> ' . $escape($supportArea) . '</p>';
+            }
+            $htmlMessage .= '<ol style="padding-left:18px;">';
+            foreach ($instructions as $step) {
+                $htmlMessage .= '<li style="margin-bottom:8px;">' . $escape((string) $step) . '</li>';
+            }
+            $htmlMessage .= '</ol>';
+            if ($details !== '') {
+                $htmlMessage .= '<p><strong>Dettagli forniti:</strong><br>' . nl2br($escape($details)) . '</p>';
+            }
+            $htmlMessage .= '<p>Guida completa: <a href="' . $escape($guideUrl) . '">' . $escape($guideUrl) . '</a></p>';
+            $htmlMessage .= '<p>Se non risolvi, puoi aprire una richiesta e il supporto tecnico risponderà entro 24h lavorative.</p>';
+            $htmlMessage .= '</body></html>';
+
+            $sent = sendGuideSupportEmail(
+                $contactEmail,
+                $subject,
+                implode("\n", $lines),
+                $resendApiKey,
+                $resendFrom,
+                $resendFromName,
+                $htmlMessage
+            );
+
+            if (!$sent) {
+                $_SESSION['support_auto_feedback'] = [
+                    'success' => false,
+                    'message' => 'Invio istruzioni non riuscito.',
+                    'error' => 'Riprova tra qualche minuto.',
+                ];
+                $_SESSION['support_auto_old_input'] = [
+                    'support_issue' => $issueKey,
+                    'support_area' => $supportArea,
+                    'support_details' => $details,
+                    'support_email' => $contactEmail,
+                    'support_escalate' => $needsEscalation ? '1' : '0',
+                ];
+                header('Location: index.php?page=support_auto');
+                exit;
+            }
+
+            $supportSent = true;
+            if ($needsEscalation) {
+                $supportRecipient = $alertEmail;
+                if (!is_string($supportRecipient) || !filter_var($supportRecipient, FILTER_VALIDATE_EMAIL)) {
+                    $supportRecipient = 'ag.servizi16@gmail.com';
+                }
+
+                $tenantId = (int) ($currentUser['tenant_id'] ?? 0);
+                $userName = (string) ($currentUser['fullname'] ?? $currentUser['username'] ?? 'Operatore');
+                $supportLines = [];
+                $supportLines[] = 'Richiesta supporto tecnico 24/7 (non risolta automaticamente).';
+                $supportLines[] = 'Problema: ' . $issue['title'];
+                if ($supportArea !== '') {
+                    $supportLines[] = 'Area: ' . $supportArea;
+                }
+                $supportLines[] = 'Tenant ID: ' . $tenantId;
+                $supportLines[] = 'Utente: ' . $userName;
+                $supportLines[] = 'Email contatto: ' . $contactEmail;
+                if ($details !== '') {
+                    $supportLines[] = '';
+                    $supportLines[] = 'Dettagli:';
+                    $supportLines[] = $details;
+                }
+
+                $supportSubject = 'Richiesta supporto tecnico · ' . $issue['title'];
+                $supportSent = sendGuideSupportEmail(
+                    $supportRecipient,
+                    $supportSubject,
+                    implode("\n", $supportLines),
+                    $resendApiKey,
+                    $resendFrom,
+                    $resendFromName
+                );
+            }
+
+            $_SESSION['support_auto_feedback'] = [
+                'success' => true,
+                'message' => $needsEscalation
+                    ? ($supportSent
+                        ? 'Istruzioni inviate e richiesta inoltrata al supporto tecnico.'
+                        : 'Istruzioni inviate, ma la richiesta al supporto non è stata inviata.')
+                    : 'Istruzioni inviate con successo al tuo indirizzo email.',
+            ];
+            header('Location: index.php?page=support_auto');
+            exit;
+        }
+
+        render('support_auto', [
+            'currentUser' => $currentUser,
+            'pageTitle' => 'Supporto tecnico 24/7',
+            'catalog' => $supportCatalog,
+            'feedback' => is_array($supportFeedback) ? $supportFeedback : null,
+            'oldInput' => is_array($supportOldInput) ? $supportOldInput : null,
         ]);
         break;
 

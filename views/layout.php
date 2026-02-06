@@ -173,6 +173,9 @@ $isActiveSidebar = static function (string $page) use ($currentPage): string {
             <?php if ($moduleEnabled('support_requests')): ?>
                 <a href="index.php?page=support_requests" class="sidebar__link<?= $isActiveSidebar('support_requests') ?>" data-tooltip="Supporto clienti">💬 <span>Richieste supporto</span></a>
             <?php endif; ?>
+            <?php if ($moduleEnabled('support_auto')): ?>
+                <a href="index.php?page=support_auto" class="sidebar__link<?= $isActiveSidebar('support_auto') ?>" data-tooltip="Supporto tecnico 24/7">🛟 <span>Supporto 24/7</span></a>
+            <?php endif; ?>
             <?php if ($moduleEnabled('feature_requests')): ?>
                 <a href="index.php?page=feature_requests" class="sidebar__link<?= $isActiveSidebar('feature_requests') ?>" data-tooltip="Suggerisci funzionalità">✨ <span>Suggerisci feature</span></a>
             <?php endif; ?>
