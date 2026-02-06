@@ -244,8 +244,12 @@ $faqStructuredData = [
                     <div class="landing-demo__slider" data-demo-slider>
                         <div class="landing-demo__slides">
                             <?php foreach ($demoSlides as $index => $slide): ?>
-                                <figure class="landing-demo__slide" data-demo-slide <?= $index === 0 ? 'data-active="true"' : '' ?>">
-                                    <img src="assets/img/<?= rawurlencode($slide) ?>" alt="Anteprima gestionale <?= $index + 1 ?>" loading="lazy">
+                                <?php $webpSlide = preg_replace('/\.[^.]+$/', '.webp', $slide) ?? $slide; ?>
+                                <figure class="landing-demo__slide" data-demo-slide <?= $index === 0 ? 'data-active="true"' : '' ?>>
+                                    <picture>
+                                        <source type="image/webp" srcset="assets/img/<?= rawurlencode($webpSlide) ?>">
+                                        <img src="assets/img/<?= rawurlencode($slide) ?>" alt="Anteprima gestionale <?= $index + 1 ?>" loading="lazy">
+                                    </picture>
                                 </figure>
                             <?php endforeach; ?>
                         </div>
