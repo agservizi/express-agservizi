@@ -4363,6 +4363,72 @@ switch ($page) {
             ],
         ];
 
+        $recentSupport = $supportRequestService->listRequests(['type' => 'Support'], 1, 5);
+        $recentSupportRows = $recentSupport['rows'] ?? [];
+
+        if ($method === 'POST' && (($_POST['action'] ?? '') === 'support_auto_escalate')) {
+            $requestId = (int) ($_POST['request_id'] ?? 0);
+            if ($requestId <= 0) {
+                $_SESSION['support_auto_feedback'] = [
+                    'success' => false,
+                    'message' => 'Richiesta non valida.',
+                ];
+                header('Location: index.php?page=support_auto');
+                exit;
+            }
+
+            $request = $supportRequestService->getRequest($requestId);
+            if ($request === null) {
+                $_SESSION['support_auto_feedback'] = [
+                    'success' => false,
+                    'message' => 'Richiesta non trovata.',
+                ];
+                header('Location: index.php?page=support_auto');
+                exit;
+            }
+
+            $supportRecipient = $alertEmail;
+            if (!is_string($supportRecipient) || !filter_var($supportRecipient, FILTER_VALIDATE_EMAIL)) {
+                $supportRecipient = 'ag.servizi16@gmail.com';
+            }
+
+            $tenantId = (int) ($currentUser['tenant_id'] ?? 0);
+            $userName = (string) ($currentUser['fullname'] ?? $currentUser['username'] ?? 'Operatore');
+            $subject = 'la richiesta di supporto e chi la inoltrata: ' . $userName;
+
+            $lines = [];
+            $lines[] = 'La richiesta di supporto è stata inoltrata dal tenant.';
+            $lines[] = 'Ticket ID: #' . $requestId;
+            $lines[] = 'Tenant ID: ' . $tenantId;
+            $lines[] = 'Inoltrata da: ' . $userName;
+            $lines[] = 'Oggetto: ' . (string) ($request['subject'] ?? '');
+            $lines[] = 'Stato attuale: ' . (string) ($request['status'] ?? 'Open');
+            $lines[] = '';
+            $lines[] = 'Messaggio:';
+            $lines[] = (string) ($request['message'] ?? '');
+
+            $supportSent = sendGuideSupportEmail(
+                $supportRecipient,
+                $subject,
+                implode("\n", $lines),
+                $resendApiKey,
+                $resendFrom,
+                $resendFromName
+            );
+
+            $_SESSION['support_auto_feedback'] = $supportSent
+                ? [
+                    'success' => true,
+                    'message' => 'Richiesta inoltrata al supporto tecnico.',
+                ]
+                : [
+                    'success' => false,
+                    'message' => 'Invio al supporto tecnico non riuscito.',
+                ];
+            header('Location: index.php?page=support_auto');
+            exit;
+        }
+
         if ($method === 'POST' && (($_POST['action'] ?? '') === 'support_auto_send')) {
             $issueKey = trim((string) ($_POST['support_issue'] ?? ''));
             $supportArea = trim((string) ($_POST['support_area'] ?? ''));
@@ -4399,6 +4465,98 @@ switch ($page) {
             $guideUrl = buildPublicUrl('page=guide');
             $instructions = $issue['steps'] ?? [];
             $subject = 'Supporto automatico 24/7 · ' . $issue['title'];
+
+            $supportRequestId = 0;
+            $statusForRequest = $needsEscalation ? 'Open' : 'Completed';
+            $resolutionNote = $needsEscalation ? null : 'Istruzioni automatiche inviate.';
+            $tenantId = (int) ($currentUser['tenant_id'] ?? 1);
+            $userName = (string) ($currentUser['fullname'] ?? $currentUser['username'] ?? 'Operatore');
+            $customerName = $userName !== '' ? $userName : 'Operatore';
+
+            $supportMessage = 'Supporto automatico 24/7' . "\n";
+            $supportMessage .= 'Problema: ' . $issue['title'] . "\n";
+            if ($supportArea !== '') {
+                $supportMessage .= 'Area: ' . $supportArea . "\n";
+            }
+            if ($details !== '') {
+                $supportMessage .= "\nDettagli:\n" . $details . "\n";
+            }
+            if ($instructions !== []) {
+                $supportMessage .= "\nIstruzioni suggerite:\n";
+                foreach ($instructions as $step) {
+                    $supportMessage .= '- ' . $step . "\n";
+                }
+            }
+
+            try {
+                $pdo->beginTransaction();
+
+                $stmt = $pdo->prepare('SELECT id FROM customers WHERE tenant_id = :tenant_id AND email = :email LIMIT 1');
+                $stmt->execute([':tenant_id' => $tenantId, ':email' => $contactEmail]);
+                $customerId = (int) $stmt->fetchColumn();
+                if ($customerId === 0) {
+                    $insertCustomer = $pdo->prepare(
+                        'INSERT INTO customers (tenant_id, fullname, email, phone, tax_code, note)
+                         VALUES (:tenant_id, :fullname, :email, :phone, :tax_code, :note)'
+                    );
+                    $insertCustomer->execute([
+                        ':tenant_id' => $tenantId,
+                        ':fullname' => $customerName,
+                        ':email' => $contactEmail,
+                        ':phone' => null,
+                        ':tax_code' => strtoupper(bin2hex(random_bytes(8))),
+                        ':note' => 'Richiesta supporto automatico.',
+                    ]);
+                    $customerId = (int) $pdo->lastInsertId();
+                }
+
+                $stmt = $pdo->prepare('SELECT id, customer_id FROM customer_portal_accounts WHERE tenant_id = :tenant_id AND email = :email LIMIT 1');
+                $stmt->execute([':tenant_id' => $tenantId, ':email' => $contactEmail]);
+                $portalRow = $stmt->fetch(PDO::FETCH_ASSOC);
+                $portalAccountId = $portalRow ? (int) $portalRow['id'] : 0;
+                if ($portalAccountId === 0) {
+                    $insertPortal = $pdo->prepare(
+                        'INSERT INTO customer_portal_accounts (tenant_id, customer_id, email, password_hash, invite_token)
+                         VALUES (:tenant_id, :customer_id, :email, :password_hash, :invite_token)'
+                    );
+                    $insertPortal->execute([
+                        ':tenant_id' => $tenantId,
+                        ':customer_id' => $customerId,
+                        ':email' => $contactEmail,
+                        ':password_hash' => password_hash(bin2hex(random_bytes(12)), PASSWORD_DEFAULT),
+                        ':invite_token' => null,
+                    ]);
+                    $portalAccountId = (int) $pdo->lastInsertId();
+                } elseif (!empty($portalRow['customer_id'])) {
+                    $customerId = (int) $portalRow['customer_id'];
+                }
+
+                $insertSupport = $pdo->prepare(
+                    'INSERT INTO customer_support_requests
+                        (tenant_id, customer_id, portal_account_id, type, subject, message, status, resolution_note, preferred_slot, created_at, updated_at)
+                     VALUES
+                        (:tenant_id, :customer_id, :portal_account_id, :type, :subject, :message, :status, :resolution_note, :preferred_slot, NOW(), NOW())'
+                );
+                $insertSupport->execute([
+                    ':tenant_id' => $tenantId,
+                    ':customer_id' => $customerId,
+                    ':portal_account_id' => $portalAccountId,
+                    ':type' => 'Support',
+                    ':subject' => $issue['title'],
+                    ':message' => $supportMessage,
+                    ':status' => $statusForRequest,
+                    ':resolution_note' => $resolutionNote,
+                    ':preferred_slot' => null,
+                ]);
+                $supportRequestId = (int) $pdo->lastInsertId();
+
+                $pdo->commit();
+            } catch (\Throwable $exception) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $supportRequestId = 0;
+            }
 
             $lines = [];
             $lines[] = 'Ciao, ecco le istruzioni rapide per risolvere il problema:';
@@ -4472,10 +4630,11 @@ switch ($page) {
                     $supportRecipient = 'ag.servizi16@gmail.com';
                 }
 
-                $tenantId = (int) ($currentUser['tenant_id'] ?? 0);
-                $userName = (string) ($currentUser['fullname'] ?? $currentUser['username'] ?? 'Operatore');
                 $supportLines = [];
                 $supportLines[] = 'Richiesta supporto tecnico 24/7 (non risolta automaticamente).';
+                if ($supportRequestId > 0) {
+                    $supportLines[] = 'Ticket ID: #' . $supportRequestId;
+                }
                 $supportLines[] = 'Problema: ' . $issue['title'];
                 if ($supportArea !== '') {
                     $supportLines[] = 'Area: ' . $supportArea;
@@ -4516,6 +4675,7 @@ switch ($page) {
             'currentUser' => $currentUser,
             'pageTitle' => 'Supporto tecnico 24/7',
             'catalog' => $supportCatalog,
+            'requests' => $recentSupportRows,
             'feedback' => is_array($supportFeedback) ? $supportFeedback : null,
             'oldInput' => is_array($supportOldInput) ? $supportOldInput : null,
         ]);
