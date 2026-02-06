@@ -33,6 +33,7 @@ $structuredData = [
         'name' => $pageTitle,
         'url' => $canonicalUrl,
         'description' => $metaDescription,
+        'keywords' => 'gestionale telefonia, gestionale per negozi di telefonia, gestionale SIM, software punto vendita telefonia',
         'inLanguage' => 'it-IT',
     ],
     [
@@ -42,6 +43,7 @@ $structuredData = [
         'applicationCategory' => 'BusinessApplication',
         'operatingSystem' => 'Web',
         'description' => $metaDescription,
+        'keywords' => 'gestionale telefonia, gestionale per negozi di telefonia, gestionale SIM, software punto vendita telefonia',
         'url' => $canonicalUrl,
     ],
 ];
@@ -91,6 +93,10 @@ $faqStructuredData = [
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     <meta name="description" content="<?= htmlspecialchars($metaDescription) ?>">
+    <meta name="keywords" content="gestionale telefonia, gestionale per negozi di telefonia, gestionale SIM, software punto vendita telefonia">
+    <meta name="subject" content="Gestionale telefonia">
+    <meta name="category" content="BusinessApplication">
+    <meta name="application-name" content="<?= htmlspecialchars($appName) ?>">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <meta name="format-detection" content="telephone=no">
