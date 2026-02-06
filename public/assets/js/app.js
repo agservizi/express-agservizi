@@ -3707,6 +3707,97 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function setupSupportAutoAreaSelect() {
+    const form = document.querySelector('[data-support-auto-form]');
+    if (!(form instanceof HTMLFormElement)) {
+      return;
+    }
+
+    const issueSelect = form.querySelector('[data-support-issue]');
+    const areaSelect = form.querySelector('[data-support-area]');
+    if (!(issueSelect instanceof HTMLSelectElement) || !(areaSelect instanceof HTMLSelectElement)) {
+      return;
+    }
+
+    const parseAreas = value => {
+      if (!value) {
+        return [];
+      }
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+      } catch (error) {
+        return [];
+      }
+    };
+
+    const defaultAreas = parseAreas(areaSelect.dataset.defaultAreas || '');
+    const fallbackAreas = defaultAreas.length > 0
+      ? defaultAreas
+      : Array.from(areaSelect.options)
+        .map(option => option.value)
+        .filter(value => value !== '');
+
+    const resetOptions = (areas, selectedValue) => {
+      const nextAreas = Array.isArray(areas) ? areas.filter(Boolean) : [];
+      const placeholder = areaSelect.querySelector('option[value=""]');
+
+      Array.from(areaSelect.options)
+        .filter(option => option.value !== '')
+        .forEach(option => option.remove());
+
+      const seen = new Set();
+      nextAreas.forEach(area => {
+        if (seen.has(area)) {
+          return;
+        }
+        seen.add(area);
+        const option = document.createElement('option');
+        option.value = area;
+        option.textContent = area;
+        if (selectedValue === area) {
+          option.selected = true;
+        }
+        areaSelect.appendChild(option);
+      });
+
+      if (selectedValue && !seen.has(selectedValue)) {
+        const option = document.createElement('option');
+        option.value = selectedValue;
+        option.textContent = selectedValue;
+        option.selected = true;
+        areaSelect.appendChild(option);
+      }
+
+      if (!placeholder) {
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = 'Seleziona';
+        areaSelect.insertBefore(emptyOption, areaSelect.firstChild);
+      }
+    };
+
+    const getIssueAreas = () => {
+      const selectedOption = issueSelect.selectedOptions[0];
+      if (!selectedOption) {
+        return fallbackAreas;
+      }
+      const areas = parseAreas(selectedOption.dataset.areas || '');
+      return areas.length > 0 ? areas : fallbackAreas;
+    };
+
+    const updateAreas = keepSelection => {
+      const currentValue = keepSelection ? areaSelect.value : '';
+      resetOptions(getIssueAreas(), currentValue);
+    };
+
+    issueSelect.addEventListener('change', () => {
+      updateAreas(false);
+    });
+
+    updateAreas(true);
+  }
+
   function setupBackToTop() {
     const button = document.querySelector('[data-back-to-top]');
     if (!(button instanceof HTMLButtonElement)) {
@@ -3734,6 +3825,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleVisibility();
   }
 
+  setupSupportAutoAreaSelect();
   setupBackToTop();
 
   const scrollToHashTarget = () => {

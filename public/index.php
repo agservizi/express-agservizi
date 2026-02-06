@@ -4301,6 +4301,7 @@ switch ($page) {
             'login_access' => [
                 'title' => 'Accesso e credenziali',
                 'area' => 'Accesso',
+                'areas' => ['Accesso', 'Impostazioni', 'Altro'],
                 'steps' => [
                     'Verifica che username e password siano corretti (maiuscole/minuscole).',
                     'Usa il reset password dalla schermata di login se necessario.',
@@ -4310,6 +4311,7 @@ switch ($page) {
             'sales_flow' => [
                 'title' => 'Vendite e stampa scontrino',
                 'area' => 'Vendite',
+                'areas' => ['Vendite', 'Impostazioni', 'Altro'],
                 'steps' => [
                     'Controlla che stampante e cassa siano selezionate nelle Impostazioni scontrino.',
                     'Verifica che il prodotto abbia prezzo e IVA assegnati.',
@@ -4319,6 +4321,7 @@ switch ($page) {
             'sim_stock' => [
                 'title' => 'Magazzino SIM e scorte',
                 'area' => 'Magazzino SIM',
+                'areas' => ['Magazzino SIM', 'Impostazioni', 'Altro'],
                 'steps' => [
                     'Aggiorna i listini e verifica lo stato della SIM (Disponibile/Assegnata).',
                     'Controlla le soglie di riordino e gli alert in Impostazioni.',
@@ -4328,6 +4331,7 @@ switch ($page) {
             'products_pricing' => [
                 'title' => 'Prodotti, listini e prezzi',
                 'area' => 'Prodotti',
+                'areas' => ['Prodotti', 'Impostazioni', 'Altro'],
                 'steps' => [
                     'Verifica che il prodotto sia attivo e abbia un prezzo valido.',
                     'Controlla il listino selezionato e gli eventuali sconti applicati.',
@@ -4337,6 +4341,7 @@ switch ($page) {
             'reports_kpi' => [
                 'title' => 'Report e KPI',
                 'area' => 'Report',
+                'areas' => ['Report', 'Altro'],
                 'steps' => [
                     'Seleziona il periodo corretto e aggiorna i filtri.',
                     'Verifica che siano state registrate vendite nel periodo scelto.',
@@ -4346,6 +4351,7 @@ switch ($page) {
             'performance' => [
                 'title' => 'Lentezza o errori di caricamento',
                 'area' => 'Prestazioni',
+                'areas' => ['Prestazioni', 'Altro'],
                 'steps' => [
                     'Ricarica la pagina e svuota la cache del browser.',
                     'Prova con un browser alternativo o una finestra anonima.',
@@ -4355,6 +4361,7 @@ switch ($page) {
             'permissions' => [
                 'title' => 'Ruoli e permessi',
                 'area' => 'Impostazioni',
+                'areas' => ['Impostazioni', 'Accesso', 'Altro'],
                 'steps' => [
                     'Controlla che l’utente abbia il ruolo corretto in Impostazioni.',
                     'Verifica il limite utenti della licenza attiva.',

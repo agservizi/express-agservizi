@@ -27,6 +27,7 @@ $areaOptions = [
     'Prestazioni',
     'Altro',
 ];
+$defaultAreas = $areaOptions;
 $prefillDetails = (string) ($oldInput['support_details'] ?? '');
 $prefillEscalate = (string) ($oldInput['support_escalate'] ?? '0');
 ?>
@@ -74,15 +75,19 @@ $prefillEscalate = (string) ($oldInput['support_escalate'] ?? '0');
         </div>
     </section>
 
-    <form method="post" class="form">
+    <form method="post" class="form" data-support-auto-form>
         <input type="hidden" name="action" value="support_auto_send">
         <div class="form__grid">
             <div class="form__group">
                 <label for="support_issue">Problema *</label>
-                <select id="support_issue" name="support_issue" required>
+                <select id="support_issue" name="support_issue" required data-support-issue>
                     <option value="">Seleziona</option>
                     <?php foreach ($catalog as $key => $item): ?>
-                        <option value="<?= htmlspecialchars($key) ?>" <?= $prefillIssue === $key ? 'selected' : '' ?>>
+                        <?php
+                            $areas = array_values(array_filter((array) ($item['areas'] ?? [])));
+                            $areasJson = htmlspecialchars(json_encode($areas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]');
+                        ?>
+                        <option value="<?= htmlspecialchars($key) ?>" data-areas="<?= $areasJson ?>" <?= $prefillIssue === $key ? 'selected' : '' ?>>
                             <?= htmlspecialchars((string) ($item['title'] ?? '')) ?>
                         </option>
                     <?php endforeach; ?>
@@ -90,7 +95,7 @@ $prefillEscalate = (string) ($oldInput['support_escalate'] ?? '0');
             </div>
             <div class="form__group">
                 <label for="support_area">Area</label>
-                <select id="support_area" name="support_area">
+                <select id="support_area" name="support_area" data-support-area data-default-areas="<?= htmlspecialchars(json_encode($defaultAreas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]') ?>">
                     <option value="">Seleziona</option>
                     <?php foreach ($areaOptions as $area): ?>
                         <option value="<?= htmlspecialchars($area) ?>" <?= $prefillArea === $area ? 'selected' : '' ?>>
@@ -107,13 +112,6 @@ $prefillEscalate = (string) ($oldInput['support_escalate'] ?? '0');
                 <label for="support_details">Dettagli utili</label>
                 <input id="support_details" name="support_details" type="text" placeholder="Es. Errore su stampa scontrino" value="<?= htmlspecialchars($prefillDetails) ?>">
             </div>
-        </div>
-
-        <div class="form__group">
-            <label class="checkbox">
-                <input type="checkbox" name="support_escalate" value="1" <?= $prefillEscalate === '1' ? 'checked' : '' ?>>
-                <span>Non ho risolto: inoltra la richiesta al supporto tecnico.</span>
-            </label>
         </div>
 
         <div class="form__footer">
