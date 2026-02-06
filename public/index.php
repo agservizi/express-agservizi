@@ -1982,7 +1982,7 @@ if ($page === 'global_search') {
     ]);
 }
 
-if ($currentUser === null && !in_array($page, ['landing', 'demo', 'funzionalita', 'vantaggi', 'piani', 'faq', 'contatto', 'prezzi', 'checkout', 'checkout_success', 'checkout_cancel', 'stripe_webhook', 'vies_lookup', 'login', 'login_mfa', 'sso_authorize', 'sso_token'], true)) {
+if ($currentUser === null && !in_array($page, ['landing', 'demo', 'funzionalita', 'vantaggi', 'piani', 'faq', 'contatto', 'prezzi', 'checkout', 'checkout_success', 'checkout_cancel', 'stripe_webhook', 'vies_lookup', 'login', 'login_mfa', 'forgot_password', 'sso_authorize', 'sso_token'], true)) {
     header('Location: index.php?page=login');
     exit;
 }
@@ -2133,6 +2133,50 @@ if ($page === 'login') {
         'errors' => $loginErrors,
         'appName' => $GLOBALS['config']['app']['name'] ?? 'Gestionale Telefonia',
         'oldInput' => ['username' => '', 'remember_me' => false],
+    ], false);
+    exit;
+}
+
+if ($page === 'forgot_password' && $method === 'POST') {
+    $identifier = trim((string) ($_POST['identifier'] ?? ''));
+    $rateKey = 'forgot_password_last_request';
+    $now = time();
+    $last = isset($_SESSION[$rateKey]) ? (int) $_SESSION[$rateKey] : 0;
+
+    if ($last > 0 && ($now - $last) < 60) {
+        $_SESSION['forgot_password_feedback'] = [
+            'success' => false,
+            'message' => 'Richiesta troppo frequente.',
+            'error' => 'Attendi un minuto prima di riprovare.',
+        ];
+        $_SESSION['forgot_password_old_input'] = ['identifier' => $identifier];
+        header('Location: index.php?page=forgot_password');
+        exit;
+    }
+
+    $result = $userService->requestPasswordReset($identifier);
+    $_SESSION[$rateKey] = $now;
+    $_SESSION['forgot_password_feedback'] = $result;
+    $_SESSION['forgot_password_old_input'] = ['identifier' => $identifier];
+    header('Location: index.php?page=forgot_password');
+    exit;
+}
+
+if ($page === 'forgot_password') {
+    if ($currentUser !== null) {
+        header('Location: index.php?page=profile');
+        exit;
+    }
+
+    $feedback = $_SESSION['forgot_password_feedback'] ?? null;
+    unset($_SESSION['forgot_password_feedback']);
+    $oldInput = $_SESSION['forgot_password_old_input'] ?? ['identifier' => ''];
+    unset($_SESSION['forgot_password_old_input']);
+
+    render('forgot_password', [
+        'feedback' => is_array($feedback) ? $feedback : null,
+        'oldInput' => is_array($oldInput) ? $oldInput : ['identifier' => ''],
+        'appName' => $GLOBALS['config']['app']['name'] ?? 'Gestionale Telefonia',
     ], false);
     exit;
 }

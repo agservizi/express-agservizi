@@ -62,7 +62,7 @@ $oldDemoPlan = htmlspecialchars((string) ($oldInput['demo_plan'] ?? 'start'), EN
                         <input type="checkbox" name="remember_me" value="1" <?= $rememberChecked ? 'checked' : '' ?>>
                         <span>Ricordami su questo dispositivo</span>
                     </label>
-                    <span class="login-form__help">Problemi di accesso? Contatta l'amministratore.</span>
+                    <a class="login-form__help" href="index.php?page=forgot_password">Recupera password</a>
                 </div>
                 <button type="submit" class="btn btn--primary btn--full">Accedi</button>
             </form>

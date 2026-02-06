@@ -243,6 +243,68 @@ final class UserService
     }
 
     /**
+     * @return array{success:bool,message:string,error?:string}
+     */
+    public function requestPasswordReset(string $identifier): array
+    {
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            return [
+                'success' => false,
+                'message' => 'Impossibile inviare il reset password.',
+                'error' => 'Inserisci un indirizzo email o il tuo username.',
+            ];
+        }
+
+        $normalized = function_exists('mb_strtolower')
+            ? mb_strtolower($identifier, 'UTF-8')
+            : strtolower($identifier);
+
+        $stmt = $this->pdo->prepare(
+            'SELECT id, tenant_id, username, fullname, email
+             FROM users
+             WHERE LOWER(email) = :identifier OR LOWER(username) = :identifier
+             LIMIT 1'
+        );
+        $stmt->execute([':identifier' => $normalized]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user !== false) {
+            $email = trim((string) ($user['email'] ?? ''));
+            if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $password = $this->generateTempPassword();
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+                if ($hash !== false) {
+                    $update = $this->pdo->prepare('UPDATE users SET password_hash = :hash, updated_at = NOW() WHERE id = :id');
+                    $update->execute([
+                        ':hash' => $hash,
+                        ':id' => (int) ($user['id'] ?? 0),
+                    ]);
+
+                    $sent = $this->sendResetCredentialsEmail(
+                        $email,
+                        (string) ($user['username'] ?? ''),
+                        $password,
+                        (string) ($user['fullname'] ?? '')
+                    );
+
+                    if (!$sent) {
+                        $tenantId = (int) ($user['tenant_id'] ?? 0);
+                        if ($tenantId > 0) {
+                            $this->logTenantCredentialEmailFailure($tenantId, $email);
+                        }
+                    }
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Se l’account esiste, riceverai una email con le istruzioni per accedere.',
+        ];
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function getRoles(): array
