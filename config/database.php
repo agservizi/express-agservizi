@@ -52,6 +52,8 @@ final class Database
             $name = self::getEnv('DB_NAME');
             $user = self::getEnv('DB_USER');
             $pass = self::getEnv('DB_PASS') ?? '';
+            $persistentEnv = strtolower((string) (self::getEnv('DB_PERSISTENT') ?? 'true'));
+            $usePersistent = !in_array($persistentEnv, ['0', 'false', 'no', 'off'], true);
 
             if ($host === null || $name === null || $user === null) {
                 throw new RuntimeException('Variabili DB_HOST/DB_NAME/DB_USER mancanti.');
@@ -60,7 +62,7 @@ final class Database
             $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $name);
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_PERSISTENT => false,
+                PDO::ATTR_PERSISTENT => $usePersistent,
             ];
 
             self::$pdo = new PDO($dsn, $user, $pass, $options);
@@ -99,6 +101,8 @@ final class Database
             $port = self::getEnv('DB_PORT') ?: '3306';
             $user = self::getEnv('DB_USER');
             $pass = self::getEnv('DB_PASS') ?? '';
+            $persistentEnv = strtolower((string) (self::getEnv('DB_PERSISTENT') ?? 'true'));
+            $usePersistent = !in_array($persistentEnv, ['0', 'false', 'no', 'off'], true);
 
             if ($host === null || $user === null) {
                 throw new RuntimeException('Variabili DB_HOST/DB_USER mancanti.');
@@ -107,7 +111,7 @@ final class Database
             $dsn = sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $host, $port);
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_PERSISTENT => false,
+                PDO::ATTR_PERSISTENT => $usePersistent,
             ];
 
             self::$serverPdo = new PDO($dsn, $user, $pass, $options);
