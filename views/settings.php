@@ -8,6 +8,7 @@ declare(strict_types=1);
  * @var array<int, array<string, mixed>> $operators
  * @var array<int, array<string, mixed>> $providers
  * @var array<int, array<string, mixed>> $discountCampaigns
+ * @var array<int, array<string, mixed>> $discountCodes
  * @var array<int, array<string, mixed>> $fiscalProducts
  * @var array<int, array<string, mixed>> $auditLogs
  * @var array{page:int, per_page:int, total:int, pages:int, has_prev:bool, has_next:bool} $auditPagination
@@ -45,12 +46,14 @@ declare(strict_types=1);
  * @var int $licenseFocusId
  * @var bool $canManageTenantSettings
  * @var int $currentTenantId
+ * @var bool $discountCodesOpen
  */
 $pageTitle = $pageTitle ?? 'Impostazioni';
 $roles = $roles ?? [];
 $operators = $operators ?? [];
 $providers = $providers ?? [];
 $discountCampaigns = $discountCampaigns ?? [];
+$discountCodes = $discountCodes ?? [];
 $fiscalProducts = $fiscalProducts ?? [];
 $isAdmin = $isAdmin ?? false;
 $canManageTenantSettings = $canManageTenantSettings ?? $isAdmin;
@@ -151,6 +154,10 @@ if (!$fiscalOpen && $feedback !== null) {
     }
 }
 $campaignsOpen = $feedback !== null && isset($feedback['message']) && strpos((string) $feedback['message'], 'Campagna') !== false;
+$discountCodesOpen = isset($discountCodesOpen) ? (bool) $discountCodesOpen : false;
+if (!$discountCodesOpen && $feedback !== null && isset($feedback['message'])) {
+    $discountCodesOpen = stripos((string) $feedback['message'], 'codice sconto') !== false;
+}
 $ssoOpen = $ssoOpen || $ssoFeedback !== null;
 $auditCurrentPage = max(1, (int) ($auditPagination['page'] ?? 1));
 $totalAuditPages = max(1, (int) ($auditPagination['pages'] ?? 1));
@@ -490,6 +497,114 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                         </section>
                     </div>
                 <?php endif; ?>
+            </div>
+        </article>
+        <?php endif; ?>
+
+        <?php if ($canManageTenantSettings): ?>
+        <article class="settings-accordion__item" data-accordion data-open="<?= $discountCodesOpen ? 'true' : 'false' ?>">
+            <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $discountCodesOpen ? 'true' : 'false' ?>">
+                <span class="settings-accordion__title">Codici sconto checkout</span>
+                <span class="settings-accordion__icon" aria-hidden="true"></span>
+            </button>
+            <div class="settings-accordion__content" data-accordion-content <?= $discountCodesOpen ? '' : 'hidden' ?>>
+                <div class="settings-operators">
+                    <section class="settings-operators__panel">
+                        <h4>Crea codice sconto</h4>
+                        <form method="post" class="form settings-form">
+                            <input type="hidden" name="action" value="create_discount_code">
+                            <div class="settings-form__grid">
+                                <div class="settings-form__field">
+                                    <label for="discount_code">Codice</label>
+                                    <input type="text" id="discount_code" name="discount_code" maxlength="32" placeholder="ES. PROMO10" required>
+                                </div>
+                                <div class="settings-form__field">
+                                    <label for="discount_type">Tipo sconto</label>
+                                    <select id="discount_type" name="discount_type" required>
+                                        <option value="fixed">Importo fisso</option>
+                                        <option value="percent">Percentuale</option>
+                                    </select>
+                                </div>
+                                <div class="settings-form__field">
+                                    <label for="discount_value">Valore</label>
+                                    <input type="number" id="discount_value" name="discount_value" min="0" step="0.01" required>
+                                </div>
+                                <div class="settings-form__field">
+                                    <label for="discount_starts_at">Valido dal</label>
+                                    <input type="date" id="discount_starts_at" name="discount_starts_at">
+                                </div>
+                                <div class="settings-form__field">
+                                    <label for="discount_ends_at">Valido fino al</label>
+                                    <input type="date" id="discount_ends_at" name="discount_ends_at">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn--primary">Salva codice</button>
+                        </form>
+                        <p class="muted">Usa solo lettere, numeri o trattini (3-32 caratteri). Il codice viene applicato al checkout del tenant.</p>
+                    </section>
+
+                    <section class="settings-operators__panel">
+                        <h4>Codici attivi e archivio</h4>
+                        <?php if (empty($discountCodes)): ?>
+                            <p class="muted">Nessun codice sconto configurato.</p>
+                        <?php else: ?>
+                            <div class="table-wrapper table-wrapper--embedded">
+                                <table class="table table--compact">
+                                    <thead>
+                                        <tr>
+                                            <th>Codice</th>
+                                            <th>Tipo</th>
+                                            <th>Valore</th>
+                                            <th>Validità</th>
+                                            <th>Stato</th>
+                                            <th>Azioni</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($discountCodes as $code): ?>
+                                            <?php
+                                                $isActive = (int) ($code['is_active'] ?? 0) === 1;
+                                                $type = (string) ($code['type'] ?? 'Fixed');
+                                                $value = (float) ($code['value'] ?? 0);
+                                                $starts = !empty($code['starts_at']) ? date('d/m/Y', strtotime((string) $code['starts_at'])) : null;
+                                                $ends = !empty($code['ends_at']) ? date('d/m/Y', strtotime((string) $code['ends_at'])) : null;
+                                            ?>
+                                            <tr>
+                                                <td><strong><?= htmlspecialchars((string) $code['code']) ?></strong></td>
+                                                <td><?= $type === 'Percent' ? 'Percentuale' : 'Importo fisso' ?></td>
+                                                <td>
+                                                    <?php if ($type === 'Percent'): ?>
+                                                        <?= number_format($value, 2, ',', '.') ?>%
+                                                    <?php else: ?>
+                                                        € <?= number_format($value, 2, ',', '.') ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <?php if ($starts === null && $ends === null): ?>
+                                                        Sempre
+                                                    <?php else: ?>
+                                                        <?= $starts ?? 'n/d' ?> → <?= $ends ?? 'n/d' ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td><?= $isActive ? 'Attivo' : 'Disattivato' ?></td>
+                                                <td>
+                                                    <form method="post" class="inline-form">
+                                                        <input type="hidden" name="action" value="toggle_discount_code">
+                                                        <input type="hidden" name="discount_code_id" value="<?= (int) $code['id'] ?>">
+                                                        <input type="hidden" name="target_status" value="<?= $isActive ? '0' : '1' ?>">
+                                                        <button type="submit" class="btn btn--secondary btn--small">
+                                                            <?= $isActive ? 'Disattiva' : 'Attiva' ?>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </section>
+                </div>
             </div>
         </article>
         <?php endif; ?>

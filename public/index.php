@@ -863,15 +863,15 @@ function fetchViesVat(string $country, string $vatNumber): array
 }
 
 /**
- * @param array{plan_key:string,billing_cycle:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string,vat_number:?string,company_country:?string,company_name:?string,company_address:?string} $payload
+ * @param array{plan_key:string,billing_cycle:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string,vat_number:?string,company_country:?string,company_name:?string,company_address:?string,discount_code:?string,discount_type:?string,discount_value:?float,discount_amount:?float} $payload
  */
 function createCheckoutRequest(PDO $pdo, array $payload): int
 {
     $stmt = $pdo->prepare(
         'INSERT INTO tenant_checkout_requests
-            (plan_key, billing_cycle, tenant_name, tenant_slug, tenant_email, tenant_phone, vat_number, company_country, company_name, company_address, status)
+            (plan_key, billing_cycle, tenant_name, tenant_slug, tenant_email, tenant_phone, vat_number, company_country, company_name, company_address, discount_code, discount_type, discount_value, discount_amount, status)
          VALUES
-            (:plan_key, :billing_cycle, :tenant_name, :tenant_slug, :tenant_email, :tenant_phone, :vat_number, :company_country, :company_name, :company_address, "pending")'
+            (:plan_key, :billing_cycle, :tenant_name, :tenant_slug, :tenant_email, :tenant_phone, :vat_number, :company_country, :company_name, :company_address, :discount_code, :discount_type, :discount_value, :discount_amount, "pending")'
     );
     $stmt->execute([
         ':plan_key' => $payload['plan_key'],
@@ -884,6 +884,10 @@ function createCheckoutRequest(PDO $pdo, array $payload): int
         ':company_country' => $payload['company_country'] !== '' ? $payload['company_country'] : null,
         ':company_name' => $payload['company_name'] !== '' ? $payload['company_name'] : null,
         ':company_address' => $payload['company_address'] !== '' ? $payload['company_address'] : null,
+        ':discount_code' => $payload['discount_code'] !== '' ? $payload['discount_code'] : null,
+        ':discount_type' => $payload['discount_type'] !== '' ? $payload['discount_type'] : null,
+        ':discount_value' => $payload['discount_value'] !== null ? $payload['discount_value'] : null,
+        ':discount_amount' => $payload['discount_amount'] !== null ? $payload['discount_amount'] : null,
     ]);
 
     return (int) $pdo->lastInsertId();
@@ -903,7 +907,7 @@ function updateCheckoutSession(PDO $pdo, int $requestId, string $sessionId): voi
 }
 
 /**
- * @param array{plan_key:string,billing_cycle:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string,vat_number:?string,company_country:?string,company_name:?string,company_address:?string} $payload
+ * @param array{plan_key:string,billing_cycle:string,tenant_name:string,tenant_slug:string,tenant_email:string,tenant_phone:?string,vat_number:?string,company_country:?string,company_name:?string,company_address:?string,discount_code:?string,discount_type:?string,discount_value:?float,discount_amount:?float} $payload
  */
 function updateCheckoutRequest(PDO $pdo, int $requestId, array $payload): void
 {
@@ -919,6 +923,10 @@ function updateCheckoutRequest(PDO $pdo, int $requestId, array $payload): void
              company_country = :company_country,
              company_name = :company_name,
              company_address = :company_address,
+             discount_code = :discount_code,
+             discount_type = :discount_type,
+             discount_value = :discount_value,
+             discount_amount = :discount_amount,
              status = "pending",
              stripe_session_id = NULL,
              stripe_payment_intent_id = NULL,
@@ -939,8 +947,187 @@ function updateCheckoutRequest(PDO $pdo, int $requestId, array $payload): void
         ':company_country' => $payload['company_country'] !== '' ? $payload['company_country'] : null,
         ':company_name' => $payload['company_name'] !== '' ? $payload['company_name'] : null,
         ':company_address' => $payload['company_address'] !== '' ? $payload['company_address'] : null,
+        ':discount_code' => $payload['discount_code'] !== '' ? $payload['discount_code'] : null,
+        ':discount_type' => $payload['discount_type'] !== '' ? $payload['discount_type'] : null,
+        ':discount_value' => $payload['discount_value'] !== null ? $payload['discount_value'] : null,
+        ':discount_amount' => $payload['discount_amount'] !== null ? $payload['discount_amount'] : null,
         ':id' => $requestId,
     ]);
+}
+
+function normalizeDiscountCode(string $code): string
+{
+    $code = strtoupper(trim($code));
+    $code = preg_replace('/\s+/', '', $code) ?? $code;
+    return $code;
+}
+
+function listDiscountCodes(PDO $pdo, int $tenantId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT * FROM tenant_discount_codes WHERE tenant_id = :tenant_id ORDER BY created_at DESC'
+    );
+    $stmt->execute([':tenant_id' => $tenantId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+function createDiscountCode(PDO $pdo, int $tenantId, array $input): array
+{
+    $code = normalizeDiscountCode((string) ($input['discount_code'] ?? ''));
+    $typeInput = strtolower(trim((string) ($input['discount_type'] ?? 'fixed')));
+    $type = $typeInput === 'percent' ? 'Percent' : 'Fixed';
+    $value = (float) ($input['discount_value'] ?? 0);
+    $startsAt = trim((string) ($input['discount_starts_at'] ?? ''));
+    $endsAt = trim((string) ($input['discount_ends_at'] ?? ''));
+
+    $errors = [];
+    if ($code === '' || !preg_match('/^[A-Z0-9\-]{3,32}$/', $code)) {
+        $errors[] = 'Il codice deve contenere solo lettere, numeri o trattini (3-32 caratteri).';
+    }
+    if ($value <= 0) {
+        $errors[] = 'Inserisci un valore sconto maggiore di zero.';
+    }
+    if ($type === 'Percent' && $value > 100) {
+        $errors[] = 'La percentuale non può superare 100.';
+    }
+    if ($startsAt !== '' && strtotime($startsAt) === false) {
+        $errors[] = 'Data inizio non valida.';
+    }
+    if ($endsAt !== '' && strtotime($endsAt) === false) {
+        $errors[] = 'Data fine non valida.';
+    }
+    if ($startsAt !== '' && $endsAt !== '' && strtotime($startsAt) > strtotime($endsAt)) {
+        $errors[] = 'La data di fine deve essere successiva alla data di inizio.';
+    }
+
+    if ($errors !== []) {
+        return [
+            'success' => false,
+            'message' => 'Controlla i dati del codice sconto.',
+            'errors' => $errors,
+        ];
+    }
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO tenant_discount_codes
+            (tenant_id, code, type, value, starts_at, ends_at, is_active)
+         VALUES
+            (:tenant_id, :code, :type, :value, :starts_at, :ends_at, 1)'
+    );
+
+    try {
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':code' => $code,
+            ':type' => $type,
+            ':value' => $value,
+            ':starts_at' => $startsAt !== '' ? $startsAt : null,
+            ':ends_at' => $endsAt !== '' ? $endsAt : null,
+        ]);
+    } catch (Throwable $exception) {
+        return [
+            'success' => false,
+            'message' => 'Impossibile salvare il codice sconto.',
+            'errors' => [$exception->getMessage()],
+        ];
+    }
+
+    return [
+        'success' => true,
+        'message' => 'Codice sconto creato correttamente.',
+    ];
+}
+
+function toggleDiscountCode(PDO $pdo, int $tenantId, int $codeId, bool $target): array
+{
+    if ($codeId <= 0) {
+        return [
+            'success' => false,
+            'message' => 'Codice non valido.',
+        ];
+    }
+    $stmt = $pdo->prepare(
+        'UPDATE tenant_discount_codes SET is_active = :active WHERE id = :id AND tenant_id = :tenant_id'
+    );
+    $stmt->execute([
+        ':active' => $target ? 1 : 0,
+        ':id' => $codeId,
+        ':tenant_id' => $tenantId,
+    ]);
+
+    if ($stmt->rowCount() === 0) {
+        return [
+            'success' => false,
+            'message' => 'Codice non trovato.',
+        ];
+    }
+
+    return [
+        'success' => true,
+        'message' => $target ? 'Codice attivato.' : 'Codice disattivato.',
+    ];
+}
+
+function findActiveDiscountCode(PDO $pdo, int $tenantId, string $code): ?array
+{
+    $code = normalizeDiscountCode($code);
+    if ($code === '') {
+        return null;
+    }
+    $stmt = $pdo->prepare(
+        'SELECT * FROM tenant_discount_codes WHERE tenant_id = :tenant_id AND code = :code LIMIT 1'
+    );
+    $stmt->execute([
+        ':tenant_id' => $tenantId,
+        ':code' => $code,
+    ]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+    if ((int) ($row['is_active'] ?? 0) !== 1) {
+        return null;
+    }
+    $today = new DateTimeImmutable('today');
+    if (!empty($row['starts_at'])) {
+        $starts = date_create((string) $row['starts_at']);
+        if ($starts !== false && $starts > $today) {
+            return null;
+        }
+    }
+    if (!empty($row['ends_at'])) {
+        $ends = date_create((string) $row['ends_at']);
+        if ($ends !== false && $ends < $today) {
+            return null;
+        }
+    }
+
+    return $row;
+}
+
+function applyDiscountToAmount(float $amount, array $discount): array
+{
+    $amount = max($amount, 0.0);
+    $type = (string) ($discount['type'] ?? 'Fixed');
+    $value = (float) ($discount['value'] ?? 0);
+    $discountAmount = 0.0;
+
+    if ($amount > 0 && $value > 0) {
+        if ($type === 'Percent') {
+            $discountAmount = round($amount * ($value / 100), 2);
+        } else {
+            $discountAmount = $value;
+        }
+    }
+
+    if ($discountAmount > $amount) {
+        $discountAmount = $amount;
+    }
+
+    return [
+        'discount_amount' => $discountAmount,
+        'final_amount' => round($amount - $discountAmount, 2),
+    ];
 }
 
 /**
@@ -2582,6 +2769,7 @@ switch ($page) {
                     'tenant_slug' => (string) ($resumeRequest['tenant_slug'] ?? ''),
                     'tenant_email' => (string) ($resumeRequest['tenant_email'] ?? ''),
                     'tenant_phone' => (string) ($resumeRequest['tenant_phone'] ?? ''),
+                    'discount_code' => (string) ($resumeRequest['discount_code'] ?? ''),
                     'vat_number' => (string) ($resumeRequest['vat_number'] ?? ''),
                     'company_country' => (string) ($resumeRequest['company_country'] ?? ''),
                     'company_name' => (string) ($resumeRequest['company_name'] ?? ''),
@@ -2606,6 +2794,7 @@ switch ($page) {
             $tenantEmail = trim((string) ($_POST['tenant_email'] ?? ''));
             $tenantEmail = function_exists('mb_strtolower') ? mb_strtolower($tenantEmail, 'UTF-8') : strtolower($tenantEmail);
             $tenantPhone = trim((string) ($_POST['tenant_phone'] ?? ''));
+            $discountCode = normalizeDiscountCode((string) ($_POST['discount_code'] ?? ''));
             $companyCountryInput = (string) ($_POST['company_country'] ?? '');
             $companyCountry = $companyCountryInput !== '' ? normalizeVatCountry($companyCountryInput) : '';
             $vatNumberInput = trim((string) ($_POST['vat_number'] ?? ''));
@@ -2638,6 +2827,28 @@ switch ($page) {
                     $errors[] = 'Inserisci una P.IVA valida.';
                 }
             }
+
+            $baseAmount = $plan !== null
+                ? (float) ($plan['billing_price_eur'] ?? $plan['price_eur'] ?? 0)
+                : 0.0;
+            $discountData = null;
+            $discountAmount = 0.0;
+            $discountFinalAmount = null;
+            if ($discountCode !== '') {
+                $discountTenantId = 1;
+                $discountData = findActiveDiscountCode($pdo, $discountTenantId, $discountCode);
+                if ($discountData === null) {
+                    $errors[] = 'Codice sconto non valido o scaduto.';
+                } elseif ($plan !== null) {
+                    $applied = applyDiscountToAmount($baseAmount, $discountData);
+                    $discountAmount = (float) ($applied['discount_amount'] ?? 0.0);
+                    $discountFinalAmount = (float) ($applied['final_amount'] ?? $baseAmount);
+                }
+            }
+
+            $discountType = $discountData !== null ? (string) ($discountData['type'] ?? '') : '';
+            $discountValue = $discountData !== null ? (float) ($discountData['value'] ?? 0) : null;
+            $discountAmountValue = $discountData !== null ? $discountAmount : null;
 
             if ($tenantSlug !== '' && tenantSlugExists($pdo, $tenantSlug)) {
                 $errors[] = 'Lo slug è già in uso. Scegline uno diverso.';
@@ -2696,6 +2907,7 @@ switch ($page) {
                     'tenant_slug' => $tenantSlug,
                     'tenant_email' => $tenantEmail,
                     'tenant_phone' => $tenantPhone,
+                    'discount_code' => $discountCode,
                     'company_country' => $companyCountry,
                     'vat_number' => $vatNumber,
                     'company_name' => $companyName,
@@ -2719,6 +2931,7 @@ switch ($page) {
                     'tenant_slug' => $tenantSlug,
                     'tenant_email' => $tenantEmail,
                     'tenant_phone' => $tenantPhone,
+                    'discount_code' => $discountCode,
                     'company_country' => $companyCountry,
                     'vat_number' => $vatNumber,
                     'company_name' => $companyName,
@@ -2742,6 +2955,10 @@ switch ($page) {
                     'company_country' => $companyCountry,
                     'company_name' => $companyName,
                     'company_address' => $companyAddress,
+                    'discount_code' => $discountData !== null ? $discountCode : '',
+                    'discount_type' => $discountType,
+                    'discount_value' => $discountValue,
+                    'discount_amount' => $discountAmountValue,
                 ]);
             } else {
                 $requestId = createCheckoutRequest($pdo, [
@@ -2755,6 +2972,10 @@ switch ($page) {
                     'company_country' => $companyCountry,
                     'company_name' => $companyName,
                     'company_address' => $companyAddress,
+                    'discount_code' => $discountData !== null ? $discountCode : '',
+                    'discount_type' => $discountType,
+                    'discount_value' => $discountValue,
+                    'discount_amount' => $discountAmountValue,
                 ]);
             }
 
@@ -2781,6 +3002,7 @@ switch ($page) {
                     'tenant_slug' => $tenantSlug,
                     'tenant_email' => $tenantEmail,
                     'tenant_phone' => $tenantPhone,
+                    'discount_code' => $discountCode,
                     'company_country' => $companyCountry,
                     'vat_number' => $vatNumber,
                     'company_name' => $companyName,
@@ -2792,7 +3014,9 @@ switch ($page) {
 
             try {
                 Stripe::setApiKey($stripeSecretKey);
-                $unitAmount = (int) round(((float) ($plan['billing_price_eur'] ?? $plan['price_eur'] ?? 0)) * 100);
+                $finalAmount = $discountFinalAmount ?? $baseAmount;
+                $finalAmount = max(0.0, $finalAmount);
+                $unitAmount = (int) round($finalAmount * 100);
                 $sessionMode = $billingCycle === 'monthly' ? 'subscription' : 'payment';
                 $subscriptionData = null;
                 if ($billingCycle === 'monthly') {
@@ -2829,6 +3053,10 @@ switch ($page) {
                         'request_id' => (string) $requestId,
                         'plan_key' => (string) $planKey,
                         'billing_cycle' => (string) $billingCycle,
+                        'discount_code' => $discountData !== null ? $discountCode : '',
+                        'discount_type' => $discountType,
+                        'discount_value' => $discountValue !== null ? (string) $discountValue : '',
+                        'discount_amount' => $discountAmountValue !== null ? (string) $discountAmountValue : '',
                     ],
                 ];
                 if ($subscriptionData !== null) {
@@ -2848,6 +3076,10 @@ switch ($page) {
                     'currency' => (string) $currency,
                     'unit_amount' => (int) $unitAmount,
                     'term_months' => $subscriptionData['metadata']['term_months'] ?? null,
+                    'discount_code' => $discountData !== null ? $discountCode : null,
+                    'discount_type' => $discountType !== '' ? $discountType : null,
+                    'discount_value' => $discountValue !== null ? $discountValue : null,
+                    'discount_amount' => $discountAmountValue !== null ? $discountAmountValue : null,
                 ], JSON_UNESCAPED_UNICODE));
                 markCheckoutRequestFailed($pdo, $requestId, 'Errore Stripe: ' . $exception->getMessage());
                 $errorMessages = ['Riprova tra qualche minuto.'];
@@ -2864,6 +3096,7 @@ switch ($page) {
                     'tenant_slug' => $tenantSlug,
                     'tenant_email' => $tenantEmail,
                     'tenant_phone' => $tenantPhone,
+                    'discount_code' => $discountCode,
                     'company_country' => $companyCountry,
                     'vat_number' => $vatNumber,
                     'company_name' => $companyName,
@@ -4892,6 +5125,7 @@ switch ($page) {
         $pdaOpen = isset($_GET['pda_open']) || $pdaSettingsFeedback !== null;
         $receiptSettings = $receiptSettingsService->getSettings();
         $receiptOpen = isset($_GET['receipt_open']) || $receiptSettingsFeedback !== null;
+        $discountCodesOpen = isset($_GET['discount_codes_open']);
         $energyProviders = $canManageTenantSettings ? $energyProviderService->listProviders() : [];
         $energyOpen = isset($_GET['energy_open']) || $energySettingsFeedback !== null;
         $energyOffersImportStatus = loadEnergyOffersImportStatus();
@@ -4907,6 +5141,7 @@ switch ($page) {
             }
         }
         $tenantsList = $isAdmin ? $tenantService->listTenants() : [];
+        $discountCodes = $canManageTenantSettings ? listDiscountCodes($pdo, $tenantId) : [];
 
         if ($isAdmin) {
             maybeScheduleEnergyOffersImport();
@@ -5362,6 +5597,30 @@ switch ($page) {
                     $target = isset($_POST['target_status']) ? ((int) $_POST['target_status'] === 1) : true;
                     $result = $discountCampaignService->setStatus($campaignId, $target);
                 }
+            } elseif ($action === 'create_discount_code') {
+                if (!$canManageTenantSettings) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'error' => 'Solo i responsabili del tenant possono gestire i codici sconto.',
+                    ];
+                } else {
+                    $result = createDiscountCode($pdo, $tenantId, $_POST);
+                }
+                $redirectParams['discount_codes_open'] = 1;
+            } elseif ($action === 'toggle_discount_code') {
+                if (!$canManageTenantSettings) {
+                    $result = [
+                        'success' => false,
+                        'message' => 'Operazione non autorizzata.',
+                        'error' => 'Solo i responsabili del tenant possono gestire i codici sconto.',
+                    ];
+                } else {
+                    $codeId = (int) ($_POST['discount_code_id'] ?? 0);
+                    $target = isset($_POST['target_status']) ? ((int) $_POST['target_status'] === 1) : true;
+                    $result = toggleDiscountCode($pdo, $tenantId, $codeId, $target);
+                }
+                $redirectParams['discount_codes_open'] = 1;
             } elseif ($action === 'force_disable_mfa') {
                 if (!$canManageTenantSettings) {
                     $result = [
@@ -5591,6 +5850,8 @@ switch ($page) {
             'fiscalProducts' => $canManageTenantSettings ? $productService->listForFiscalSettings() : [],
             'fiscalOpen' => $fiscalOpen,
             'discountCampaigns' => $canManageTenantSettings ? $discountCampaignService->listAll() : [],
+            'discountCodes' => $discountCodes,
+            'discountCodesOpen' => $discountCodesOpen,
             'isAdmin' => $isAdmin,
             'canManageTenantSettings' => $canManageTenantSettings,
             'currentTenantId' => $tenantId,

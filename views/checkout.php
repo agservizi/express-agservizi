@@ -17,7 +17,8 @@ $tenantSlug = trim((string) ($oldInput['tenant_slug'] ?? ''));
 $tenantEmail = trim((string) ($oldInput['tenant_email'] ?? ''));
 $tenantPhone = trim((string) ($oldInput['tenant_phone'] ?? ''));
 $tenantVatNumber = trim((string) ($oldInput['vat_number'] ?? ''));
-$tenantCompanyCountry = trim((string) ($oldInput['company_country'] ?? 'IT'));
+$tenantCompanyCountry = 'IT';
+$discountCode = trim((string) ($oldInput['discount_code'] ?? ''));
 $tenantCompanyName = trim((string) ($oldInput['company_name'] ?? ''));
 $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
 ?>
@@ -118,13 +119,14 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                                     <input type="text" name="tenant_phone" value="<?= htmlspecialchars($tenantPhone) ?>">
                                 </label>
                                 <label>
-                                    Paese P.IVA
-                                    <input type="text" name="company_country" value="<?= htmlspecialchars($tenantCompanyCountry !== '' ? $tenantCompanyCountry : 'IT') ?>" maxlength="2" placeholder="IT">
+                                    Codice sconto
+                                    <input type="text" name="discount_code" value="<?= htmlspecialchars($discountCode) ?>" placeholder="Inserisci il codice sconto">
                                 </label>
+                                <input type="hidden" name="company_country" value="IT">
                                 <label class="landing-form__span">
                                     P.IVA
                                     <div class="landing-form__inline landing-form__inline--inside">
-                                        <input type="text" name="vat_number" value="<?= htmlspecialchars($tenantVatNumber) ?>" placeholder="IT12345678901">
+                                        <input type="text" name="vat_number" value="<?= htmlspecialchars($tenantVatNumber) ?>" placeholder="12345678901">
                                         <button type="button" class="landing-btn landing-btn--secondary landing-btn--small" data-vies-button>Verifica VIES</button>
                                     </div>
                                     <span class="landing-form__status" data-vies-status></span>
@@ -218,7 +220,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                                 <li><strong>Email:</strong> <span data-checkout-tenant-email></span></li>
                                 <li><strong>Telefono:</strong> <span data-checkout-tenant-phone></span></li>
                                 <li><strong>P.IVA:</strong> <span data-checkout-tenant-vat></span></li>
-                                <li><strong>Paese:</strong> <span data-checkout-tenant-country></span></li>
+                                <li><strong>Codice sconto:</strong> <span data-checkout-tenant-discount></span></li>
                                 <li><strong>Ragione sociale:</strong> <span data-checkout-tenant-company></span></li>
                                 <li><strong>Indirizzo sede:</strong> <span data-checkout-tenant-address></span></li>
                             </ul>
@@ -279,7 +281,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                 const vat = vatInput.value.trim();
                 const country = countryInput.value.trim();
                 if (!vat || !country) {
-                    setStatus('Inserisci paese e P.IVA.', 'error');
+                    setStatus('Inserisci la P.IVA.', 'error');
                     return;
                 }
 
@@ -341,7 +343,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
             const tenantEmailEl = document.querySelector('[data-checkout-tenant-email]');
             const tenantPhoneEl = document.querySelector('[data-checkout-tenant-phone]');
             const tenantVatEl = document.querySelector('[data-checkout-tenant-vat]');
-            const tenantCountryEl = document.querySelector('[data-checkout-tenant-country]');
+            const tenantDiscountEl = document.querySelector('[data-checkout-tenant-discount]');
             const tenantCompanyEl = document.querySelector('[data-checkout-tenant-company]');
             const tenantAddressEl = document.querySelector('[data-checkout-tenant-address]');
 
@@ -351,6 +353,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
             const tenantPhoneInput = document.querySelector('input[name="tenant_phone"]');
             const tenantVatInput = document.querySelector('input[name="vat_number"]');
             const tenantCountryInput = document.querySelector('input[name="company_country"]');
+            const tenantDiscountInput = document.querySelector('input[name="discount_code"]');
             const tenantCompanyInput = document.querySelector('input[name="company_name"]');
             const tenantAddressInput = document.querySelector('textarea[name="company_address"]');
 
@@ -383,7 +386,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                 setText(tenantEmailEl, tenantEmailInput?.value);
                 setText(tenantPhoneEl, tenantPhoneInput?.value);
                 setText(tenantVatEl, tenantVatInput?.value);
-                setText(tenantCountryEl, tenantCountryInput?.value);
+                setText(tenantDiscountEl, tenantDiscountInput?.value);
                 setText(tenantCompanyEl, tenantCompanyInput?.value);
                 setText(tenantAddressEl, tenantAddressInput?.value);
             };
