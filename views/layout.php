@@ -134,10 +134,12 @@ $isActiveSidebar = static function (string $page) use ($currentPage): string {
 <div class="layout">
     <aside class="sidebar" data-collapsed="false">
         <div class="sidebar__header">
-            <span class="sidebar__logo" aria-hidden="true">
-                <img src="assets/img/logo-collapsed.svg" alt="">
-            </span>
-            <span class="sidebar__title">Coresuite Express</span>
+            <a class="sidebar__brand" href="https://express.agenziaplinio.it">
+                <span class="sidebar__logo" aria-hidden="true">
+                    <img src="assets/img/logo-collapsed.svg" alt="">
+                </span>
+                <span class="sidebar__title">Coresuite Express</span>
+            </a>
         </div>
         <nav class="sidebar__nav">
             <?php if ($moduleEnabled('dashboard')): ?>
