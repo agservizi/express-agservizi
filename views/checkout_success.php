@@ -7,7 +7,7 @@ $request = isset($request) && is_array($request) ? $request : null;
 $isLoggedIn = isset($currentUser) && $currentUser !== null;
 $loginUrl = $isLoggedIn ? 'index.php?page=dashboard' : 'index.php?page=login';
 $loginLabel = $isLoggedIn ? 'Area personale' : 'Accedi';
-$prezziUrl = 'index.php?page=prezzi';
+$prezziUrl = 'index.php?page=prezzi&public=1';
 $landingUrl = 'index.php?page=landing&public=1';
 $status = $request['status'] ?? null;
 ?>

@@ -5,7 +5,7 @@ $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ('Pagamento annullato - ' . $appName);
 $planKey = $planKey ?? 'start';
 $billingCycle = isset($billingCycle) && is_string($billingCycle) ? $billingCycle : 'annual';
-$prezziUrl = 'index.php?page=prezzi';
+$prezziUrl = 'index.php?page=prezzi&public=1';
 $billingParam = $billingCycle === 'monthly' ? '&billing=monthly' : '';
 ?>
 <!doctype html>

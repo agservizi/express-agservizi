@@ -4,7 +4,7 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Vantaggi');
 $loginUrl = 'index.php?page=login';
-$landingUrl = 'index.php?page=landing';
+$landingUrl = 'index.php?page=landing&public=1';
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $metaDescription = 'Vantaggi per store e responsabili di rete: processi standardizzati, controllo realtime e rollout rapido.';
 $canonical = $baseUrl . '/index.php?page=vantaggi';
@@ -42,13 +42,13 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
                 <a class="landing-nav__link" href="<?= htmlspecialchars($landingUrl) ?>">Home</a>
-                <a class="landing-nav__link" href="index.php?page=demo">Demo</a>
-                <a class="landing-nav__link" href="index.php?page=funzionalita">Funzionalità</a>
-                <a class="landing-nav__link" href="index.php?page=vantaggi">Vantaggi</a>
-                <a class="landing-nav__link" href="index.php?page=piani">Piani</a>
-                <a class="landing-nav__link" href="index.php?page=prezzi">Prezzi</a>
-                <a class="landing-nav__link" href="index.php?page=faq">FAQ</a>
-                <a class="landing-nav__link" href="index.php?page=contatto">Contatto</a>
+                <a class="landing-nav__link" href="index.php?page=demo&public=1">Demo</a>
+                <a class="landing-nav__link" href="index.php?page=funzionalita&public=1">Funzionalità</a>
+                <a class="landing-nav__link" href="index.php?page=vantaggi&public=1">Vantaggi</a>
+                <a class="landing-nav__link" href="index.php?page=piani&public=1">Piani</a>
+                <a class="landing-nav__link" href="index.php?page=prezzi&public=1">Prezzi</a>
+                <a class="landing-nav__link" href="index.php?page=faq&public=1">FAQ</a>
+                <a class="landing-nav__link" href="index.php?page=contatto&public=1">Contatto</a>
             </nav>
             <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
         </div>
@@ -63,8 +63,8 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                     Ogni tenant ha impostazioni fiscali, scontrini personalizzati e dashboard dedicate per una gestione scalabile.
                 </p>
                 <div class="landing-hero__actions">
-                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Parla con un consulente</a>
-                    <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi">Scopri i piani</a>
+                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto&public=1">Parla con un consulente</a>
+                    <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi&public=1">Scopri i piani</a>
                 </div>
             </div>
         </div>
@@ -102,7 +102,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 <p>Ti aiutiamo a configurare licenze, utenti e stock iniziale in pochi giorni.</p>
             </div>
             <div class="landing-hero__actions">
-                <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Richiedi informazioni</a>
+                <a class="landing-btn landing-btn--primary" href="index.php?page=contatto&public=1">Richiedi informazioni</a>
                 <a class="landing-btn landing-btn--secondary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
             </div>
         </section>

@@ -13,7 +13,7 @@ $isLoggedIn = isset($currentUser) && $currentUser !== null;
 $loginUrl = $isLoggedIn ? 'index.php?page=dashboard' : 'index.php?page=login';
 $loginLabel = $isLoggedIn ? 'Area personale' : 'Accedi';
 $landingUrl = 'index.php?page=landing&public=1';
-$prezziUrl = 'index.php?page=prezzi';
+$prezziUrl = 'index.php?page=prezzi&public=1';
 $currentPage = 'checkout';
 $tenantName = trim((string) ($oldInput['tenant_name'] ?? ''));
 $tenantSlug = trim((string) ($oldInput['tenant_slug'] ?? ''));
@@ -44,13 +44,13 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
                 <a class="landing-nav__link <?= $currentPage === 'landing' ? 'landing-nav__link--active' : '' ?>" href="<?= htmlspecialchars($landingUrl) ?>">Home</a>
-                <a class="landing-nav__link <?= $currentPage === 'demo' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=demo">Demo</a>
-                <a class="landing-nav__link <?= $currentPage === 'funzionalita' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=funzionalita">Funzionalità</a>
-                <a class="landing-nav__link <?= $currentPage === 'vantaggi' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=vantaggi">Vantaggi</a>
-                <a class="landing-nav__link <?= $currentPage === 'piani' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=piani">Piani</a>
+                <a class="landing-nav__link <?= $currentPage === 'demo' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=demo&public=1">Demo</a>
+                <a class="landing-nav__link <?= $currentPage === 'funzionalita' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=funzionalita&public=1">Funzionalità</a>
+                <a class="landing-nav__link <?= $currentPage === 'vantaggi' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=vantaggi&public=1">Vantaggi</a>
+                <a class="landing-nav__link <?= $currentPage === 'piani' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=piani&public=1">Piani</a>
                 <a class="landing-nav__link <?= $currentPage === 'prezzi' ? 'landing-nav__link--active' : '' ?>" href="<?= htmlspecialchars($prezziUrl) ?>">Prezzi</a>
-                <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq">FAQ</a>
-                <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto">Contatto</a>
+                <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq&public=1">FAQ</a>
+                <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto&public=1">Contatto</a>
             </nav>
             <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
         </div>

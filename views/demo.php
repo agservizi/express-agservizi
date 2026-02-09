@@ -52,13 +52,13 @@ $demoSlides = [
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
                 <a class="landing-nav__link <?= $currentPage === 'landing' ? 'landing-nav__link--active' : '' ?>" href="<?= htmlspecialchars($landingUrl) ?>">Home</a>
-                <a class="landing-nav__link <?= $currentPage === 'demo' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=demo">Demo</a>
-                <a class="landing-nav__link <?= $currentPage === 'funzionalita' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=funzionalita">Funzionalità</a>
-                <a class="landing-nav__link <?= $currentPage === 'vantaggi' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=vantaggi">Vantaggi</a>
-                <a class="landing-nav__link <?= $currentPage === 'piani' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=piani">Piani</a>
-                <a class="landing-nav__link <?= $currentPage === 'prezzi' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=prezzi">Prezzi</a>
-                <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq">FAQ</a>
-                <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto">Contatto</a>
+                <a class="landing-nav__link <?= $currentPage === 'demo' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=demo&public=1">Demo</a>
+                <a class="landing-nav__link <?= $currentPage === 'funzionalita' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=funzionalita&public=1">Funzionalità</a>
+                <a class="landing-nav__link <?= $currentPage === 'vantaggi' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=vantaggi&public=1">Vantaggi</a>
+                <a class="landing-nav__link <?= $currentPage === 'piani' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=piani&public=1">Piani</a>
+                <a class="landing-nav__link <?= $currentPage === 'prezzi' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=prezzi&public=1">Prezzi</a>
+                <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq&public=1">FAQ</a>
+                <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto&public=1">Contatto</a>
             </nav>
             <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
         </div>
@@ -73,7 +73,7 @@ $demoSlides = [
                     Scopri il flusso di vendita, il magazzino SIM e i report KPI in un’unica piattaforma pensata per i punti vendita.
                 </p>
                 <div class="landing-hero__actions">
-                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Richiedi demo personalizzata</a>
+                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto&public=1">Richiedi demo personalizzata</a>
                     <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginDemoLabel) ?></a>
                 </div>
             </div>
@@ -93,7 +93,7 @@ $demoSlides = [
                         <li>Gestione SIM e scorte con alert automatici.</li>
                         <li>Dashboard KPI per ogni punto vendita.</li>
                     </ul>
-                    <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Richiedi demo personalizzata</a>
+                    <a class="landing-btn landing-btn--primary" href="index.php?page=contatto&public=1">Richiedi demo personalizzata</a>
                 </div>
                 <div class="landing-demo__frame" aria-label="Anteprima demo piattaforma">
                     <div class="landing-demo__slider" data-demo-slider>
@@ -122,7 +122,7 @@ $demoSlides = [
                 <p>Ti inviamo credenziali e supporto dedicato per configurare il tuo primo store.</p>
             </div>
             <div class="landing-hero__actions">
-                <a class="landing-btn landing-btn--primary" href="index.php?page=contatto">Richiedi informazioni</a>
+                <a class="landing-btn landing-btn--primary" href="index.php?page=contatto&public=1">Richiedi informazioni</a>
                 <a class="landing-btn landing-btn--secondary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginDemoLabel) ?></a>
             </div>
         </section>

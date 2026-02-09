@@ -1620,6 +1620,7 @@ $energyContractController = new EnergyContractController($energyContractService)
 
 $page = $_GET['page'] ?? 'landing';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$forcePublic = isset($_GET['public']) && $_GET['public'] === '1';
 $currentUser = $authService->currentUser();
 TenantContext::setTenantId(isset($currentUser['tenant_id']) ? (int) $currentUser['tenant_id'] : 1);
 
@@ -3119,7 +3120,7 @@ switch ($page) {
         break;
 
     case 'checkout_success':
-        if ($currentUser !== null) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }
@@ -3133,7 +3134,7 @@ switch ($page) {
         break;
 
     case 'checkout_cancel':
-        if ($currentUser !== null) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }
@@ -3148,7 +3149,7 @@ switch ($page) {
         break;
 
     case 'demo':
-        if ($currentUser !== null) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }
@@ -3158,7 +3159,7 @@ switch ($page) {
         break;
 
     case 'funzionalita':
-        if ($currentUser !== null) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }
@@ -3168,7 +3169,7 @@ switch ($page) {
         break;
 
     case 'vantaggi':
-        if ($currentUser !== null) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }
@@ -3178,7 +3179,7 @@ switch ($page) {
         break;
 
     case 'piani':
-        if ($currentUser !== null) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }
@@ -3188,7 +3189,7 @@ switch ($page) {
         break;
 
     case 'faq':
-        if ($currentUser !== null) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }
@@ -3198,7 +3199,7 @@ switch ($page) {
         break;
 
     case 'contatto':
-        if ($currentUser !== null) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }
@@ -3377,8 +3378,7 @@ switch ($page) {
         break;
 
     case 'landing':
-        $forceLanding = isset($_GET['public']) && $_GET['public'] === '1';
-        if ($currentUser !== null && !$forceLanding) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }
@@ -3556,7 +3556,7 @@ switch ($page) {
         ], false);
         break;
     case 'prezzi':
-        if ($currentUser !== null) {
+        if ($currentUser !== null && !$forcePublic) {
             header('Location: index.php?page=dashboard');
             exit;
         }

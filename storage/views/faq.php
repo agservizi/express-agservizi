@@ -4,7 +4,7 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - FAQ');
 $loginUrl = 'index.php?page=login';
-$landingUrl = 'index.php?page=landing';
+$landingUrl = 'index.php?page=landing&public=1';
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $metaDescription = 'FAQ sul gestionale: tempi di attivazione, demo, piani e supporto.';
 $canonical = $baseUrl . '/index.php?page=faq';
@@ -60,13 +60,13 @@ $faqItems = [
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
                 <a class="landing-nav__link" href="<?= htmlspecialchars($landingUrl) ?>">Home</a>
-                <a class="landing-nav__link" href="index.php?page=demo">Demo</a>
-                <a class="landing-nav__link" href="index.php?page=funzionalita">Funzionalità</a>
-                <a class="landing-nav__link" href="index.php?page=vantaggi">Vantaggi</a>
-                <a class="landing-nav__link" href="index.php?page=piani">Piani</a>
-                <a class="landing-nav__link" href="index.php?page=prezzi">Prezzi</a>
-                <a class="landing-nav__link" href="index.php?page=faq">FAQ</a>
-                <a class="landing-nav__link" href="index.php?page=contatto">Contatto</a>
+                <a class="landing-nav__link" href="index.php?page=demo&public=1">Demo</a>
+                <a class="landing-nav__link" href="index.php?page=funzionalita&public=1">Funzionalità</a>
+                <a class="landing-nav__link" href="index.php?page=vantaggi&public=1">Vantaggi</a>
+                <a class="landing-nav__link" href="index.php?page=piani&public=1">Piani</a>
+                <a class="landing-nav__link" href="index.php?page=prezzi&public=1">Prezzi</a>
+                <a class="landing-nav__link" href="index.php?page=faq&public=1">FAQ</a>
+                <a class="landing-nav__link" href="index.php?page=contatto&public=1">Contatto</a>
             </nav>
             <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
         </div>
@@ -81,8 +81,8 @@ $faqItems = [
                     Tempi di attivazione, demo, piani e supporto: trovi tutto qui.
                 </p>
                 <div class="landing-hero__actions">
-                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Contattaci</a>
-                    <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi">Vedi i prezzi</a>
+                    <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto&public=1">Contattaci</a>
+                    <a class="landing-btn landing-btn--primary" href="index.php?page=prezzi&public=1">Vedi i prezzi</a>
                 </div>
             </div>
         </div>
@@ -111,7 +111,7 @@ $faqItems = [
             </div>
             <div class="landing-hero__actions">
                 <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
-                <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Parla con un consulente</a>
+                <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto&public=1">Parla con un consulente</a>
             </div>
         </section>
     </main>
