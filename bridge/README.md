@@ -13,7 +13,7 @@ Espone un endpoint HTTP utilizzabile dal browser e inoltra i comandi in TCP alla
 cp config.example.json config.json
 ```
 
-2) Modifica config.json con IP/porta della stampante e una chiave API.
+2) Modifica config.json con IP/porta della stampante e (opzionale) una chiave API.
 
 3) Avvia il bridge:
 
@@ -79,7 +79,7 @@ Esempio config.json:
 {
   "host": "127.0.0.1",
   "port": 4789,
-  "api_key": "change-me",
+  "api_key": "",
   "command_delay_ms": 120,
   "terminator": "",
   "devices": {
@@ -96,7 +96,7 @@ Esempio config.json:
 - `command_delay_ms`: delay tra comandi per evitare overflow.
 
 ## API
-Tutte le richieste devono includere header `X-Bridge-Key` con la chiave API.
+Se `api_key` è valorizzata, tutte le richieste devono includere header `X-Bridge-Key` con la chiave API. Se `api_key` è vuota, il bridge accetta tutte le richieste.
 
 ### GET /health
 Ritorna stato del bridge.

@@ -14,9 +14,7 @@ const readConfig = () => {
   }
   const raw = fs.readFileSync(configPath, 'utf8');
   const cfg = JSON.parse(raw);
-  if (!cfg.api_key) {
-    throw new Error('api_key mancante nel config');
-  }
+  cfg.api_key = cfg.api_key || '';
   cfg.host = cfg.host || '127.0.0.1';
   cfg.port = Number(cfg.port || 4789);
   cfg.command_delay_ms = Number(cfg.command_delay_ms || 120);
@@ -416,7 +414,7 @@ const createServer = () => {
         const deviceId = String(body.device_id || '').trim() || 'cassa_1';
         const deviceHost = String(body.device_host || '').trim();
         const devicePort = Number(body.device_port || 0);
-        if (!apiKey || !deviceHost || !devicePort) {
+        if (!deviceHost || !devicePort) {
           sendJson(res, 400, { error: 'invalid_payload' });
           return;
         }
@@ -467,10 +465,12 @@ const createServer = () => {
       return;
     }
 
-    const apiKey = req.headers['x-bridge-key'];
-    if (apiKey !== config.api_key) {
-      sendJson(res, 401, { error: 'unauthorized' });
-      return;
+    if (config.api_key) {
+      const apiKey = req.headers['x-bridge-key'];
+      if (apiKey !== config.api_key) {
+        sendJson(res, 401, { error: 'unauthorized' });
+        return;
+      }
     }
 
     if (req.url === '/send' && req.method === 'POST') {
