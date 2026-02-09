@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Vantaggi');
-$loginUrl = 'index.php?page=login';
+$isLoggedIn = isset($currentUser) && $currentUser !== null;
+$loginUrl = $isLoggedIn ? 'index.php?page=dashboard' : 'index.php?page=login';
+$loginLabel = $isLoggedIn ? 'Area personale' : 'Accedi';
 $landingUrl = 'index.php?page=landing&public=1';
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $metaDescription = 'Vantaggi per store e responsabili di rete: processi standardizzati, controllo realtime e rollout rapido.';
@@ -50,7 +52,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 <a class="landing-nav__link" href="index.php?page=faq&public=1">FAQ</a>
                 <a class="landing-nav__link" href="index.php?page=contatto&public=1">Contatto</a>
             </nav>
-            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
+            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
         </div>
     </div>
 

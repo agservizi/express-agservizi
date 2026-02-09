@@ -3116,6 +3116,7 @@ switch ($page) {
             'resumeRequestId' => $resumeId > 0 ? $resumeId : (int) ($_SESSION['checkout_resume_request_id'] ?? 0),
             'feedback' => is_array($checkoutFeedback) ? $checkoutFeedback : null,
             'oldInput' => is_array($checkoutOldInput) ? $checkoutOldInput : null,
+            'currentUser' => $currentUser,
         ], false);
         break;
 
@@ -3130,6 +3131,7 @@ switch ($page) {
         render('checkout_success', [
             'pageTitle' => 'Pagamento completato',
             'request' => $request,
+            'currentUser' => $currentUser,
         ], false);
         break;
 
@@ -3145,6 +3147,7 @@ switch ($page) {
             'pageTitle' => 'Pagamento annullato',
             'planKey' => $planKey,
             'billingCycle' => $billingCycle,
+            'currentUser' => $currentUser,
         ], false);
         break;
 
@@ -3155,6 +3158,7 @@ switch ($page) {
         }
         render('demo', [
             'pageTitle' => 'Demo',
+            'currentUser' => $currentUser,
         ], false);
         break;
 
@@ -3165,6 +3169,7 @@ switch ($page) {
         }
         render('funzionalita', [
             'pageTitle' => 'Funzionalità',
+            'currentUser' => $currentUser,
         ], false);
         break;
 
@@ -3175,6 +3180,7 @@ switch ($page) {
         }
         render('vantaggi', [
             'pageTitle' => 'Vantaggi',
+            'currentUser' => $currentUser,
         ], false);
         break;
 
@@ -3185,6 +3191,7 @@ switch ($page) {
         }
         render('piani', [
             'pageTitle' => 'Piani',
+            'currentUser' => $currentUser,
         ], false);
         break;
 
@@ -3195,6 +3202,7 @@ switch ($page) {
         }
         render('faq', [
             'pageTitle' => 'FAQ',
+            'currentUser' => $currentUser,
         ], false);
         break;
 
@@ -3372,6 +3380,7 @@ switch ($page) {
 
         render('contatto', [
             'pageTitle' => 'Contatto',
+            'currentUser' => $currentUser,
             'feedback' => is_array($contactFeedback) ? $contactFeedback : null,
             'oldInput' => is_array($contactOldInput) ? $contactOldInput : null,
         ], false);
