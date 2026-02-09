@@ -819,6 +819,15 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                             <small class="muted">Porta HTTP configurata nel file bridge/config.json.</small>
                         </div>
                         <div class="form__group">
+                            <label for="bridge_device_host">IP stampante (bridge)</label>
+                            <input type="text" id="bridge_device_host" name="bridge_device_host" placeholder="192.168.1.50" readonly>
+                            <small class="muted">Aggiornato automaticamente dalla ricerca LAN.</small>
+                        </div>
+                        <div class="form__group">
+                            <label for="bridge_device_port">Porta stampante (bridge)</label>
+                            <input type="text" id="bridge_device_port" name="bridge_device_port" placeholder="9100" readonly>
+                        </div>
+                        <div class="form__group">
                             <label for="bridge_api_key">API key</label>
                             <input type="text" id="bridge_api_key" name="bridge_api_key" placeholder="change-me">
                             <small class="muted">Deve combaciare con api_key nel bridge.</small>
@@ -831,6 +840,11 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                         <div class="form__group">
                             <label for="bridge_dept">Reparto di default</label>
                             <input type="number" id="bridge_dept" name="bridge_dept" min="1" value="1">
+                        </div>
+                        <div class="form__group">
+                            <label for="bridge_scan_port">Porta stampante (scan LAN)</label>
+                            <input type="number" id="bridge_scan_port" name="bridge_scan_port" min="1" value="9100">
+                            <small class="muted">Default 9100 per stampanti fiscali TCP.</small>
                         </div>
                         <div class="form__group">
                             <label for="bridge_operator">Operatore RT</label>
@@ -847,8 +861,10 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
                     <div class="form__inline">
                         <button type="submit" class="btn btn--primary">Salva impostazioni locali</button>
                         <button type="button" class="btn btn--secondary" data-bridge-test>Test connessione</button>
+                        <button type="button" class="btn btn--secondary" data-bridge-scan>Cerca stampante in LAN</button>
                     </div>
                     <div class="alert" data-bridge-status hidden></div>
+                    <div class="table-actions-inline" data-bridge-scan-results></div>
                 </form>
             </div>
         </article>

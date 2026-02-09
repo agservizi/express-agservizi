@@ -834,7 +834,8 @@ document.addEventListener('DOMContentLoaded', () => {
     deviceId: '',
     dept: '1',
     operator: '',
-    includeSubtotal: true
+    includeSubtotal: true,
+    scanPort: '9100'
   };
 
   const normalizeBridgeSettings = raw => {
@@ -858,6 +859,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const deptValue = parseInt(raw.dept, 10);
       if (!Number.isNaN(deptValue) && deptValue > 0) {
         next.dept = String(deptValue);
+      }
+    }
+    if (raw.scanPort != null) {
+      const scanValue = parseInt(raw.scanPort, 10);
+      if (!Number.isNaN(scanValue) && scanValue > 0) {
+        next.scanPort = String(scanValue);
       }
     }
     if (typeof raw.operator === 'string') {
@@ -910,11 +917,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlInput = form.querySelector('[name="bridge_url"]');
     const apiKeyInput = form.querySelector('[name="bridge_api_key"]');
     const deviceInput = form.querySelector('[name="bridge_device_id"]');
+    const deviceHostOutput = form.querySelector('[name="bridge_device_host"]');
+    const devicePortOutput = form.querySelector('[name="bridge_device_port"]');
     const deptInput = form.querySelector('[name="bridge_dept"]');
+    const scanPortInput = form.querySelector('[name="bridge_scan_port"]');
     const operatorInput = form.querySelector('[name="bridge_operator"]');
     const includeInput = form.querySelector('[name="bridge_include_subtotal"]');
     const statusBox = form.querySelector('[data-bridge-status]');
     const testBtn = form.querySelector('[data-bridge-test]');
+    const scanBtn = form.querySelector('[data-bridge-scan]');
+    const scanResults = form.querySelector('[data-bridge-scan-results]');
 
     const settings = getBridgeSettings();
     if (enabledInput instanceof HTMLInputElement) {
@@ -929,14 +941,74 @@ document.addEventListener('DOMContentLoaded', () => {
     if (deviceInput instanceof HTMLInputElement) {
       deviceInput.value = settings.deviceId;
     }
+    if (deviceHostOutput instanceof HTMLInputElement) {
+      deviceHostOutput.value = '';
+    }
+    if (devicePortOutput instanceof HTMLInputElement) {
+      devicePortOutput.value = '';
+    }
     if (deptInput instanceof HTMLInputElement) {
       deptInput.value = settings.dept;
+    }
+    if (scanPortInput instanceof HTMLInputElement) {
+      scanPortInput.value = settings.scanPort;
     }
     if (operatorInput instanceof HTMLInputElement) {
       operatorInput.value = settings.operator;
     }
     if (includeInput instanceof HTMLInputElement) {
       includeInput.checked = settings.includeSubtotal;
+    }
+
+    const refreshDeviceHost = () => {
+      const current = getBridgeSettings();
+      const url = current.url ? current.url.replace(/\/+$/, '') : '';
+      if (!url || !(deviceHostOutput instanceof HTMLInputElement)) {
+        return;
+      }
+      fetch(url + '/config')
+        .then(response => response.ok ? response.json() : null)
+        .then(data => {
+          if (!data || typeof data.device_host !== 'string') {
+            return;
+          }
+          deviceHostOutput.value = data.device_host;
+          if (devicePortOutput instanceof HTMLInputElement && data.device_port) {
+            devicePortOutput.value = String(data.device_port);
+          }
+        })
+        .catch(() => {});
+    };
+
+    const checkBridgeStatus = () => {
+      const current = getBridgeSettings();
+      const url = current.url ? current.url.replace(/\/+$/, '') : '';
+      if (!url) {
+        return;
+      }
+      if (statusBox instanceof HTMLElement && statusBox.textContent) {
+        return;
+      }
+      fetch(url + '/health', { method: 'GET' })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok || !data || data.status !== 'ok') {
+            throw new Error('bridge_offline');
+          }
+          setBridgeStatus(statusBox, 'Bridge attivo (versione ' + String(data.version || '') + ').', 'success');
+        })
+        .catch(() => {
+          setBridgeStatus(statusBox, 'Bridge non raggiungibile. Avvia il servizio locale.', 'warning');
+        });
+    };
+
+    refreshDeviceHost();
+    checkBridgeStatus();
+
+    if (urlInput instanceof HTMLInputElement) {
+      urlInput.addEventListener('blur', () => {
+        checkBridgeStatus();
+      });
     }
 
     form.addEventListener('submit', event => {
@@ -947,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', () => {
         apiKey: apiKeyInput instanceof HTMLInputElement ? apiKeyInput.value.trim() : '',
         deviceId: deviceInput instanceof HTMLInputElement ? deviceInput.value.trim() : '',
         dept: deptInput instanceof HTMLInputElement ? deptInput.value.trim() : '',
+        scanPort: scanPortInput instanceof HTMLInputElement ? scanPortInput.value.trim() : '',
         operator: operatorInput instanceof HTMLInputElement ? operatorInput.value.trim() : '',
         includeSubtotal: includeInput instanceof HTMLInputElement ? includeInput.checked : true
       };
@@ -977,6 +1050,113 @@ document.addEventListener('DOMContentLoaded', () => {
           .catch(() => {
             notify.danger('Bridge non raggiungibile.');
             setBridgeStatus(statusBox, 'Bridge non raggiungibile.', 'error');
+          });
+      });
+    }
+
+    if (scanBtn instanceof HTMLButtonElement) {
+      scanBtn.addEventListener('click', () => {
+        const current = getBridgeSettings();
+        const url = current.url ? current.url.replace(/\/+$/, '') : '';
+        const portValue = scanPortInput instanceof HTMLInputElement
+          ? parseInt(scanPortInput.value || current.scanPort || '9100', 10)
+          : parseInt(current.scanPort || '9100', 10);
+        if (!url) {
+          notify.warning('Inserisci l\'URL del bridge per la scansione.');
+          setBridgeStatus(statusBox, 'URL bridge mancante.', 'error');
+          return;
+        }
+        if (!Number.isFinite(portValue) || portValue <= 0) {
+          notify.warning('Inserisci una porta valida per la scansione.');
+          setBridgeStatus(statusBox, 'Porta scansione non valida.', 'error');
+          return;
+        }
+        if (scanResults instanceof HTMLElement) {
+          scanResults.textContent = '';
+        }
+        setBridgeStatus(statusBox, 'Scansione rete in corso...', 'warning');
+        fetch(url + '/scan?port=' + String(portValue))
+          .then(response => response.json().then(data => ({ ok: response.ok, data })))
+          .then(({ ok, data }) => {
+            if (!ok || !data) {
+              throw new Error('scan_failed');
+            }
+            const hosts = Array.isArray(data.hosts) ? data.hosts : [];
+            if (hosts.length === 0) {
+              setBridgeStatus(statusBox, 'Nessuna stampante trovata sulla rete.', 'warning');
+              return;
+            }
+            setBridgeStatus(statusBox, 'Stampanti trovate: ' + String(hosts.length), 'success');
+            if (!(scanResults instanceof HTMLElement)) {
+              return;
+            }
+            scanResults.textContent = '';
+            const applyHost = async host => {
+              try {
+                const configResponse = await fetch(url + '/config');
+                if (!configResponse.ok) {
+                  throw new Error('config_failed');
+                }
+                const currentConfig = await configResponse.json();
+                const payload = {
+                  api_key: currentConfig.api_key || current.apiKey || '',
+                  device_id: currentConfig.device_id || current.deviceId || 'cassa_1',
+                  device_host: host,
+                  device_port: currentConfig.device_port || portValue || 9100,
+                  command_delay_ms: currentConfig.command_delay_ms || 120,
+                  terminator: currentConfig.terminator || '',
+                  device_terminator: currentConfig.device_terminator || ''
+                };
+                const saveResponse = await fetch(url + '/config', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload)
+                });
+                const saveData = await saveResponse.json();
+                if (!saveResponse.ok || !saveData || !saveData.ok) {
+                  throw new Error('save_failed');
+                }
+                if (deviceHostOutput instanceof HTMLInputElement) {
+                  deviceHostOutput.value = host;
+                }
+                if (devicePortOutput instanceof HTMLInputElement) {
+                  devicePortOutput.value = String(payload.device_port || portValue || 9100);
+                }
+                if (scanPortInput instanceof HTMLInputElement) {
+                  scanPortInput.value = String(payload.device_port || portValue || 9100);
+                }
+                notify.success('Porta stampante aggiornata: ' + String(payload.device_port || portValue || 9100));
+                notify.success('Stampante aggiornata nel bridge: ' + host);
+                setBridgeStatus(statusBox, 'Bridge aggiornato con IP ' + host + '.', 'success');
+              } catch (_error) {
+                notify.danger('Impossibile aggiornare il bridge con la stampante selezionata.');
+                setBridgeStatus(statusBox, 'Aggiornamento bridge non riuscito.', 'error');
+              }
+            };
+            hosts.forEach(host => {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'btn btn--secondary btn--small';
+              btn.textContent = String(host);
+              btn.addEventListener('click', async () => {
+                await applyHost(String(host));
+                try {
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(String(host));
+                    notify.success('IP stampante copiato negli appunti.');
+                  } else {
+                    window.prompt('Copia l\'IP stampante:', String(host));
+                  }
+                } catch (_error) {
+                  window.prompt('Copia l\'IP stampante:', String(host));
+                }
+              });
+              scanResults.appendChild(btn);
+            });
+          })
+          .catch(() => {
+            notify.danger('Scansione LAN non riuscita.');
+            setBridgeStatus(statusBox, 'Errore scansione rete.', 'error');
           });
       });
     }
