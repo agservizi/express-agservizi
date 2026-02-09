@@ -3,7 +3,11 @@ declare(strict_types=1);
 
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Gestionale in cloud multi-tenant');
-$loginUrl = 'index.php?page=login';
+$isLoggedIn = isset($currentUser) && $currentUser !== null;
+$loginUrl = $isLoggedIn ? 'index.php?page=dashboard' : 'index.php?page=login';
+$loginLabel = $isLoggedIn ? 'Area personale' : 'Accedi';
+$loginCtaLabel = $isLoggedIn ? 'Area personale' : 'Accedi ora';
+$loginCardLabel = $isLoggedIn ? 'Area personale' : 'Vai al login';
 $currentPage = 'landing';
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
 $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
@@ -135,7 +139,7 @@ $faqStructuredData = [
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
             <nav class="landing-nav" aria-label="Navigazione principale">
-                <a class="landing-nav__link <?= $currentPage === 'landing' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=landing">Home</a>
+                <a class="landing-nav__link <?= $currentPage === 'landing' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=landing&public=1">Home</a>
                 <a class="landing-nav__link <?= $currentPage === 'demo' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=demo">Demo</a>
                 <a class="landing-nav__link <?= $currentPage === 'funzionalita' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=funzionalita">Funzionalità</a>
                 <a class="landing-nav__link <?= $currentPage === 'vantaggi' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=vantaggi">Vantaggi</a>
@@ -144,14 +148,14 @@ $faqStructuredData = [
                 <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq">FAQ</a>
                 <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto">Contatto</a>
             </nav>
-            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
+            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
         </div>
     </div>
 
     <div class="landing-sticky-cta" role="region" aria-label="CTA rapida">
         <div class="landing-sticky-cta__inner">
             <span>Pronto a vedere <?= htmlspecialchars($appName) ?> in azione?</span>
-            <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Prenota una demo</a>
+            <a class="landing-btn landing-btn--primary" href="#contatto">Prenota una demo</a>
         </div>
     </div>
 
@@ -201,7 +205,7 @@ $faqStructuredData = [
                     </ul>
                     <div class="landing-card__cta">
                         <span>Pronto a far crescere il tuo punto vendita?</span>
-                        <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Vai al login</a>
+                        <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginCardLabel) ?></a>
                     </div>
                 </div>
             </div>
@@ -583,7 +587,7 @@ $faqStructuredData = [
                 <h2>Pronto a potenziare il tuo negozio?</h2>
                 <p>Attiva il gestionale in pochi minuti, organizza il team con flussi guidati e fai crescere vendite e margini con dati sempre sotto controllo.</p>
             </div>
-            <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi ora</a>
+            <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginCtaLabel) ?></a>
         </section>
     </main>
 

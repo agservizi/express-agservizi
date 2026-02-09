@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - FAQ');
-$loginUrl = 'index.php?page=login';
-$landingUrl = 'index.php?page=landing';
+$isLoggedIn = isset($currentUser) && $currentUser !== null;
+$loginUrl = $isLoggedIn ? 'index.php?page=dashboard' : 'index.php?page=login';
+$loginLabel = $isLoggedIn ? 'Area personale' : 'Accedi';
+$loginDemoLabel = $isLoggedIn ? 'Area personale' : 'Accedi alla demo';
+$landingUrl = 'index.php?page=landing&public=1';
 $currentPage = 'faq';
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $metaDescription = 'FAQ sul gestionale: tempi di attivazione, demo, piani e supporto.';
@@ -69,7 +72,7 @@ $faqItems = [
                 <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq">FAQ</a>
                 <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto">Contatto</a>
             </nav>
-            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
+            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
         </div>
     </div>
 
@@ -111,7 +114,7 @@ $faqItems = [
                 <p>Accedi alla demo o richiedi una consulenza personalizzata.</p>
             </div>
             <div class="landing-hero__actions">
-                <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
+                <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginDemoLabel) ?></a>
                 <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Parla con un consulente</a>
             </div>
         </section>

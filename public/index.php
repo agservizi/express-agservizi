@@ -3377,7 +3377,8 @@ switch ($page) {
         break;
 
     case 'landing':
-        if ($currentUser !== null) {
+        $forceLanding = isset($_GET['public']) && $_GET['public'] === '1';
+        if ($currentUser !== null && !$forceLanding) {
             header('Location: index.php?page=dashboard');
             exit;
         }

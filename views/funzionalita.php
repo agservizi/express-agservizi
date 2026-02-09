@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Funzionalità');
-$loginUrl = 'index.php?page=login';
-$landingUrl = 'index.php?page=landing';
+$isLoggedIn = isset($currentUser) && $currentUser !== null;
+$loginUrl = $isLoggedIn ? 'index.php?page=dashboard' : 'index.php?page=login';
+$loginLabel = $isLoggedIn ? 'Area personale' : 'Accedi';
+$loginDemoLabel = $isLoggedIn ? 'Area personale' : 'Accedi alla demo';
+$landingUrl = 'index.php?page=landing&public=1';
 $currentPage = 'funzionalita';
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $metaDescription = 'Funzionalità del gestionale: vendite, magazzino SIM, campagne sconto, gestori energia e sicurezza avanzata.';
@@ -51,7 +54,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq">FAQ</a>
                 <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto">Contatto</a>
             </nav>
-            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
+            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
         </div>
     </div>
 
@@ -111,7 +114,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 <p>Accedi alla demo o richiedi un affiancamento guidato per il tuo store.</p>
             </div>
             <div class="landing-hero__actions">
-                <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
+                <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginDemoLabel) ?></a>
                 <a class="landing-btn landing-btn--secondary" href="index.php?page=contatto">Parla con un consulente</a>
             </div>
         </section>

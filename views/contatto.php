@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ($appName . ' - Contatto');
-$loginUrl = 'index.php?page=login';
-$landingUrl = 'index.php?page=landing';
+$isLoggedIn = isset($currentUser) && $currentUser !== null;
+$loginUrl = $isLoggedIn ? 'index.php?page=dashboard' : 'index.php?page=login';
+$loginLabel = $isLoggedIn ? 'Area personale' : 'Accedi';
+$loginDemoLabel = $isLoggedIn ? 'Area personale' : 'Accedi alla demo';
+$landingUrl = 'index.php?page=landing&public=1';
 $currentPage = 'contatto';
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
 $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
@@ -53,7 +56,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq">FAQ</a>
                 <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto">Contatto</a>
             </nav>
-            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>">Accedi</a>
+            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
         </div>
     </div>
 
@@ -67,7 +70,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 </p>
                 <div class="landing-hero__actions">
                     <a class="landing-btn landing-btn--secondary" href="index.php?page=prezzi">Scopri i piani</a>
-                    <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
+                    <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginDemoLabel) ?></a>
                 </div>
             </div>
         </div>
@@ -123,7 +126,7 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
                 <p>Ti aiutiamo a configurare il primo punto vendita e a importare lo stock iniziale.</p>
             </div>
             <div class="landing-hero__actions">
-                <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>">Accedi alla demo</a>
+                <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginDemoLabel) ?></a>
                 <a class="landing-btn landing-btn--secondary" href="index.php?page=prezzi">Confronta i prezzi</a>
             </div>
         </section>

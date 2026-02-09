@@ -9,7 +9,10 @@ $billingCycle = isset($billingCycle) && is_string($billingCycle) ? $billingCycle
 $resumeRequestId = isset($resumeRequestId) ? (int) $resumeRequestId : 0;
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
 $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
-$landingUrl = 'index.php?page=landing';
+$isLoggedIn = isset($currentUser) && $currentUser !== null;
+$loginUrl = $isLoggedIn ? 'index.php?page=dashboard' : 'index.php?page=login';
+$loginLabel = $isLoggedIn ? 'Area personale' : 'Accedi';
+$landingUrl = 'index.php?page=landing&public=1';
 $prezziUrl = 'index.php?page=prezzi';
 $currentPage = 'checkout';
 $tenantName = trim((string) ($oldInput['tenant_name'] ?? ''));
@@ -49,7 +52,7 @@ $tenantCompanyAddress = trim((string) ($oldInput['company_address'] ?? ''));
                 <a class="landing-nav__link <?= $currentPage === 'faq' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=faq">FAQ</a>
                 <a class="landing-nav__link <?= $currentPage === 'contatto' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=contatto">Contatto</a>
             </nav>
-            <a class="landing-btn landing-btn--ghost" href="index.php?page=login">Accedi</a>
+            <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
         </div>
     </div>
 

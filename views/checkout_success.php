@@ -4,8 +4,11 @@ declare(strict_types=1);
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
 $pageTitle = $pageTitle ?? ('Pagamento completato - ' . $appName);
 $request = isset($request) && is_array($request) ? $request : null;
+$isLoggedIn = isset($currentUser) && $currentUser !== null;
+$loginUrl = $isLoggedIn ? 'index.php?page=dashboard' : 'index.php?page=login';
+$loginLabel = $isLoggedIn ? 'Area personale' : 'Accedi';
 $prezziUrl = 'index.php?page=prezzi';
-$landingUrl = 'index.php?page=landing';
+$landingUrl = 'index.php?page=landing&public=1';
 $status = $request['status'] ?? null;
 ?>
 <!doctype html>
@@ -56,7 +59,7 @@ $status = $request['status'] ?? null;
             </div>
             <div class="landing-hero__actions">
                 <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($landingUrl) ?>#contatto">Contatta il supporto</a>
-                <a class="landing-btn landing-btn--secondary" href="index.php?page=login">Accedi</a>
+                <a class="landing-btn landing-btn--secondary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
             </div>
         </section>
     </main>

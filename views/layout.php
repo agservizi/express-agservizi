@@ -134,7 +134,7 @@ $isActiveSidebar = static function (string $page) use ($currentPage): string {
 <div class="layout">
     <aside class="sidebar" data-collapsed="false">
         <div class="sidebar__header">
-            <a class="sidebar__brand" href="https://express.agenziaplinio.it">
+            <a class="sidebar__brand" href="https://express.agenziaplinio.it/index.php?page=landing&public=1">
                 <span class="sidebar__logo" aria-hidden="true">
                     <img src="assets/img/logo-collapsed.svg" alt="">
                 </span>
