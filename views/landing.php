@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 $appName = $GLOBALS['config']['app']['name'] ?? 'Coresuite Express';
-$pageTitle = $pageTitle ?? ($appName . ' - Gestionale multi-tenant');
+$pageTitle = $pageTitle ?? ($appName . ' - Gestionale in cloud multi-tenant');
 $loginUrl = 'index.php?page=login';
 $currentPage = 'landing';
 $feedback = isset($feedback) && is_array($feedback) ? $feedback : null;
@@ -10,7 +10,7 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $baseUrl = rtrim($baseUrl, '/');
 $canonicalUrl = $baseUrl . '/';
-$metaDescription = 'Gestionale per negozi di telefonia: SIM, vendite, stock e report in un solo cruscotto. Demo rapida e onboarding guidato.';
+$metaDescription = 'Gestionale in cloud per negozi di telefonia: SIM, vendite, stock e report in un solo cruscotto. Demo rapida e onboarding guidato.';
 $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
 $logoUrl = $baseUrl . '/assets/img/logo-collapsed.svg';
 $structuredData = [
@@ -54,6 +54,10 @@ $demoSlides = [
     'Screenshot 2026-01-31 alle 18.28.03.png',
 ];
 $faqItems = [
+    [
+        'question' => 'È un gestionale in cloud?',
+        'answer' => 'Sì. È accessibile via web da qualsiasi dispositivo, senza installazioni locali.',
+    ],
     [
         'question' => 'È adatto anche a un singolo punto vendita?',
         'answer' => 'Sì. Il piano Start è pensato per singoli store e può crescere con il tuo business.',
@@ -155,11 +159,14 @@ $faqStructuredData = [
 
         <div class="landing-hero__content">
             <div class="landing-hero__text">
-                <p class="landing-kicker">Gestionale retail per negozi di telefonia</p>
-                <h1>Più vendite, meno caos in cassa.</h1>
+                <p class="landing-kicker">Gestionale retail in cloud per negozi di telefonia</p>
+                <h1>Più vendite, meno caos in cassa con il cloud.</h1>
                 <p class="landing-subtitle">
                     <?= htmlspecialchars($appName) ?> centralizza SIM, stock, vendite e report in un'unica dashboard.
                     Usato da store e reti retail che vogliono velocizzare le operazioni e avere margini sempre visibili.
+                </p>
+                <p class="landing-subtitle">
+                    Adatto per negozi di telefonia Vodafone, Tim, WindTre, Fastweb, Iliad, Sky e Multibrand.
                 </p>
                 <div class="landing-hero__actions">
                     <a class="landing-btn landing-btn--primary" href="#contatto">Prenota una demo</a>
@@ -185,6 +192,7 @@ $faqStructuredData = [
                 <div class="landing-card">
                     <h3>Perché sceglierlo</h3>
                     <ul>
+                        <li>Gestionale in cloud con accesso da qualsiasi dispositivo.</li>
                         <li>Gestione completa di SIM, stock, prodotti e vendite.</li>
                         <li>Campagne sconto, listini e promozioni centralizzate.</li>
                         <li>Fatturato, margini e performance sempre tracciati.</li>

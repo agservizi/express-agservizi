@@ -703,6 +703,7 @@ $previewHasErrors = $previewErrors !== [];
         const receiptUrl = 'print_receipt.php?sale_id=<?= $pendingReceiptId ?>';
         const triggerModal = () => {
             window.dispatchEvent(new CustomEvent('app:openReceipt', { detail: { url: receiptUrl } }));
+            window.dispatchEvent(new CustomEvent('app:printFiscalReceipt', { detail: { saleId: <?= $pendingReceiptId ?> } }));
             try {
                 const cleaned = new URL(window.location.href);
                 cleaned.searchParams.delete('print');

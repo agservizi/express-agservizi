@@ -826,6 +826,308 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const bridgeSettingsKey = 'fiscal_bridge_settings';
+  const bridgeDefaults = {
+    enabled: false,
+    url: 'http://127.0.0.1:4789',
+    apiKey: '',
+    deviceId: '',
+    dept: '1',
+    operator: '',
+    includeSubtotal: true
+  };
+
+  const normalizeBridgeSettings = raw => {
+    const next = { ...bridgeDefaults };
+    if (!raw || typeof raw !== 'object') {
+      return next;
+    }
+    if (typeof raw.enabled === 'boolean') {
+      next.enabled = raw.enabled;
+    }
+    if (typeof raw.url === 'string') {
+      next.url = raw.url.trim();
+    }
+    if (typeof raw.apiKey === 'string') {
+      next.apiKey = raw.apiKey.trim();
+    }
+    if (typeof raw.deviceId === 'string') {
+      next.deviceId = raw.deviceId.trim();
+    }
+    if (raw.dept != null) {
+      const deptValue = parseInt(raw.dept, 10);
+      if (!Number.isNaN(deptValue) && deptValue > 0) {
+        next.dept = String(deptValue);
+      }
+    }
+    if (typeof raw.operator === 'string') {
+      next.operator = raw.operator.trim();
+    }
+    if (typeof raw.includeSubtotal === 'boolean') {
+      next.includeSubtotal = raw.includeSubtotal;
+    }
+    return next;
+  };
+
+  const getBridgeSettings = () => {
+    try {
+      const stored = window.localStorage.getItem(bridgeSettingsKey);
+      return normalizeBridgeSettings(stored ? JSON.parse(stored) : null);
+    } catch (_error) {
+      return { ...bridgeDefaults };
+    }
+  };
+
+  const saveBridgeSettings = settings => {
+    const normalized = normalizeBridgeSettings(settings);
+    window.localStorage.setItem(bridgeSettingsKey, JSON.stringify(normalized));
+    return normalized;
+  };
+
+  const setBridgeStatus = (box, message, variant) => {
+    if (!(box instanceof HTMLElement)) {
+      return;
+    }
+    if (!message) {
+      box.textContent = '';
+      box.hidden = true;
+      return;
+    }
+    box.textContent = message;
+    box.className = 'alert';
+    if (variant) {
+      box.classList.add('alert--' + variant);
+    }
+    box.hidden = false;
+  };
+
+  const initBridgeSettingsForm = () => {
+    const form = document.querySelector('[data-bridge-settings-form]');
+    if (!(form instanceof HTMLFormElement)) {
+      return;
+    }
+    const enabledInput = form.querySelector('[name="bridge_enabled"]');
+    const urlInput = form.querySelector('[name="bridge_url"]');
+    const apiKeyInput = form.querySelector('[name="bridge_api_key"]');
+    const deviceInput = form.querySelector('[name="bridge_device_id"]');
+    const deptInput = form.querySelector('[name="bridge_dept"]');
+    const operatorInput = form.querySelector('[name="bridge_operator"]');
+    const includeInput = form.querySelector('[name="bridge_include_subtotal"]');
+    const statusBox = form.querySelector('[data-bridge-status]');
+    const testBtn = form.querySelector('[data-bridge-test]');
+
+    const settings = getBridgeSettings();
+    if (enabledInput instanceof HTMLInputElement) {
+      enabledInput.checked = settings.enabled;
+    }
+    if (urlInput instanceof HTMLInputElement) {
+      urlInput.value = settings.url;
+    }
+    if (apiKeyInput instanceof HTMLInputElement) {
+      apiKeyInput.value = settings.apiKey;
+    }
+    if (deviceInput instanceof HTMLInputElement) {
+      deviceInput.value = settings.deviceId;
+    }
+    if (deptInput instanceof HTMLInputElement) {
+      deptInput.value = settings.dept;
+    }
+    if (operatorInput instanceof HTMLInputElement) {
+      operatorInput.value = settings.operator;
+    }
+    if (includeInput instanceof HTMLInputElement) {
+      includeInput.checked = settings.includeSubtotal;
+    }
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const next = {
+        enabled: enabledInput instanceof HTMLInputElement ? enabledInput.checked : false,
+        url: urlInput instanceof HTMLInputElement ? urlInput.value.trim() : '',
+        apiKey: apiKeyInput instanceof HTMLInputElement ? apiKeyInput.value.trim() : '',
+        deviceId: deviceInput instanceof HTMLInputElement ? deviceInput.value.trim() : '',
+        dept: deptInput instanceof HTMLInputElement ? deptInput.value.trim() : '',
+        operator: operatorInput instanceof HTMLInputElement ? operatorInput.value.trim() : '',
+        includeSubtotal: includeInput instanceof HTMLInputElement ? includeInput.checked : true
+      };
+      saveBridgeSettings(next);
+      notify.success('Impostazioni bridge salvate in questo browser.');
+      setBridgeStatus(statusBox, 'Impostazioni salvate localmente.', 'success');
+    });
+
+    if (testBtn instanceof HTMLButtonElement) {
+      testBtn.addEventListener('click', () => {
+        const current = getBridgeSettings();
+        const url = current.url ? current.url.replace(/\/+$/, '') : '';
+        if (!url) {
+          notify.warning('Inserisci l\'URL del bridge per eseguire il test.');
+          setBridgeStatus(statusBox, 'URL bridge mancante.', 'error');
+          return;
+        }
+        setBridgeStatus(statusBox, 'Verifica bridge in corso...', 'warning');
+        fetch(url + '/health', { method: 'GET' })
+          .then(response => response.json().then(data => ({ ok: response.ok, data })))
+          .then(({ ok, data }) => {
+            if (!ok || !data || data.status !== 'ok') {
+              throw new Error('Bridge non raggiungibile.');
+            }
+            notify.success('Bridge raggiungibile.');
+            setBridgeStatus(statusBox, 'Bridge attivo (versione ' + String(data.version || '') + ').', 'success');
+          })
+          .catch(() => {
+            notify.danger('Bridge non raggiungibile.');
+            setBridgeStatus(statusBox, 'Bridge non raggiungibile.', 'error');
+          });
+      });
+    }
+  };
+
+  const mapPaymentType = method => {
+    const value = (method || '').toString().toLowerCase();
+    if (value.includes('contant')) {
+      return 'cash';
+    }
+    if (value.includes('carta') || value.includes('pos')) {
+      return 'card';
+    }
+    return 'cash';
+  };
+
+  const toCents = amount => {
+    const value = typeof amount === 'number' ? amount : parseFloat(amount || '0');
+    if (Number.isNaN(value)) {
+      return 0;
+    }
+    return Math.round(value * 100);
+  };
+
+  const buildReceiptDescription = item => {
+    if (item.description) {
+      return String(item.description).trim();
+    }
+    if (item.iccid) {
+      return 'SIM ' + String(item.iccid);
+    }
+    if (item.id) {
+      return 'Articolo #' + String(item.id);
+    }
+    return 'Articolo';
+  };
+
+  const fetchSaleDetails = saleId => {
+    const params = new URLSearchParams({ action: 'load_sale_details', sale_id: String(saleId) });
+    return fetch('index.php?page=sales_create', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      credentials: 'same-origin',
+      body: params.toString()
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (!data || data.success !== true || !data.sale) {
+          throw new Error('Impossibile recuperare i dettagli dello scontrino.');
+        }
+        return data.sale;
+      });
+  };
+
+  const sendFiscalReceipt = (saleId, settings) => {
+    const normalizedUrl = settings.url.replace(/\/+$/, '');
+    return fetchSaleDetails(saleId).then(sale => {
+      const items = Array.isArray(sale.items) ? sale.items : [];
+      const receiptItems = items
+        .map(item => {
+          const qty = parseInt(item.quantity || '0', 10);
+          if (Number.isNaN(qty) || qty <= 0) {
+            return null;
+          }
+          return {
+            desc: buildReceiptDescription(item),
+            qty: qty,
+            price_cents: toCents(item.price),
+            dept: settings.dept
+          };
+        })
+        .filter(Boolean);
+
+      if (receiptItems.length === 0) {
+        throw new Error('Nessun articolo da inviare allo scontrino fiscale.');
+      }
+
+      const totalPaid = Number(sale.total_paid || 0);
+      const paymentAmount = totalPaid > 0 ? totalPaid : sale.total;
+
+      const payload = {
+        device_id: settings.deviceId,
+        operator: settings.operator || undefined,
+        include_subtotal: settings.includeSubtotal,
+        customer_tax_code: sale.customer_tax_code || undefined,
+        items: receiptItems,
+        payment: {
+          type: mapPaymentType(sale.payment_method),
+          amount_cents: toCents(paymentAmount)
+        }
+      };
+
+      return fetch(normalizedUrl + '/receipt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Bridge-Key': settings.apiKey
+        },
+        body: JSON.stringify(payload)
+      })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) {
+            const errorMessage = data && data.error ? data.error : 'Errore bridge fiscale.';
+            throw new Error(errorMessage);
+          }
+          return data;
+        });
+    });
+  };
+
+  const pendingFiscalPrints = new Set();
+
+  window.addEventListener('app:printFiscalReceipt', event => {
+    const saleId = event && event.detail ? parseInt(event.detail.saleId || '0', 10) : 0;
+    if (!saleId || Number.isNaN(saleId)) {
+      return;
+    }
+    if (pendingFiscalPrints.has(saleId)) {
+      return;
+    }
+    const settings = getBridgeSettings();
+    if (!settings.enabled) {
+      return;
+    }
+    if (!settings.url || !settings.apiKey || !settings.deviceId) {
+      notify.warning('Configura il bridge fiscale nelle impostazioni prima di stampare.');
+      return;
+    }
+
+    pendingFiscalPrints.add(saleId);
+    notify.info('Invio scontrino fiscale in corso...');
+
+    sendFiscalReceipt(saleId, settings)
+      .then(() => {
+        notify.success('Scontrino fiscale inviato alla stampante.');
+      })
+      .catch(error => {
+        const message = error && error.message ? error.message : 'Errore stampa fiscale.';
+        notify.danger('Stampa fiscale non riuscita: ' + message);
+      })
+      .finally(() => {
+        pendingFiscalPrints.delete(saleId);
+      });
+  });
+
+  initBridgeSettingsForm();
+
   const seededToasts = Array.isArray(window.AppInitialToasts) ? window.AppInitialToasts : [];
   seededToasts.forEach(toast => toastManager.show(toast));
   delete window.AppInitialToasts;

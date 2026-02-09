@@ -1,0 +1,10 @@
+{
+  "name": "custom-rt-bridge",
+  "version": "0.1.0",
+  "description": "Bridge locale HTTP per registratori di cassa CUSTOM con protocollo XON/XOFF",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "license": "UNLICENSED"
+}

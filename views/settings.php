@@ -683,6 +683,61 @@ $hasAuditNext = (bool) ($auditPagination['has_next'] ?? ($auditCurrentPage < $to
             </article>
         <?php endif; ?>
 
+        <article class="settings-accordion__item" data-accordion data-open="false">
+            <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="false">
+                <span class="settings-accordion__title">Bridge fiscale (CUSTOM)</span>
+                <span class="settings-accordion__icon" aria-hidden="true"></span>
+            </button>
+            <div class="settings-accordion__content" data-accordion-content hidden>
+                <p class="muted">Queste impostazioni vengono salvate localmente nel browser e valgono per la postazione corrente.</p>
+                <form class="form" data-bridge-settings-form>
+                    <div class="form__grid">
+                        <div class="form__group" style="grid-column: span 2;">
+                            <label>
+                                <input type="checkbox" name="bridge_enabled">
+                                Abilita stampa fiscale con bridge locale
+                            </label>
+                        </div>
+                        <div class="form__group">
+                            <label for="bridge_url">URL bridge</label>
+                            <input type="text" id="bridge_url" name="bridge_url" placeholder="http://127.0.0.1:4789">
+                            <small class="muted">Porta HTTP configurata nel file bridge/config.json.</small>
+                        </div>
+                        <div class="form__group">
+                            <label for="bridge_api_key">API key</label>
+                            <input type="text" id="bridge_api_key" name="bridge_api_key" placeholder="change-me">
+                            <small class="muted">Deve combaciare con api_key nel bridge.</small>
+                        </div>
+                        <div class="form__group">
+                            <label for="bridge_device_id">ID dispositivo</label>
+                            <input type="text" id="bridge_device_id" name="bridge_device_id" placeholder="cassa_1">
+                            <small class="muted">Usa la chiave definita in devices nel config del bridge.</small>
+                        </div>
+                        <div class="form__group">
+                            <label for="bridge_dept">Reparto di default</label>
+                            <input type="number" id="bridge_dept" name="bridge_dept" min="1" value="1">
+                        </div>
+                        <div class="form__group">
+                            <label for="bridge_operator">Operatore RT</label>
+                            <input type="text" id="bridge_operator" name="bridge_operator" placeholder="1">
+                            <small class="muted">Opzionale. Se vuoto non viene inviato.</small>
+                        </div>
+                        <div class="form__group" style="grid-column: span 2;">
+                            <label>
+                                <input type="checkbox" name="bridge_include_subtotal">
+                                Invia subtotale automatico
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form__inline">
+                        <button type="submit" class="btn btn--primary">Salva impostazioni locali</button>
+                        <button type="button" class="btn btn--secondary" data-bridge-test>Test connessione</button>
+                    </div>
+                    <div class="alert" data-bridge-status hidden></div>
+                </form>
+            </div>
+        </article>
+
         <article class="settings-accordion__item" data-accordion data-open="<?= $ssoOpen ? 'true' : 'false' ?>">
             <button type="button" class="settings-accordion__toggle" data-accordion-toggle aria-expanded="<?= $ssoOpen ? 'true' : 'false' ?>">
                 <span class="settings-accordion__title">Single sign-on interno</span>

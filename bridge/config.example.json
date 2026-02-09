@@ -1,0 +1,14 @@
+{
+  "host": "127.0.0.1",
+  "port": 4789,
+  "api_key": "change-me",
+  "command_delay_ms": 120,
+  "terminator": "",
+  "devices": {
+    "cassa_1": {
+      "host": "192.168.1.50",
+      "port": 9100,
+      "terminator": ""
+    }
+  }
+}
