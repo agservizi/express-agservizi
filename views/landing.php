@@ -138,6 +138,11 @@ $faqStructuredData = [
                 </span>
                 <span class="landing-brand__name"><?= htmlspecialchars($appName) ?></span>
             </div>
+            <button class="landing-menu-toggle" type="button" aria-label="Apri menu" aria-expanded="false" data-landing-menu-toggle>
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
             <nav class="landing-nav" aria-label="Navigazione principale">
                 <a class="landing-nav__link <?= $currentPage === 'landing' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=landing&public=1">Home</a>
                 <a class="landing-nav__link <?= $currentPage === 'demo' ? 'landing-nav__link--active' : '' ?>" href="index.php?page=demo&public=1">Demo</a>
@@ -150,6 +155,29 @@ $faqStructuredData = [
             </nav>
             <a class="landing-btn landing-btn--ghost" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
         </div>
+    </div>
+
+    <div class="landing-menu" data-landing-menu aria-hidden="true" data-open="false">
+        <div class="landing-menu__backdrop" data-landing-menu-close></div>
+        <aside class="landing-menu__panel" role="dialog" aria-modal="true" aria-label="Menu mobile">
+            <button class="landing-menu__close" type="button" aria-label="Chiudi menu" data-landing-menu-close>
+                <span></span>
+                <span></span>
+            </button>
+            <nav class="landing-menu__nav" aria-label="Menu">
+                <a class="landing-menu__link" href="index.php?page=landing&public=1">Home</a>
+                <a class="landing-menu__link" href="index.php?page=demo&public=1">Demo</a>
+                <a class="landing-menu__link" href="index.php?page=funzionalita&public=1">Funzionalità</a>
+                <a class="landing-menu__link" href="index.php?page=vantaggi&public=1">Vantaggi</a>
+                <a class="landing-menu__link" href="index.php?page=piani&public=1">Piani</a>
+                <a class="landing-menu__link" href="index.php?page=prezzi&public=1">Prezzi</a>
+                <a class="landing-menu__link" href="index.php?page=faq&public=1">FAQ</a>
+                <a class="landing-menu__link" href="index.php?page=contatto&public=1">Contatto</a>
+            </nav>
+            <div class="landing-menu__cta">
+                <a class="landing-btn landing-btn--primary" href="<?= htmlspecialchars($loginUrl) ?>"><?= htmlspecialchars($loginLabel) ?></a>
+            </div>
+        </aside>
     </div>
 
     <div class="landing-sticky-cta" role="region" aria-label="CTA rapida">
@@ -702,6 +730,37 @@ $faqStructuredData = [
         slider.addEventListener('mouseenter', stopAutoplay);
         slider.addEventListener('mouseleave', startAutoplay);
         startAutoplay();
+    })();
+    </script>
+    <script>
+    (function () {
+        const menu = document.querySelector('[data-landing-menu]');
+        const toggle = document.querySelector('[data-landing-menu-toggle]');
+        const closeButtons = document.querySelectorAll('[data-landing-menu-close]');
+
+        if (!menu || !toggle) {
+            return;
+        }
+
+        const setOpen = (isOpen) => {
+            menu.dataset.open = isOpen ? 'true' : 'false';
+            menu.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+            toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            document.body.classList.toggle('landing-menu-open', isOpen);
+        };
+
+        toggle.addEventListener('click', () => {
+            const nextState = menu.dataset.open !== 'true';
+            setOpen(nextState);
+        });
+
+        closeButtons.forEach((button) => {
+            button.addEventListener('click', () => setOpen(false));
+        });
+
+        menu.querySelectorAll('a').forEach((link) => {
+            link.addEventListener('click', () => setOpen(false));
+        });
     })();
     </script>
 </body>
