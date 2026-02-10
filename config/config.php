@@ -152,6 +152,10 @@ $notificationTopbarLimit = (int) ($getEnv('NOTIFICATIONS_TOPBAR_LIMIT', '10'));
 $ssoIssuer = $getEnv('SSO_ISSUER', 'coresuite-express');
 $ssoSharedSecret = $getEnv('SSO_SHARED_SECRET', null);
 $ssoTokenTtl = (int) ($getEnv('SSO_TOKEN_TTL', '3600'));
+$seoGoogleVerification = $getEnv('SEO_GOOGLE_SITE_VERIFICATION', null);
+$seoBingVerification = $getEnv('SEO_BING_SITE_VERIFICATION', null);
+$seoGa4Id = $getEnv('SEO_GA4_ID', null);
+$seoGtmId = $getEnv('SEO_GTM_ID', null);
 $stripeSecretKey = $getEnv('STRIPE_SECRET_KEY', null);
 $stripeWebhookSecret = $getEnv('STRIPE_WEBHOOK_SECRET', null);
 $stripeSuccessUrl = $getEnv('STRIPE_SUCCESS_URL', null);
@@ -199,6 +203,12 @@ $configCache = [
         'tax_note' => $taxNote,
         'timezone' => $appTimezone,
         'portal_url' => $customerPortalUrl,
+    ],
+    'seo' => [
+        'google_site_verification' => $seoGoogleVerification,
+        'bing_site_verification' => $seoBingVerification,
+        'ga4_id' => $seoGa4Id,
+        'gtm_id' => $seoGtmId,
     ],
     'alerts' => [
         'email' => $alertEmail,

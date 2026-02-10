@@ -15,6 +15,19 @@ $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.a
 $metaDescription = 'Contattaci per una demo o informazioni sui piani del gestionale.';
 $canonical = $baseUrl . '/index.php?page=contatto';
 $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
+$seoConfig = $GLOBALS['config']['seo'] ?? [];
+$seoGoogleVerification = $seoConfig['google_site_verification'] ?? null;
+$seoBingVerification = $seoConfig['bing_site_verification'] ?? null;
+$seoGa4Id = $seoConfig['ga4_id'] ?? null;
+$seoGtmId = $seoConfig['gtm_id'] ?? null;
+$structuredData = [
+    '@context' => 'https://schema.org',
+    '@type' => 'WebPage',
+    'name' => $pageTitle,
+    'url' => $canonical,
+    'description' => $metaDescription,
+    'inLanguage' => 'it-IT',
+];
 ?>
 <!doctype html>
 <html lang="it">
@@ -23,8 +36,20 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     <meta name="description" content="<?= htmlspecialchars($metaDescription) ?>">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="format-detection" content="telephone=no">
+    <?php if (!empty($seoGoogleVerification)): ?>
+        <meta name="google-site-verification" content="<?= htmlspecialchars($seoGoogleVerification) ?>">
+    <?php endif; ?>
+    <?php if (!empty($seoBingVerification)): ?>
+        <meta name="msvalidate.01" content="<?= htmlspecialchars($seoBingVerification) ?>">
+    <?php endif; ?>
     <link rel="canonical" href="<?= htmlspecialchars($canonical) ?>">
+    <link rel="alternate" href="<?= htmlspecialchars($canonical) ?>" hreflang="it-IT">
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="<?= htmlspecialchars($appName) ?>">
+    <meta property="og:locale" content="it_IT">
     <meta property="og:title" content="<?= htmlspecialchars($pageTitle) ?>">
     <meta property="og:description" content="<?= htmlspecialchars($metaDescription) ?>">
     <meta property="og:url" content="<?= htmlspecialchars($canonical) ?>">
@@ -36,8 +61,39 @@ $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
     <meta name="theme-color" content="#2563eb">
     <link rel="preload" href="assets/css/styles.css" as="style">
     <link rel="stylesheet" href="assets/css/styles.css">
+    <?php if (!empty($seoGtmId)): ?>
+        <script>
+        (function (w, d, s, l, i) {
+            w[l] = w[l] || [];
+            w[l].push({
+                'gtm.start': new Date().getTime(),
+                event: 'gtm.js'
+            });
+            var f = d.getElementsByTagName(s)[0];
+            var j = d.createElement(s);
+            var dl = l !== 'dataLayer' ? '&l=' + l : '';
+            j.async = true;
+            j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+            f.parentNode.insertBefore(j, f);
+        })(window, document, 'script', 'dataLayer', '<?= htmlspecialchars($seoGtmId) ?>');
+        </script>
+    <?php elseif (!empty($seoGa4Id)): ?>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=<?= htmlspecialchars($seoGa4Id) ?>"></script>
+        <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', '<?= htmlspecialchars($seoGa4Id) ?>');
+        </script>
+    <?php endif; ?>
+    <script type="application/ld+json"><?= json_encode($structuredData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
 </head>
 <body class="landing-body">
+    <?php if (!empty($seoGtmId)): ?>
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=<?= htmlspecialchars($seoGtmId) ?>" height="0" width="0" style="display:none;visibility:hidden"></iframe>
+        </noscript>
+    <?php endif; ?>
     <div class="landing-topbar">
         <div class="landing-topbar__inner">
             <div class="landing-brand">

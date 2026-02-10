@@ -14,9 +14,14 @@ $oldInput = isset($oldInput) && is_array($oldInput) ? $oldInput : [];
 $baseUrl = (string) ($GLOBALS['config']['app']['base_url'] ?? 'https://express.agenziaplinio.it');
 $baseUrl = rtrim($baseUrl, '/');
 $canonicalUrl = $baseUrl . '/';
-$metaDescription = 'Gestionale in cloud per negozi di telefonia: SIM, vendite, stock e report in un solo cruscotto. Demo rapida e onboarding guidato.';
+$metaDescription = 'Gestionale in cloud per negozi di telefonia: SIM, vendite, stock e report in un solo cruscotto. Adatto per negozi di telefonia Vodafone, Tim, WindTre, Fastweb, Iliad, Sky e Multibrand. Demo rapida e onboarding guidato.';
 $ogImage = $baseUrl . '/assets/img/logo-collapsed.svg';
 $logoUrl = $baseUrl . '/assets/img/logo-collapsed.svg';
+$seoConfig = $GLOBALS['config']['seo'] ?? [];
+$seoGoogleVerification = $seoConfig['google_site_verification'] ?? null;
+$seoBingVerification = $seoConfig['bing_site_verification'] ?? null;
+$seoGa4Id = $seoConfig['ga4_id'] ?? null;
+$seoGtmId = $seoConfig['gtm_id'] ?? null;
 $structuredData = [
     [
         '@context' => 'https://schema.org',
@@ -37,7 +42,7 @@ $structuredData = [
         'name' => $pageTitle,
         'url' => $canonicalUrl,
         'description' => $metaDescription,
-        'keywords' => 'gestionale telefonia, gestionale per negozi di telefonia, gestionale SIM, software punto vendita telefonia',
+        'keywords' => 'gestionale telefonia, gestionale per negozi di telefonia, gestionale SIM, software punto vendita telefonia, Vodafone, Tim, WindTre, Fastweb, Iliad, Sky, Multibrand',
         'inLanguage' => 'it-IT',
     ],
     [
@@ -47,7 +52,7 @@ $structuredData = [
         'applicationCategory' => 'BusinessApplication',
         'operatingSystem' => 'Web',
         'description' => $metaDescription,
-        'keywords' => 'gestionale telefonia, gestionale per negozi di telefonia, gestionale SIM, software punto vendita telefonia',
+        'keywords' => 'gestionale telefonia, gestionale per negozi di telefonia, gestionale SIM, software punto vendita telefonia, Vodafone, Tim, WindTre, Fastweb, Iliad, Sky, Multibrand',
         'url' => $canonicalUrl,
     ],
 ];
@@ -101,13 +106,19 @@ $faqStructuredData = [
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     <meta name="description" content="<?= htmlspecialchars($metaDescription) ?>">
-    <meta name="keywords" content="gestionale telefonia, gestionale per negozi di telefonia, gestionale SIM, software punto vendita telefonia">
+    <meta name="keywords" content="gestionale telefonia, gestionale per negozi di telefonia, gestionale SIM, software punto vendita telefonia, Vodafone, Tim, WindTre, Fastweb, Iliad, Sky, Multibrand">
     <meta name="subject" content="Gestionale telefonia">
     <meta name="category" content="BusinessApplication">
     <meta name="application-name" content="<?= htmlspecialchars($appName) ?>">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <meta name="format-detection" content="telephone=no">
+    <?php if (!empty($seoGoogleVerification)): ?>
+        <meta name="google-site-verification" content="<?= htmlspecialchars($seoGoogleVerification) ?>">
+    <?php endif; ?>
+    <?php if (!empty($seoBingVerification)): ?>
+        <meta name="msvalidate.01" content="<?= htmlspecialchars($seoBingVerification) ?>">
+    <?php endif; ?>
     <link rel="canonical" href="<?= htmlspecialchars($canonicalUrl) ?>">
     <link rel="alternate" href="<?= htmlspecialchars($canonicalUrl) ?>" hreflang="it-IT">
     <meta property="og:type" content="website">
@@ -124,12 +135,42 @@ $faqStructuredData = [
     <meta name="theme-color" content="#2563eb">
     <link rel="preload" href="assets/css/styles.css" as="style">
     <link rel="stylesheet" href="assets/css/styles.css">
+    <?php if (!empty($seoGtmId)): ?>
+        <script>
+        (function (w, d, s, l, i) {
+            w[l] = w[l] || [];
+            w[l].push({
+                'gtm.start': new Date().getTime(),
+                event: 'gtm.js'
+            });
+            var f = d.getElementsByTagName(s)[0];
+            var j = d.createElement(s);
+            var dl = l !== 'dataLayer' ? '&l=' + l : '';
+            j.async = true;
+            j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+            f.parentNode.insertBefore(j, f);
+        })(window, document, 'script', 'dataLayer', '<?= htmlspecialchars($seoGtmId) ?>');
+        </script>
+    <?php elseif (!empty($seoGa4Id)): ?>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=<?= htmlspecialchars($seoGa4Id) ?>"></script>
+        <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', '<?= htmlspecialchars($seoGa4Id) ?>');
+        </script>
+    <?php endif; ?>
     <?php foreach ($structuredData as $entry): ?>
         <script type="application/ld+json"><?= json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
     <?php endforeach; ?>
     <script type="application/ld+json"><?= json_encode($faqStructuredData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
 </head>
 <body class="landing-body">
+    <?php if (!empty($seoGtmId)): ?>
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=<?= htmlspecialchars($seoGtmId) ?>" height="0" width="0" style="display:none;visibility:hidden"></iframe>
+        </noscript>
+    <?php endif; ?>
     <div class="landing-topbar">
         <div class="landing-topbar__inner">
             <div class="landing-brand">
