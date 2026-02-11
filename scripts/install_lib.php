@@ -293,16 +293,73 @@ if (!class_exists('AppInstaller')) {
 
             $statements = self::splitSqlStatements($sql);
             $executed = 0;
+            $skipped = 0;
+            $ignorableErrors = [1060, 1061, 1091, 1050, 121];
+            $existingTables = self::listExistingTables($pdo);
+
             foreach ($statements as $statement) {
                 $trimmed = trim($statement);
                 if ($trimmed === '') {
                     continue;
                 }
-                $pdo->exec($trimmed);
-                $executed++;
+
+                $createTable = self::extractTableName($trimmed, 'create');
+                if ($createTable !== null) {
+                    if (isset($existingTables[$createTable])) {
+                        $skipped++;
+                        continue;
+                    }
+                    if (self::execStatement($pdo, $trimmed, $ignorableErrors)) {
+                        $existingTables[$createTable] = true;
+                        $executed++;
+                    } else {
+                        $skipped++;
+                    }
+                    continue;
+                }
+
+                $alterTable = self::extractTableName($trimmed, 'alter');
+                if ($alterTable !== null) {
+                    if (!isset($existingTables[$alterTable])) {
+                        $skipped++;
+                        continue;
+                    }
+                    if (self::execStatement($pdo, $trimmed, $ignorableErrors)) {
+                        $executed++;
+                    } else {
+                        $skipped++;
+                    }
+                    continue;
+                }
+
+                $dropTable = self::extractTableName($trimmed, 'drop');
+                if ($dropTable !== null) {
+                    if (!isset($existingTables[$dropTable])) {
+                        $skipped++;
+                        continue;
+                    }
+                    if (self::execStatement($pdo, $trimmed, $ignorableErrors)) {
+                        unset($existingTables[$dropTable]);
+                        $executed++;
+                    } else {
+                        $skipped++;
+                    }
+                    continue;
+                }
+
+                if (self::execStatement($pdo, $trimmed, $ignorableErrors)) {
+                    $executed++;
+                } else {
+                    $skipped++;
+                }
             }
 
-            $messages[] = sprintf('Applicato file SQL %s (%d statement).', basename($filePath), $executed);
+            $messages[] = sprintf(
+                'Applicato file SQL %s (%d statement eseguiti, %d saltati).',
+                basename($filePath),
+                $executed,
+                $skipped
+            );
 
             return $executed;
         }
@@ -357,6 +414,62 @@ if (!class_exists('AppInstaller')) {
         {
             $lines = preg_split('/;\s*(?:\r?\n|$)/', $sql);
             return $lines === false ? [] : $lines;
+        }
+
+        /**
+         * @return array<string, bool>
+         */
+        private static function listExistingTables(PDO $pdo): array
+        {
+            $tables = [];
+            $stmt = $pdo->query('SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');
+            if ($stmt === false) {
+                return $tables;
+            }
+
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (!empty($row['TABLE_NAME'])) {
+                    $tables[(string) $row['TABLE_NAME']] = true;
+                }
+            }
+
+            return $tables;
+        }
+
+        private static function execStatement(PDO $pdo, string $statement, array $ignorableErrors): bool
+        {
+            try {
+                $pdo->exec($statement);
+                return true;
+            } catch (\PDOException $exception) {
+                $errorInfo = $exception->errorInfo;
+                $code = is_array($errorInfo) ? ($errorInfo[1] ?? null) : null;
+                $message = $exception->getMessage();
+                $isDuplicateKey = $code === 1005 && preg_match('/errno:\s*121\b/i', $message) === 1;
+                if ($isDuplicateKey || ($code !== null && in_array((int) $code, $ignorableErrors, true))) {
+                    return false;
+                }
+                throw $exception;
+            }
+        }
+
+        private static function extractTableName(string $statement, string $type): ?string
+        {
+            $pattern = match (strtolower($type)) {
+                'create' => '/^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:`?[\w]+`?\.)?(`?[\w]+`?)/i',
+                'alter' => '/^\s*ALTER\s+TABLE\s+(?:`?[\w]+`?\.)?(`?[\w]+`?)/i',
+                'drop' => '/^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:`?[\w]+`?\.)?(`?[\w]+`?)/i',
+                default => null,
+            };
+
+            if ($pattern === null || !preg_match($pattern, $statement, $matches)) {
+                return null;
+            }
+
+            $name = $matches[1] ?? '';
+            $name = trim($name, "`\"");
+
+            return $name !== '' ? $name : null;
         }
 
         private static function computeFileChecksum(string $filePath): string
